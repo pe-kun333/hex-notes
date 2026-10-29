@@ -1,0 +1,615 @@
+<title>ヘクサノート 曲の持ち込み</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Rajdhani:wght@500;600;700&display=swap">
+<style>
+/* m5 曲の持ち込み: MIDI → 折り畳み → 間引き → 同期 → 譜面 JSON。カード積みの一枚ページ。 */
+:root{
+  --bg:#f3f1ec; --fg:#1d1b17; --muted:#6b6660; --panel:#fbfaf7; --line:#d9d4ca; --field:#ffffff; --field-2:#f1eee7;
+  --accent:#d9672b; --accent-2:#2b7fd9; --good:#2f9e5b; --warn:#d9a52b; --bad:#d94b4b;
+  --stage:#0b0d12; --stage-2:#151b28;
+  --row0:#c08cf0; --row1:#62a6f2; --row2:#52d490; --row3:#f2a452;
+  --font-body:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  --font-num:"Rajdhani","Zen Kaku Gothic New",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#15171c; --fg:#ecebe6; --muted:#9a978f; --panel:#1d2027; --line:#2e323b; --field:#262a33; --field-2:#20242c; --accent:#f08a4b; --accent-2:#5aa0f0; --good:#4cc07a; --warn:#e6b84a; --bad:#f06a6a; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#15171c; --fg:#ecebe6; --muted:#9a978f; --panel:#1d2027; --line:#2e323b; --field:#262a33; --field-2:#20242c; --accent:#f08a4b; --accent-2:#5aa0f0; --good:#4cc07a; --warn:#e6b84a; --bad:#f06a6a; color-scheme:dark }
+html,body{min-height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.5;overflow-x:hidden}
+*{box-sizing:border-box}
+.app{display:grid;grid-template-rows:auto 1fr;min-height:100vh}
+header.top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px;white-space:nowrap}
+.brand svg{width:22px;height:22px;fill:var(--accent)}
+.brand .sub{font-weight:400;color:var(--muted);font-size:12px;letter-spacing:.04em}
+.status{color:var(--muted);font-size:12px;flex:1 1 240px;min-width:0}
+.status b{color:var(--fg)}
+.wrap{padding-block:14px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;max-width:1240px;width:100%;margin:0 auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:10px;align-content:start;min-width:0}
+.card.wide{grid-column:1/-1}
+.card h2{margin:0;font-size:15px;font-weight:700;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.card h2 .step{font-family:var(--font-num);font-size:12px;font-weight:600;color:#fff;background:var(--accent-2);border-radius:999px;padding:1px 8px;letter-spacing:.06em}
+.card h2 .hint{font-weight:400;font-size:12px;color:var(--muted)}
+button{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--field);color:var(--fg);border-radius:6px;padding:6px 12px;cursor:pointer;min-width:0}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.small{padding:3px 8px;font-size:12px}
+.btns{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.kbd{font-family:var(--font-num);border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:12px;background:var(--field)}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:14px;text-align:center;color:var(--muted);font-size:13px;background:var(--field-2);display:grid;gap:6px;cursor:pointer}
+.drop.over{border-color:var(--accent);color:var(--fg)}
+.drop b{color:var(--fg)}
+.drop input{display:none}
+.row{display:grid;grid-template-columns:96px minmax(0,1fr);align-items:center;gap:8px}
+.row label,.row .lbl{color:var(--muted);font-size:12px}
+select,input[type=text]{width:100%;min-width:0;font:inherit;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--fg)}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;min-width:0}
+.seg label{flex:1;text-align:center;padding:5px 4px;cursor:pointer;font-size:12px;line-height:1.25;color:var(--muted);position:relative;min-width:0;display:flex;align-items:center;justify-content:center}
+.seg input{position:absolute;opacity:0;inset:0;margin:0}
+.seg label:has(input:checked){background:var(--accent-2);color:#fff}
+.note{font-size:12px;color:var(--muted);margin:0}
+.note b{color:var(--fg)}
+.tbl-wrap{overflow:auto;max-width:100%}
+table.tbl{border-collapse:collapse;width:100%;font-size:12.5px;font-variant-numeric:tabular-nums}
+table.tbl th,table.tbl td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+table.tbl th{color:var(--muted);font-weight:500;font-size:11.5px}
+table.tbl td.num,table.tbl th.num{text-align:right;font-family:var(--font-num);font-size:13.5px}
+table.tbl tr.cur td{background:color-mix(in srgb,var(--accent-2) 14%,transparent)}
+table.tbl tr.pick{cursor:pointer}
+table.tbl tr.pick:hover td{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.stat{background:var(--field-2);border-radius:8px;padding:8px 10px;min-width:0}
+.stat .k{font-size:11px;color:var(--muted)}
+.stat .v{font-family:var(--font-num);font-size:22px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat .s{font-size:11px;color:var(--muted)}
+.stat.warn .v{color:var(--warn)} .stat.bad .v{color:var(--bad)} .stat.good .v{color:var(--good)}
+.stage{background:var(--stage);border-radius:8px;overflow:hidden;position:relative}
+canvas{display:block;width:100%}
+#roll{height:300px}
+.video{aspect-ratio:16/9;max-width:480px;width:100%}
+#video{height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:4px}
+pre.json{margin:0;background:var(--field-2);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:ui-monospace,Consolas,"Rajdhani",monospace;font-size:11.5px;line-height:1.4;max-height:360px;overflow:auto;white-space:pre;color:var(--fg)}
+ul.warns{margin:0;padding-left:18px;font-size:12.5px;display:grid;gap:3px}
+ul.warns li.w4{color:var(--warn)} ul.warns li.rect{color:var(--bad)}
+ul.plain{margin:0;padding-left:18px;font-size:12.5px;display:grid;gap:2px}
+.play{font-size:12px;color:var(--accent);min-height:18px}
+.flex{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.flex > *{min-width:0}
+.pill{font-family:var(--font-num);font-size:12px;border-radius:999px;padding:1px 8px;background:var(--field-2);color:var(--muted)}
+.tapbox{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;max-width:480px}
+.tapbox span{height:10px;border-radius:3px;background:var(--line)}
+.tapbox span.on{background:var(--accent-2)}
+.tapbox span.ok{background:var(--good)}
+.hidden-ta{position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0}
+.ex-note{font-size:12px;color:var(--muted)}
+.unimpl{font-size:11.5px;color:var(--warn)}
+@media (max-width:900px){ .wrap{grid-template-columns:minmax(0,1fr)} .card.wide{grid-column:auto} #roll{height:260px} }
+@media (max-width:480px){ .row{grid-template-columns:minmax(0,1fr)} .stat .v{font-size:19px} }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5 21.5 7v10L12 22.5 2.5 17V7z"/></svg>ヘクサノート<span class="sub">m5 曲の持ち込み v0.1</span></div>
+    <div class="status" id="status">MIDI を音符にして、配列へ折り畳み、同時押しを間引き、ダミー動画に合わせて譜面 JSON を出します。</div>
+  </header>
+  <div class="wrap">
+
+    <section class="card wide">
+      <h2><span class="step">1</span>曲の入力 <span class="hint">Standard MIDI File（形式 0 / 1）を自前パーサーで読みます。内蔵の例でも試せます。</span></h2>
+      <div class="flex">
+        <label class="drop" id="drop" for="file">
+          <b>ここに MIDI（.mid）をドロップ</b><span>またはクリックして選択。テンポ変化・拍子も読みます。外部ライブラリは使いません。</span>
+          <input type="file" id="file" accept=".mid,.midi,audio/midi,audio/x-midi">
+        </label>
+        <div style="display:grid;gap:6px;min-width:0">
+          <span class="ex-note">内蔵の例（MIDI が無くても試せます）</span>
+          <div class="btns"><button id="exTwinkle">きらきら星</button><button id="exCanon">カノン進行（三和音）</button></div>
+          <p class="note" id="fileNote"></p>
+        </div>
+      </div>
+      <p class="note" id="songInfo"></p>
+      <div class="tbl-wrap"><table class="tbl" id="trackTbl"><thead><tr><th></th><th>トラック</th><th>ch</th><th class="num">音数</th><th>音域</th><th class="num">長さ（拍）</th></tr></thead><tbody></tbody></table></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">2</span>配列と折り畳み <span class="hint">変更は即時反映</span></h2>
+      <div class="row"><label for="layout">配列</label><select id="layout"></select></div>
+      <p class="note" id="layoutDesc"></p>
+      <div class="row"><span class="lbl">折り畳み</span>
+        <div class="seg" id="foldSeg">
+          <label><input type="radio" name="fold" value="octave" checked><span>オクターブ折り返し</span></label>
+          <label><input type="radio" name="fold" value="cut"><span>音域外カット</span></label>
+          <label><input type="radio" name="fold" value="nearest"><span>近傍写像</span></label>
+        </div></div>
+      <p class="note" id="foldDesc"></p>
+      <div class="row"><span class="lbl">同時押し上限</span>
+        <div class="seg" id="limitSeg">
+          <label><input type="radio" name="limit" value="2" checked><span>2</span></label>
+          <label><input type="radio" name="limit" value="3"><span>3</span></label>
+          <label><input type="radio" name="limit" value="4"><span>4</span></label>
+        </div></div>
+      <p class="note">間引きは同じ拍で鳴る和音から低い音を落とします。最上声（旋律）は必ず残します。</p>
+      <div class="stats" id="sumStats"></div>
+      <div class="btns">
+        <span class="note">試聴:</span>
+        <button id="playOrig">元</button>
+        <button id="playFold">折り畳み後</button>
+        <button id="playThin">間引き後</button>
+        <button id="playAlt" class="primary">元 ⇄ 折り畳み後を交互</button>
+        <button id="playStop">停止</button>
+      </div>
+      <div class="play" id="playLabel"></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">3</span>難度指標と運指の警告 <span class="hint">間引き後の譜面について</span></h2>
+      <div class="stats" id="metStats"></div>
+      <p class="note">跳躍＝連続する音（和音どうしは最も近い組）の六角距離。段またぎ＝段を移る割合。密度の括弧内は元の音数での値。</p>
+      <ul class="warns" id="warnList"></ul>
+    </section>
+
+    <section class="card wide">
+      <h2><span class="step">4</span>差の図 <span class="hint">上段: 元 → 折り畳み後、下段: 折り畳み後 → 間引き後（ピアノロール風。試聴中は再生位置を表示）</span></h2>
+      <div class="stage"><canvas id="roll"></canvas></div>
+      <div class="legend">
+        <span>上段:</span><span><i style="background:var(--row1)"></i>そのまま</span><span><i style="background:var(--row3)"></i>寄せた音（線は元の高さ）</span><span><i style="background:var(--bad)"></i>✕ 落とした音</span><span><i style="border:1px solid var(--muted)"></i>元の音</span>
+        <span style="margin-left:12px">下段:</span><span><i style="background:var(--row0)"></i>数字段</span><span><i style="background:var(--row1)"></i>Q 段</span><span><i style="background:var(--row2)"></i>A 段</span><span><i style="background:var(--row3)"></i>Z 段</span><span><i style="background:var(--bad);opacity:.5"></i>間引いた音</span>
+        <span style="margin-left:12px">交互再生のカーソル:</span><span><i style="background:var(--row1)"></i>元</span><span><i style="background:var(--row3)"></i>折り畳み後</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">5</span>動画との同期（8 拍タップ） <span class="hint">ダミー動画。テンポ比とオフセットは隠した真値で鳴ります</span></h2>
+      <div class="stage video"><canvas id="video"></canvas></div>
+      <div class="btns">
+        <button id="vidStart" class="primary">再生して 8 拍タップ <span class="kbd">Space</span></button>
+        <button id="vidRetry">やり直し</button>
+        <button id="tapBtn">タップ（画面用）</button>
+      </div>
+      <p class="note">クリック音が鳴り始めたら、<b>最初の拍から</b> 8 回、Space か文字キー（または上のタップ）を合わせて押します。修飾キーや Tab は数えません。Esc で中止。タップの時刻列を最小二乗で直線に当て、オフセットとテンポ比を推定します。8 拍そろうと動画は止まり、再計測は「やり直し」からです。</p>
+      <div class="tapbox" id="tapbox"></div>
+      <div class="note" id="tapStatus">まだタップしていません。</div>
+      <div class="stats" id="syncStats"></div>
+      <p class="note" id="syncTruth"></p>
+      <div class="row"><label for="videoId">動画 ID（任意）</label><input type="text" id="videoId" placeholder="空なら sync.source は none" autocomplete="off"></div>
+      <ul class="plain" id="attempts"></ul>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">6</span>方式の比較表 <span class="hint">折り畳み 3 択 × 上限 2／3（行を押すと切替）</span></h2>
+      <div class="tbl-wrap"><table class="tbl" id="varTbl"><thead><tr><th>折り畳み</th><th class="num">上限</th><th class="num">元</th><th class="num">落とした</th><th class="num">寄せた</th><th class="num">間引き</th><th class="num">最終</th><th class="num">密度</th><th class="num">跳躍</th><th class="num">警告</th></tr></thead><tbody></tbody></table></div>
+      <p class="note">落とした＝折り畳みで消えた音（音域外カット／配列に無い音名／寄せた結果の重複）。寄せた＝別の高さへ移した音。間引き＝上限で落とした音。</p>
+    </section>
+
+    <section class="card wide">
+      <h2><span class="step">7</span>譜面 JSON <span class="hint">hexnote-chart/1（音高譜・拍パルス・動画同期の三層）。m1'／m4 がこれを読みます。sync.offset は拍 0 の動画時刻（秒）、sync.rate は 動画 BPM ÷ 譜面 BPM（動画時刻 = offset + 譜面秒 ÷ rate。テンポ変化があっても全区間に同じ比を掛ける）</span></h2>
+      <div class="btns">
+        <button id="copyJson" class="primary">JSON をコピー</button>
+        <button id="dlJson">ダウンロード（.json）</button>
+        <span class="note" id="copyNote">公開版では a[download] が効かないため、テキスト表示＋コピーが主です。</span>
+      </div>
+      <pre class="json" id="jsonOut"></pre>
+      <textarea class="hidden-ta" id="copyArea" aria-hidden="true" tabindex="-1"></textarea>
+    </section>
+
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const SQ3 = Math.sqrt(3);
+/* ---------- キー表（m1 と同じ） ---------- */
+const ROWS = [
+  ['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','Digit0'],
+  ['KeyQ','KeyW','KeyE','KeyR','KeyT','KeyY','KeyU','KeyI','KeyO','KeyP'],
+  ['KeyA','KeyS','KeyD','KeyF','KeyG','KeyH','KeyJ','KeyK','KeyL','Semicolon'],
+  ['KeyZ','KeyX','KeyC','KeyV','KeyB','KeyN','KeyM','Comma','Period','Slash'],
+];
+const ROW_OFF = [0, 0.5, 1.0, 1.5];
+const ROW_NAMES = ['数字段', 'Q 段', 'A 段', 'Z 段'];
+const SPECIAL = { Semicolon:';', Comma:',', Period:'.', Slash:'/' };
+const KEYS = [];
+ROWS.forEach((r, ri) => r.forEach((code, ci) => KEYS.push({ code, row: ri, col: ci, label: SPECIAL[code] || code.replace(/^Key|^Digit/, ''), gx: ROW_OFF[ri] + ci })));
+const byCode = Object.fromEntries(KEYS.map(k => [k.code, k]));
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const noteName = m => NOTE_NAMES[m % 12] + (Math.floor(m / 12) - 1);
+const ROW_COLORS = ['#c08cf0', '#62a6f2', '#52d490', '#f2a452'];
+const hexDist = (a, b) => { const dq = a.col - b.col, dr = a.row - b.row; return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2; };
+
+/* ---------- 配列プリセット（KeyboardEvent.code → MIDI。m1 と同じ） ---------- */
+const PRESETS = {
+  fl: { name: 'ピアノ風・2オクターブ（FL Studio 風）', desc: 'Z 段と Q 段が白鍵（Z = C3、Q = C4）、A 段と数字段が黒鍵。音域 C3〜E5。',
+    map() { const m = {}; [48,50,52,53,55,57,59,60,62,64].forEach((p, i) => m[ROWS[3][i]] = p);
+      Object.assign(m, { KeyS:49, KeyD:51, KeyG:54, KeyH:56, KeyJ:58, KeyL:61, Semicolon:63 });
+      [60,62,64,65,67,69,71,72,74,76].forEach((p, i) => m[ROWS[1][i]] = p);
+      Object.assign(m, { Digit2:61, Digit3:63, Digit5:66, Digit6:68, Digit7:70, Digit9:73, Digit0:75 }); return m; } },
+  garage: { name: 'ピアノ風・1オクターブ（GarageBand / Ableton 風）', desc: 'A 段が白鍵（A = C4）、Q 段が黒鍵。音域 C4〜E5 と狭いので折り畳みの差が出やすい。',
+    map() { const m = {}; [60,62,64,65,67,69,71,72,74,76].forEach((p, i) => m[ROWS[2][i]] = p);
+      Object.assign(m, { KeyW:61, KeyE:63, KeyT:66, KeyY:68, KeyU:70, KeyO:73, KeyP:75 }); return m; } },
+  genshin: { name: '3 段×7・白鍵だけ（原神 / Sky 風）', desc: 'Q・A・Z 段の左 7 キーが高・中・低の白鍵。黒鍵が無いので、半音は「近傍写像」でしか残らない。',
+    map() { const m = {}; const nat = [0, 2, 4, 5, 7, 9, 11]; [[1, 72], [2, 60], [3, 48]].forEach(([r, base]) => { for (let i = 0; i < 7; i++) m[ROWS[r][i]] = base + nat[i]; }); return m; } },
+  wicki: { name: 'Wicki-Hayden（等方性配列）', desc: '右へ全音、右上へ完全5度。同じ音が複数キーにあるので、前の音から六角距離が最小のキーを選ぶ。',
+    map() { const m = {}; KEYS.forEach(k => m[k.code] = 48 + 2 * k.col + 5 * (3 - k.row)); return m; } },
+  harmonic: { name: 'Harmonic Table（和声テーブル）', desc: '右へ半音、右上へ長3度。音域 C3〜C5 で重複が多く、三和音が小さな三角形になる。',
+    map() { const m = {}; KEYS.forEach(k => m[k.code] = 48 + k.col + 3 * (3 - k.row)); return m; } },
+};
+const FOLD_DESC = {
+  octave: 'オクターブ折り返し: 音域の外に出た音はオクターブ単位で音域内へ折り返す。配列に無い音名（原神配列の黒鍵など）は落とす。旋律の形は保たれるが、上下が反転する箇所が出る。',
+  cut: '音域外カット: 配列にそのまま存在する音だけ残し、無い音は落とす。何も歪まないが、低音や黒鍵が丸ごと消える。',
+  nearest: '近傍写像: 配列に無い音を最も近い配列内の音へ寄せる（半音でも寄せる）。音は残るが、和声が変わって聞こえる箇所が出る。',
+};
+
+/* ---------- 内蔵の曲（m1 と同じ内部表現: トラック付き） ---------- */
+function mel(name, bpm, seq) { let b = 0; const notes = []; for (const [p, d] of seq) { if (p !== null) (Array.isArray(p) ? p : [p]).forEach(m => notes.push({ midi: m, beat: b, dur: d, vel: 0.8 })); b += d; }
+  return { name, bpm, division: 240, timeSig: '4/4', tempo: [{ beat: 0, bpm }], tracks: [{ name: '旋律（内蔵）', notes, ch: [0] }], beats: b, source: '内蔵' }; }
+const C=60, D=62, E=64, F=65, G=67, A=69;
+const EXAMPLES = {
+  twinkle: () => mel('きらきら星', 96, [[C,1],[C,1],[G,1],[G,1],[A,1],[A,1],[G,2],[F,1],[F,1],[E,1],[E,1],[D,1],[D,1],[C,2],[G,1],[G,1],[F,1],[F,1],[E,1],[E,1],[D,2],[G,1],[G,1],[F,1],[F,1],[E,1],[E,1],[D,2],[C,1],[C,1],[G,1],[G,1],[A,1],[A,1],[G,2],[F,1],[F,1],[E,1],[E,1],[D,1],[D,1],[C,2]]),
+  canon: () => mel('カノン進行（三和音）', 76,
+    [[[62,66,69],2],[[57,61,64],2],[[59,62,66],2],[[54,57,61],2],[[55,59,62],2],[[50,54,57],2],[[55,59,62],2],[[57,61,64],2],[[62,66,69],2],[[57,61,64],2],[[59,62,66],2],[[54,57,61],2],[[55,59,62],2],[[50,54,57],2],[[55,59,62],2],[[57,61,64],2],[[62,66,69],4]]),
+};
+
+/* ---------- SMF パーサー（形式 0/1、テンポ・拍子・トラック名） ---------- */
+function decodeText(bytes) { let ascii = true; for (const b of bytes) if (b >= 0x80) { ascii = false; break; }
+  if (ascii) return String.fromCharCode(...bytes);
+  for (const enc of ['shift_jis', 'utf-8']) { try { return new TextDecoder(enc).decode(bytes); } catch (_) {} }
+  return String.fromCharCode(...bytes); }
+function parseMidi(buf, fileName) {
+  const u8 = new Uint8Array(buf); const dv = new DataView(buf); let p = 0;
+  const str = n => { let s = ''; for (let i = 0; i < n; i++) s += String.fromCharCode(u8[p + i]); p += n; return s; };
+  const u32 = () => { const v = dv.getUint32(p); p += 4; return v; }; const u16 = () => { const v = dv.getUint16(p); p += 2; return v; };
+  if (u8.length < 14 || str(4) !== 'MThd') throw new Error('MThd ヘッダーが無いので MIDI ファイルではありません');
+  const hlen = u32(); const format = u16(); const ntrk = u16(); const div = u16(); p += hlen - 6;
+  if (format > 1) throw new Error('形式 ' + format + ' の MIDI は未対応です（形式 0 / 1 のみ）');
+  if (div & 0x8000) throw new Error('SMPTE 時刻形式の MIDI は未対応です');
+  const tracks = []; const tempos = []; const sigs = [];
+  for (let t = 0; t < ntrk && p + 8 <= u8.length; t++) {
+    const id = str(4); const len = u32(); const end = Math.min(u8.length, p + len);
+    if (id !== 'MTrk') { p = end; continue; }
+    let tick = 0, status = 0; const notes = []; const open = {}; let name = ''; const chans = new Set();
+    const vlq = () => { let v = 0, b; do { b = u8[p++]; v = (v << 7) | (b & 0x7f); } while (b & 0x80 && p < end); return v; };
+    while (p < end) {
+      tick += vlq(); if (p >= end) break; const b = u8[p];
+      if (b === 0xff) { p++; const type = u8[p++]; const l = vlq(); const s = p;
+        if (type === 0x51 && l >= 3) tempos.push({ tick, bpm: 60000000 / ((u8[s] << 16) | (u8[s + 1] << 8) | u8[s + 2]) });
+        else if (type === 0x58 && l >= 2) sigs.push({ tick, num: u8[s], den: 1 << u8[s + 1] });
+        else if (type === 0x03 && !name) name = decodeText(u8.subarray(s, s + l)).replace(/\0/g, '').trim();
+        p = s + l; continue; }
+      if (b === 0xf0 || b === 0xf7) { p++; const l = vlq(); p += l; continue; }
+      if (b >= 0xf1 && b <= 0xfe) { const skip = { 0xf1: 1, 0xf2: 2, 0xf3: 1 }[b] || 0; p += 1 + skip; continue; }
+      if (b & 0x80) { status = b; p++; }
+      if (!status) { p++; continue; }
+      const type = status & 0xf0, ch = status & 0x0f;
+      if (type === 0x90 || type === 0x80) { const n = u8[p++], v = u8[p++];
+        const key = (ch << 8) | n; /* 同じ音番号でもチャンネルが違えば別の音として開閉する */
+        if (type === 0x90 && v > 0) { (open[key] ||= []).push({ tick, vel: v, ch }); chans.add(ch); }
+        else { const arr = open[key]; if (arr && arr.length) { const o = arr.shift(); notes.push({ midi: n, tick: o.tick, dtick: Math.max(1, tick - o.tick), vel: o.vel, ch: o.ch }); } } }
+      else if (type === 0xa0 || type === 0xb0 || type === 0xe0) p += 2;
+      else if (type === 0xc0 || type === 0xd0) p += 1;
+      else p++;
+    }
+    for (const k in open) for (const o of open[k]) notes.push({ midi: (+k) & 0x7f, tick: o.tick, dtick: div, vel: o.vel, ch: o.ch });
+    p = end;
+    tracks.push({ name, notes, chans: [...chans].sort((a, b) => a - b) });
+  }
+  tempos.sort((a, b) => a.tick - b.tick);
+  const tempo = tempos.map(t => ({ beat: Math.round(t.tick / div * 10000) / 10000, bpm: Math.round(t.bpm * 100) / 100 }));
+  if (!tempo.length) tempo.push({ beat: 0, bpm: 120 }); else if (tempo[0].beat > 0) tempo.unshift({ beat: 0, bpm: tempo[0].bpm });
+  const dedup = []; for (const t of tempo) { const l = dedup[dedup.length - 1]; if (l && l.beat === t.beat) l.bpm = t.bpm; else if (!l || l.bpm !== t.bpm) dedup.push(t); }
+  let beats = 0; const outTracks = [];
+  /* 形式 0 や多チャンネルのトラックはチャンネル別に 1 行ずつ分けて積む（ch10 のドラムを旋律から切り離し、一覧から選べるようにする） */
+  tracks.forEach((tr, i) => { const chs = [...new Set(tr.notes.map(n => n.ch))].sort((a, b) => a - b); const multi = chs.length > 1; const base = tr.name || ('トラック ' + (i + 1));
+    for (const ch of chs) { const notes = tr.notes.filter(n => n.ch === ch).map(n => ({ midi: n.midi, beat: Math.round(n.tick / div * 10000) / 10000, dur: Math.round(n.dtick / div * 10000) / 10000, vel: Math.max(0.3, n.vel / 127), ch: n.ch })).sort((a, b) => a.beat - b.beat || a.midi - b.midi);
+      for (const n of notes) beats = Math.max(beats, n.beat + n.dur);
+      if (notes.length) outTracks.push({ name: base + (multi ? ' / ch' + (ch + 1) : ''), notes, ch: [ch], drum: ch === 9, split: multi }); } });
+  if (!outTracks.length) throw new Error('音符のあるトラックがありません');
+  sigs.sort((a, b) => a.tick - b.tick);
+  return { name: (fileName || 'MIDI').replace(/\.(mid|midi)$/i, ''), bpm: dedup[0].bpm, division: div, format, timeSig: sigs.length ? sigs[0].num + '/' + sigs[0].den : '（拍子なし）', sigCount: sigs.length, tempo: dedup, tracks: outTracks, beats: Math.ceil(beats), source: 'MIDI' };
+}
+
+/* ---------- 拍 ⇄ 秒（テンポ列） ---------- */
+function makeClock(song) { const segs = []; let sec = 0; const t = song.tempo.length ? song.tempo : [{ beat: 0, bpm: 120 }];
+  for (let i = 0; i < t.length; i++) { segs.push({ beat: t[i].beat, bpm: t[i].bpm, sec }); if (i + 1 < t.length) sec += (t[i + 1].beat - t[i].beat) * 60 / t[i].bpm; }
+  const b2s = b => { let s = segs[0]; for (const x of segs) { if (x.beat <= b) s = x; else break; } return s.sec + (b - s.beat) * 60 / s.bpm; };
+  const s2b = sec => { let s = segs[0]; for (const x of segs) { if (x.sec <= sec) s = x; else break; } return s.beat + (sec - s.sec) * s.bpm / 60; };
+  return { b2s, s2b }; }
+
+/* ---------- 折り畳み → 間引き → キー割り当て → 指標 ---------- */
+function buildVariant(srcNotes, layoutKey, fold, limit, clock) {
+  const mapping = PRESETS[layoutKey].map(); const byPitch = {}; for (const [code, m] of Object.entries(mapping)) (byPitch[m] ||= []).push(byCode[code]);
+  const pitches = Object.keys(byPitch).map(Number).sort((a, b) => a - b); const lo = pitches[0], hi = pitches[pitches.length - 1];
+  const src = srcNotes.slice().sort((a, b) => a.beat - b.beat || a.midi - b.midi);
+  const folded = []; let moved = 0, dropFold = 0, dupes = 0; const seen = new Set();
+  for (const n of src) { let m = n.midi, how = null;
+    if (!byPitch[m]) {
+      if (fold === 'cut') { dropFold++; folded.push({ ...n, out: 'cut' }); continue; }
+      if (fold === 'octave') { let mm = m; while (mm < lo) mm += 12; while (mm > hi) mm -= 12; let f = null;
+        for (let x = mm; x <= hi; x += 12) if (byPitch[x]) { f = x; break; }
+        if (f == null) for (let x = mm - 12; x >= lo; x -= 12) if (byPitch[x]) { f = x; break; }
+        if (f == null) { dropFold++; folded.push({ ...n, out: 'nopc' }); continue; } m = f; how = 'oct'; }
+      else { let best = pitches[0], bd = 1e9; for (const x of pitches) { const d = Math.abs(x - m); if (d < bd || (d === bd && x > m)) { bd = d; best = x; } } m = best; how = 'near'; }
+      moved++; }
+    const id = Math.round(n.beat * 1000) + ':' + m; if (seen.has(id)) { dupes++; dropFold++; folded.push({ ...n, out: 'dup', midi: m, orig: n.midi }); continue; } seen.add(id);
+    folded.push({ ...n, orig: n.midi, midi: m, how }); }
+  const kept = folded.filter(n => !n.out);
+  const groups = []; for (const n of kept) { const g = groups[groups.length - 1]; if (g && Math.abs(g[0].beat - n.beat) < 1e-3) g.push(n); else groups.push([n]); }
+  let dropThin = 0; for (const g of groups) { if (g.length > limit) { const s = g.slice().sort((a, b) => b.midi - a.midi); for (let i = limit; i < s.length; i++) { s[i].thin = true; dropThin++; } } }
+  let prev = null; const out = [];
+  for (const g of groups) { const live = g.filter(n => !n.thin).sort((a, b) => a.midi - b.midi);
+    for (const n of live) { const cands = byPitch[n.midi]; const k = prev ? cands.reduce((a, b) => hexDist(a, prev) <= hexDist(b, prev) ? a : b) : cands[Math.floor(cands.length / 2)]; n.key = k; prev = k; out.push(n); } }
+  /* 指標 */
+  const og = []; for (const n of out) { const g = og[og.length - 1]; if (g && Math.abs(g[0].beat - n.beat) < 1e-3) g.push(n); else og.push([n]); }
+  const first = out[0], last = out[out.length - 1];
+  const secs = out.length ? Math.max(0.001, clock.b2s(out.reduce((a, n) => Math.max(a, n.beat + n.dur), 0)) - clock.b2s(first.beat)) : 0;
+  const srcSecs = src.length ? Math.max(0.001, clock.b2s(src.reduce((a, n) => Math.max(a, n.beat + n.dur), 0)) - clock.b2s(src[0].beat)) : 0;
+  const leaps = []; let cross = 0; const warns = [];
+  for (let i = 1; i < og.length; i++) { let bd = 1e9, bp = null; for (const a of og[i - 1]) for (const b of og[i]) { const d = hexDist(a.key, b.key); if (d < bd) { bd = d; bp = [a, b]; } }
+    leaps.push(bd); if (bp[0].key.row !== bp[1].key.row) cross++;
+    const dt = clock.b2s(og[i][0].beat) - clock.b2s(og[i - 1][0].beat);
+    if (bp[0].key.row === bp[1].key.row && bd >= 4 && dt < 0.25) warns.push({ type: 'w4', beat: og[i][0].beat, text: `拍 ${fmtBeat(og[i][0].beat)}: ${bp[0].key.label} → ${bp[1].key.label}（${ROW_NAMES[bp[0].key.row]}で距離 ${bd}、${Math.round(dt * 1000)} ms）` }); }
+  for (const g of og) { if (g.length < 4) continue; const rows = {}; for (const n of g) (rows[n.key.row] ||= new Set()).add(n.key.col); const rs = Object.keys(rows);
+    for (let a = 0; a < rs.length; a++) for (let b = a + 1; b < rs.length; b++) { const inter = [...rows[rs[a]]].filter(c => rows[rs[b]].has(c)); if (inter.length >= 2) { warns.push({ type: 'rect', beat: g[0].beat, text: `拍 ${fmtBeat(g[0].beat)}: 同時押し ${g.map(n => n.key.label).join('+')} が矩形 4 隅（${ROW_NAMES[rs[a]]}と${ROW_NAMES[rs[b]]}の列 ${inter.join(',')}）` }); } } }
+  const chords = og.filter(g => g.length > 1).length;
+  const metrics = { density: out.length ? out.length / secs : 0, srcDensity: src.length ? src.length / srcSecs : 0,
+    leapAvg: leaps.length ? leaps.reduce((a, b) => a + b, 0) / leaps.length : 0, leapMax: leaps.reduce((a, b) => Math.max(a, b), 0),
+    chordRatio: og.length ? chords / og.length : 0, chordMax: og.reduce((a, g) => Math.max(a, g.length), 0), rowCross: leaps.length ? cross / leaps.length : 0 };
+  return { src, folded, kept, out, moved, dropFold, dupes, dropThin, metrics, warns, fold, limit, layout: layoutKey, lo, hi, nopc: folded.filter(n => n.out === 'nopc').length, cut: folded.filter(n => n.out === 'cut').length };
+}
+function fmtBeat(b) { return (Math.round(b * 100) / 100).toString(); }
+function fitTaps(ts) { const n = ts.length; const mx = (n - 1) / 2; const my = ts.reduce((a, b) => a + b, 0) / n; let sxx = 0, sxy = 0;
+  for (let i = 0; i < n; i++) { sxx += (i - mx) ** 2; sxy += (i - mx) * (ts[i] - my); } const b = sxy / sxx; const a = my - b * mx;
+  const res = Math.sqrt(ts.reduce((s, t, i) => s + (t - (a + b * i)) ** 2, 0) / n); const maxAbs = Math.max(...ts.map((t, i) => Math.abs(t - (a + b * i)))); return { a, b, res, maxAbs }; }
+
+/* ---------- 状態 ---------- */
+const state = { song: null, trackIdx: 0, layout: 'garage', fold: 'octave', limit: 2, clock: null, variant: null, variants: [], sync: { source: 'none', videoId: '', offset: 0, rate: 1, done: false } };
+try { const s = JSON.parse(localStorage.getItem('hexnote-m5') || 'null'); if (s) { if (PRESETS[s.layout]) state.layout = s.layout; if (FOLD_DESC[s.fold]) state.fold = s.fold; if ([2, 3, 4].includes(s.limit)) state.limit = s.limit; if (typeof s.videoId === 'string') state.sync.videoId = s.videoId; } } catch (_) {}
+function save() { try { localStorage.setItem('hexnote-m5', JSON.stringify({ layout: state.layout, fold: state.fold, limit: state.limit, videoId: state.sync.videoId })); } catch (_) {} }
+const melodic = t => t.drum ? [] : t.notes.filter(n => n.ch !== 9); /* 合算からは ch10（ドラム）の打点を除く */
+function selectedNotes() { const s = state.song; if (!s) return []; if (state.trackIdx < 0) return s.tracks.flatMap(melodic); const t = s.tracks[state.trackIdx] || s.tracks[0]; return t.notes; }
+
+function loadSong(song) { state.song = song; state.clock = makeClock(song);
+  let best = 0, bn = -1; song.tracks.forEach((t, i) => { if (!t.drum && t.notes.length > bn) { bn = t.notes.length; best = i; } }); state.trackIdx = best;
+  stopPlay(); renderTracks(); rebuild(); }
+function rebuild() { const notes = selectedNotes(); const c = state.clock;
+  state.variants = []; for (const fold of ['octave', 'cut', 'nearest']) for (const limit of (state.limit === 4 ? [2, 3, 4] : [2, 3])) state.variants.push(buildVariant(notes, state.layout, fold, limit, c));
+  state.variant = state.variants.find(v => v.fold === state.fold && v.limit === state.limit) || buildVariant(notes, state.layout, state.fold, state.limit, c);
+  renderSummary(); renderMetrics(); renderVariants(); renderJSON(); renderStatus(); rollDirty = true; }
+
+/* ---------- 表示: 曲・トラック ---------- */
+function renderTracks() { const s = state.song; const tb = $('#trackTbl tbody'); tb.innerHTML = '';
+  const tc = s.tempo.length - 1;
+  $('#songInfo').innerHTML = `曲: <b>${esc(s.name)}</b>（${s.source}${s.format != null ? '・形式 ' + s.format : ''}）／ BPM <b>${s.bpm}</b>${tc ? `（テンポ変化 ${tc} 回）` : ''} ／ 拍子 ${s.timeSig}${s.sigCount > 1 ? `（変化あり）` : ''} ／ 分解能 ${s.division} ／ 長さ <b>${s.beats}</b> 拍（約 ${fmtTime(state.clock.b2s(s.beats))}）`;
+  const mk = (label, i, t) => { const tr = document.createElement('tr'); tr.className = 'pick' + (state.trackIdx === i ? ' cur' : '');
+    const notes = t ? t.notes : s.tracks.flatMap(melodic); const ps = notes.map(n => n.midi); const pmin = ps.reduce((a, b) => Math.min(a, b), 127), pmax = ps.reduce((a, b) => Math.max(a, b), 0); const bmax = notes.reduce((a, n) => Math.max(a, n.beat + n.dur), 0);
+    tr.innerHTML = `<td><input type="radio" name="track" ${state.trackIdx === i ? 'checked' : ''} aria-label="${esc(label)}"></td><td>${esc(label)}${t && t.drum ? ' <span class="pill">ch10 ドラム</span>' : ''}</td><td>${t ? t.ch.map(c => c + 1).join(',') : '—'}</td><td class="num">${notes.length}</td><td>${ps.length ? noteName(pmin) + '〜' + noteName(pmax) : '—'}</td><td class="num">${notes.length ? fmtBeat(bmax) : '—'}</td>`;
+    const pick = () => { if (state.trackIdx === i) return; state.trackIdx = i; renderTracks(); rebuild(); }; tr.addEventListener('click', pick); tr.querySelector('input[type=radio]').addEventListener('change', pick); return tr; };
+  s.tracks.forEach((t, i) => tb.appendChild(mk(t.name, i, t)));
+  if (s.tracks.length > 1) tb.appendChild(mk('すべてのトラックを合算（ドラムを除く）', -1, null)); }
+function renderStatus() { const v = state.variant; const t = state.trackIdx < 0 ? '合算' : (state.song.tracks[state.trackIdx] || state.song.tracks[0]).name;
+  $('#status').innerHTML = `<b>${esc(state.song.name)}</b> ／ ${esc(t)} ／ ${esc(PRESETS[state.layout].name.split('（')[0])} ／ ${FOLD_DESC[state.fold].split(':')[0]} ／ 上限 ${state.limit} → 元 ${v.src.length} 音 → 最終 <b>${v.out.length}</b> 音（落とし ${v.dropFold}・寄せ ${v.moved}・間引き ${v.dropThin}）`; }
+
+/* ---------- 表示: 折り畳みの要約と指標 ---------- */
+function stat(k, v, s, cls) { return `<div class="stat ${cls || ''}"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s || ''}</div></div>`; }
+function renderSummary() { const v = state.variant; const p = PRESETS[state.layout];
+  $('#layoutDesc').textContent = p.desc + `（この配列の音域 ${noteName(v.lo)}〜${noteName(v.hi)}）` + (v.src.length && !v.dropFold && !v.moved ? ' この曲はこの配列に収まるので折り畳みの差が出ません。音域の狭い配列（1 オクターブ／原神）に替えると差が見えます。' : ''); $('#foldDesc').textContent = FOLD_DESC[state.fold];
+  const det = []; if (v.cut) det.push(`音域外 ${v.cut}`); if (v.nopc) det.push(`配列に無い音名 ${v.nopc}`); if (v.dupes) det.push(`重複 ${v.dupes}`);
+  $('#sumStats').innerHTML = stat('元の音数', v.src.length, '選んだトラック') + stat('落とした音', v.dropFold, det.join('・') || '折り畳みで消えた', v.dropFold ? 'bad' : 'good') + stat('寄せた音', v.moved, state.fold === 'octave' ? 'オクターブ移動' : state.fold === 'nearest' ? '近傍へ移動' : '（カットでは 0）', v.moved ? 'warn' : '') + stat('間引いた音', v.dropThin, `上限 ${v.limit} で和音の低音を落とした`, v.dropThin ? 'warn' : 'good') + stat('最終の音数', v.out.length, `${v.src.length ? Math.round(v.out.length / v.src.length * 100) : 0}% が残った`); }
+function renderMetrics() { const m = state.variant.metrics; const v = state.variant;
+  $('#metStats').innerHTML = stat('密度', m.density.toFixed(2), `音/秒（元 ${m.srcDensity.toFixed(2)}）`, m.density > 6 ? 'bad' : m.density > 3.5 ? 'warn' : '') + stat('跳躍 平均 / 最大', `${m.leapAvg.toFixed(2)} / ${m.leapMax}`, '六角距離', m.leapMax >= 6 ? 'warn' : '') + stat('同時押し', `${Math.round(m.chordRatio * 100)}%`, `最大 ${m.chordMax} 音`, m.chordMax > 2 ? 'warn' : '') + stat('段またぎ', `${Math.round(m.rowCross * 100)}%`, '連続する音で段を移る割合', m.rowCross > 0.5 ? 'warn' : '');
+  const ul = $('#warnList'); ul.innerHTML = '';
+  if (!v.warns.length) { const li = document.createElement('li'); li.textContent = '運指の警告はありません（同じ段で距離 4 以上を 0.25 秒未満で移る箇所も、矩形 4 隅の同時押しも無し）。'; ul.appendChild(li); return; }
+  v.warns.slice(0, 12).forEach(w => { const li = document.createElement('li'); li.className = w.type; li.textContent = (w.type === 'w4' ? '速い横移動: ' : '矩形の同時押し: ') + w.text; ul.appendChild(li); });
+  if (v.warns.length > 12) { const li = document.createElement('li'); li.textContent = `ほか ${v.warns.length - 12} 件`; ul.appendChild(li); } }
+function renderVariants() { const tb = $('#varTbl tbody'); tb.innerHTML = '';
+  for (const v of state.variants) { const tr = document.createElement('tr'); tr.className = 'pick' + (v === state.variant ? ' cur' : '');
+    tr.innerHTML = `<td>${FOLD_DESC[v.fold].split(':')[0]}</td><td class="num">${v.limit}</td><td class="num">${v.src.length}</td><td class="num">${v.dropFold}</td><td class="num">${v.moved}</td><td class="num">${v.dropThin}</td><td class="num">${v.out.length}</td><td class="num">${v.metrics.density.toFixed(2)}</td><td class="num">${v.metrics.leapAvg.toFixed(1)} / ${v.metrics.leapMax}</td><td class="num">${v.warns.length}</td>`;
+    tr.addEventListener('click', () => { state.fold = v.fold; state.limit = v.limit; syncControls(); save(); rebuild(); }); tb.appendChild(tr); } }
+function syncControls() { $('#layout').value = state.layout; document.querySelectorAll('input[name=fold]').forEach(r => r.checked = r.value === state.fold); document.querySelectorAll('input[name=limit]').forEach(r => r.checked = r.value === String(state.limit)); $('#videoId').value = state.sync.videoId; }
+
+/* ---------- 譜面 JSON ---------- */
+const r4 = x => Math.round(x * 10000) / 10000;
+function buildJSON() { const s = state.song, v = state.variant, m = v.metrics;
+  const notes = v.out.map(n => ({ midi: n.midi, beat: r4(n.beat), dur: r4(n.dur), hand: n.midi >= 60 ? 'R' : 'L' }));
+  const keys = v.out.map(n => n.key.code);
+  const sync = { source: state.sync.videoId ? 'youtube' : 'none', videoId: state.sync.videoId, offset: r4(state.sync.offset), rate: r4(state.sync.rate), unit: 's', offsetMeaning: 'chart beat 0 の動画時刻（秒）。videoTime = offset + chartSec / rate', rateMeaning: 'videoBpm / chartBpm。pulse.tempo の全区間へ一様に掛ける' };
+  const obj = { format: 'hexnote-chart/1', name: s.name, bpm: s.bpm, beats: s.beats, notes, pulse: { resolution: s.division, tempo: s.tempo }, sync, layout: state.layout, keys, limit: state.limit,
+    metrics: { density: r4(m.density), leap: r4(m.leapAvg), chord: r4(m.chordRatio), rowCross: r4(m.rowCross) },
+    stats: { fold: v.fold, srcNotes: v.src.length, droppedFold: v.dropFold, movedFold: v.moved, droppedThin: v.dropThin, leapMax: m.leapMax, chordMax: m.chordMax, warnings: v.warns.length, syncMeasured: state.sync.done, syncResidualMs: state.sync.done ? Math.round(state.sync.res * 1000 * 10) / 10 : null, syncElapsedS: state.sync.done ? Math.round(state.sync.elapsed * 10) / 10 : null, syncAttempts: syncSession.attempts.length } };
+  return obj; }
+function fmtJSON(o) { const L = [];
+  L.push('{'); L.push(`  "format": ${JSON.stringify(o.format)},`); L.push(`  "name": ${JSON.stringify(o.name)}, "bpm": ${o.bpm}, "beats": ${o.beats},`);
+  L.push('  "notes": [' + (o.notes.length ? '\n    ' + o.notes.map(n => JSON.stringify(n)).join(',\n    ') + '\n  ],' : '],'));
+  L.push(`  "pulse": ${JSON.stringify(o.pulse)},`); L.push(`  "sync": ${JSON.stringify(o.sync)},`); L.push(`  "layout": ${JSON.stringify(o.layout)},`);
+  L.push(`  "keys": ${JSON.stringify(o.keys)},`); L.push(`  "limit": ${o.limit},`); L.push(`  "metrics": ${JSON.stringify(o.metrics)},`); L.push(`  "stats": ${JSON.stringify(o.stats)}`); L.push('}'); return L.join('\n'); }
+let jsonText = '';
+function renderJSON() { jsonText = fmtJSON(buildJSON()); $('#jsonOut').textContent = jsonText; }
+async function copyText(txt) { try { await navigator.clipboard.writeText(txt); return true; } catch (_) {}
+  try { const ta = $('#copyArea'); ta.value = txt; ta.focus(); ta.select(); const ok = document.execCommand('copy'); ta.blur(); return ok; } catch (_) { return false; } }
+$('#copyJson').addEventListener('click', async () => { const ok = await copyText(jsonText); $('#copyNote').textContent = ok ? `コピーしました（${jsonText.length.toLocaleString()} 文字）。m1'／m4 の読込に貼り付けてください。` : 'コピーできませんでした。テキストを選択して手でコピーしてください。'; });
+$('#dlJson').addEventListener('click', () => { try { const blob = new Blob([jsonText], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = (state.song.name || 'chart').replace(/[\\/:*?"<>|]/g, '_') + `.${state.layout}.${state.fold}.L${state.limit}.hexnote.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+  $('#copyNote').textContent = 'ダウンロードを要求しました。公開版（アーティファクト）では無効なので、何も起きなければコピーを使ってください。'; } catch (_) { $('#copyNote').textContent = 'ダウンロードできませんでした。コピーを使ってください。'; } });
+
+/* ---------- 音（Web Audio で合成。m1 の playNote を時刻指定に） ---------- */
+let AC = null, master = null;
+function ensureAudio() { if (!AC) { AC = new (window.AudioContext || window.webkitAudioContext)(); const comp = AC.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4; master = AC.createGain(); master.gain.value = 0.7; master.connect(comp); comp.connect(AC.destination); }
+  /* 作成直後も resume を呼ぶ（suspended で作られるブラウザ対策） */
+  if (AC.state !== 'running') { try { const p = AC.resume(); if (p && p.catch) p.catch(() => {}); } catch (_) {} } }
+function playNoteAt(midi, vel, dur, t, bus) { if (!AC) return; const f = 440 * Math.pow(2, (midi - 69) / 12); const out = AC.createGain(); out.gain.value = 1; out.connect(bus || master);
+  const bright = Math.max(0.35, Math.min(1.3, 1.4 - (midi - 48) / 40)); const partials = [[1, 1], [2, 0.5], [3, 0.26], [4, 0.12], [5.01, 0.06], [6.02, 0.03]];
+  for (const [h, a] of partials) { const o = AC.createOscillator(); o.type = 'sine'; o.frequency.value = f * h; const g = AC.createGain(); const decay = dur * bright / (0.35 + h * 0.5);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a * vel * 0.28, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0003, t + decay); o.connect(g); g.connect(out); o.start(t); o.stop(t + decay + 0.05); }
+  const buf = AC.createBuffer(1, 2205, AC.sampleRate); const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / 300); const n = AC.createBufferSource(); n.buffer = buf; const ng = AC.createGain(); ng.gain.value = vel * 0.08; const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = Math.min(12000, f * 2); n.connect(bp); bp.connect(ng); ng.connect(out); n.start(t); }
+function clickAt(t, accent, bus) { if (!AC) return; const o = AC.createOscillator(); o.type = 'square'; o.frequency.value = accent ? 1400 : 1000; const g = AC.createGain(); g.gain.setValueAtTime(0.14, t); g.gain.exponentialRampToValueAtTime(0.0005, t + 0.04); o.connect(g); g.connect(bus || master); o.start(t); o.stop(t + 0.05); }
+function tapTick() { if (!AC) return; const t = AC.currentTime; const o = AC.createOscillator(); o.type = 'triangle'; o.frequency.value = 520; const g = AC.createGain(); g.gain.setValueAtTime(0.1, t); g.gain.exponentialRampToValueAtTime(0.0005, t + 0.03); o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.04); }
+
+/* ---------- 試聴（シーケンス再生） ---------- */
+let player = null;
+function setPlayLabel(s) { $('#playLabel').textContent = s; }
+function fmtTime(sec) { sec = Math.max(0, sec); const m = Math.floor(sec / 60), s = Math.floor(sec % 60); return `${m}:${String(s).padStart(2, '0')}`; }
+function stopPlay() { if (!player) return; clearInterval(player.timer); try { const b = player.bus; b.gain.setTargetAtTime(0, AC.currentTime, 0.03); setTimeout(() => { try { b.disconnect(); } catch (_) {} }, 400); } catch (_) {} player = null; setPlayLabel(''); rollDirty = true; }
+function itemsFrom(notes, b0, tOffset) { const c = state.clock; const base = c.b2s(b0); return notes.map(n => ({ t: tOffset + c.b2s(n.beat) - base, midi: n.midi, dur: Math.max(0.08, c.b2s(n.beat + n.dur) - c.b2s(n.beat)), vel: n.vel || 0.8 })); }
+function playItems(items, segs, label) { ensureAudio(); stopPlay(); if (vid.playing || vid.starting) { abortVideo('試聴を始めたので動画は止めました。「やり直し」で再計測。'); label += '（動画は止めました）'; }
+  if (!items.length) { setPlayLabel(label + ': 鳴らす音がありません'); return; }
+  items.sort((a, b) => a.t - b.t); const bus = AC.createGain(); bus.gain.value = 1; bus.connect(master); const base = AC.currentTime + 0.12;
+  const end = items.reduce((a, i) => Math.max(a, i.t + Math.min(2.5, i.dur + 0.3)), 0) + 0.3; player = { bus, base, items, idx: 0, end, segs, label, timer: null }; player.timer = setInterval(pump, 40); pump(); }
+function pump() { if (!player) return; const rel = AC.currentTime - player.base;
+  while (player.idx < player.items.length && player.items[player.idx].t < rel + 0.25) { const it = player.items[player.idx++]; playNoteAt(it.midi, it.vel, Math.min(2.5, it.dur + 0.3), player.base + it.t, player.bus); }
+  if (rel > player.end) { stopPlay(); return; }
+  const seg = player.segs.find(s => rel >= s.t0 && rel < s.t1); setPlayLabel(`再生中: ${player.label}${seg && seg.name ? `（いま: ${seg.name}）` : ''}  ${fmtTime(rel)} / ${fmtTime(player.end)}`); }
+function playerCursor() { if (!player || !AC) return null; const rel = AC.currentTime - player.base; const seg = player.segs.find(s => rel >= s.t0 && rel < s.t1); if (!seg) return null;
+  const c = state.clock; return { beat: c.s2b(c.b2s(seg.b0) + (rel - seg.t0)), lanes: seg.lanes, color: seg.color || '#ffd766' }; }
+function playSimple(notes, label, lanes) { playItems(itemsFrom(notes, 0, 0), [{ t0: 0, t1: 1e9, b0: 0, lanes, name: '' }], label); }
+function playAlternate() { const v = state.variant; const c = state.clock; const items = []; const segs = []; let T = 0; const chunk = 4; const total = Math.max(chunk, state.song.beats);
+  for (let b = 0; b < total; b += chunk) { const b1 = Math.min(total, b + chunk); const dur = c.b2s(b1) - c.b2s(b);
+    const A = v.src.filter(n => n.beat >= b && n.beat < b1), B = v.kept.filter(n => n.beat >= b && n.beat < b1); if (!A.length && !B.length) continue;
+    /* 区間末尾 0.35 秒の無音はカーソルを消す（t1 = T + dur）。カーソル色は 元=青、折り畳み後=橙 */
+    items.push(...itemsFrom(A, b, T)); segs.push({ t0: T, t1: T + dur, b0: b, lanes: [0], color: '#62a6f2', name: `元 ${fmtBeat(b)}〜${fmtBeat(b1)} 拍` }); T += dur + 0.35;
+    items.push(...itemsFrom(B, b, T)); segs.push({ t0: T, t1: T + dur, b0: b, lanes: [0], color: '#f2a452', name: `折り畳み後 ${fmtBeat(b)}〜${fmtBeat(b1)} 拍` }); T += dur + 0.35; }
+  playItems(items, segs, '交互（4 拍ずつ）'); }
+$('#playOrig').addEventListener('click', () => playSimple(state.variant.src, '元', [0]));
+$('#playFold').addEventListener('click', () => playSimple(state.variant.kept, '折り畳み後', [0]));
+$('#playThin').addEventListener('click', () => playSimple(state.variant.out, '間引き後', [1]));
+$('#playAlt').addEventListener('click', playAlternate);
+$('#playStop').addEventListener('click', stopPlay);
+
+/* ---------- 差の図（ピアノロール風） ---------- */
+const roll = $('#roll'); let rollDirty = true; let RW = 0, RH = 0, DPR = 1;
+function sizeCanvas(cv) { const r = cv.getBoundingClientRect(); const w = Math.max(200, r.width), h = Math.max(100, r.height); DPR = Math.min(2, window.devicePixelRatio || 1);
+  const pw = Math.round(w * DPR), ph = Math.round(h * DPR); if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; } return { w, h }; }
+function drawRoll() { const { w, h } = sizeCanvas(roll); RW = w; RH = h; const ctx = roll.getContext('2d'); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const grad = ctx.createLinearGradient(0, 0, 0, h); grad.addColorStop(0, '#0b0d12'); grad.addColorStop(1, '#151b28'); ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
+  const v = state.variant; if (!v) return; const padL = 36, padR = 12, padT = 18, gap = 14; const laneH = (h - padT * 2 - gap) / 2;
+  const ms = v.src.map(n => n.midi).concat(v.kept.map(n => n.midi)); if (!ms.length) { ctx.fillStyle = '#9a978f'; ctx.font = '500 13px "Zen Kaku Gothic New", sans-serif'; ctx.fillText('音符がありません', padL, padT + 20); return; }
+  const lo = ms.reduce((a, b) => Math.min(a, b), 127) - 1, hi = ms.reduce((a, b) => Math.max(a, b), 0) + 1; const total = Math.max(1, state.song.beats);
+  const X = b => padL + b / total * (w - padL - padR); const bw = (w - padL - padR) / total; const nh = Math.max(2, Math.min(10, laneH / (hi - lo) * 0.9));
+  const laneTop = [padT, padT + laneH + gap]; const Y = (ln, m) => laneTop[ln] + (1 - (m - lo) / (hi - lo)) * laneH - nh / 2;
+  const cursor = playerCursor();
+  for (let ln = 0; ln < 2; ln++) { const top = laneTop[ln];
+    ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fillRect(padL, top, w - padL - padR, laneH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; for (let b = 0; b <= total; b += 4) { ctx.beginPath(); ctx.moveTo(X(b), top); ctx.lineTo(X(b), top + laneH); ctx.stroke(); }
+    for (let m = lo; m <= hi; m++) if (m % 12 === 0) { const y = Y(ln, m) + nh / 2; ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke(); ctx.fillStyle = '#9a978f'; ctx.font = '600 10px Rajdhani, sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(noteName(m), padL - 4, y); }
+    ctx.fillStyle = '#c9c6bd'; ctx.font = '500 11px "Zen Kaku Gothic New", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.fillText(ln === 0 ? `元 → 折り畳み後（${FOLD_DESC[v.fold].split(':')[0]}）` : `折り畳み後 → 間引き後（上限 ${v.limit}）`, padL, top - 3);
+    if (cursor && cursor.lanes.includes(ln)) { const x = X(cursor.beat); ctx.strokeStyle = cursor.color; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top + laneH); ctx.stroke(); } }
+  ctx.fillStyle = '#9a978f'; ctx.font = '500 10px Rajdhani, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; for (let b = 0; b <= total; b += (total > 160 ? 32 : total > 64 ? 16 : 8)) ctx.fillText(String(b), X(b), laneTop[1] + laneH + 2);
+  const rect = (ln, n, m) => { const x = X(n.beat), ww = Math.max(2, n.dur * bw - 1); ctx.fillRect(x, Y(ln, m), ww, nh); };
+  /* 上段 */
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1; for (const n of v.src) { const x = X(n.beat), ww = Math.max(2, n.dur * bw - 1); ctx.strokeRect(x + 0.5, Y(0, n.midi) + 0.5, ww, nh); }
+  for (const n of v.folded) { if (n.out) { const x = X(n.beat) + Math.max(2, n.dur * bw - 1) / 2, y = Y(0, n.orig != null ? n.orig : n.midi) + nh / 2; const r = Math.max(2.5, nh * 0.45); ctx.strokeStyle = '#f06a6a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke(); continue; }
+    if (n.how) { ctx.strokeStyle = 'rgba(242,164,82,0.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(n.beat) + 1, Y(0, n.orig) + nh / 2); ctx.lineTo(X(n.beat) + 1, Y(0, n.midi) + nh / 2); ctx.stroke(); ctx.fillStyle = '#f2a452'; } else ctx.fillStyle = '#62a6f2';
+    rect(0, n, n.midi); }
+  /* 下段 */
+  for (const n of v.kept) { if (n.thin) { ctx.fillStyle = 'rgba(240,106,106,0.45)'; rect(1, n, n.midi); ctx.strokeStyle = '#f06a6a'; ctx.lineWidth = 1; const y = Y(1, n.midi) + nh / 2; ctx.beginPath(); ctx.moveTo(X(n.beat), y); ctx.lineTo(X(n.beat) + Math.max(2, n.dur * bw - 1), y); ctx.stroke(); }
+    else { ctx.fillStyle = ROW_COLORS[n.key.row]; rect(1, n, n.midi); } } }
+
+/* ---------- ダミー動画と 8 拍タップ ---------- */
+const video = $('#video'); const vid = { playing: false, starting: false, token: 0, perfStart: 0, trueOffset: 1.8, trueRate: 1, spb: 0.6, taps: [], beats: 16, duration: 0, result: null, attemptStart: 0, outLat: 0 };
+const syncSession = { firstStart: 0, attempts: [] };
+/* 試行ごとのクリック用バス。やり直し・中止・試聴開始で消音し、前の試行のクリックが二重に鳴らないようにする */
+let vidBus = null;
+function killVidBus() { if (!vidBus) return; const b = vidBus; vidBus = null; try { b.gain.setValueAtTime(0, AC.currentTime); } catch (_) {} setTimeout(() => { try { b.disconnect(); } catch (_) {} }, 120); }
+function setVidBtn() { const b = $('#vidStart'); if (vid.starting) b.textContent = '音の準備中…'; else if (vid.playing) b.textContent = `タップ（${vid.taps.length}/8）`; else b.innerHTML = '再生して 8 拍タップ <span class="kbd">Space</span>'; }
+function newTruth() { vid.trueOffset = Math.round((1.2 + Math.random() * 1.6) * 1000) / 1000; vid.trueRate = [0.96, 0.98, 1, 1.02, 1.04][Math.floor(Math.random() * 5)]; }
+newTruth();
+function videoTime() { return (performance.now() - vid.perfStart) / 1000; }
+function startVideo() { ensureAudio(); stopPlay(); killVidBus(); vid.playing = false; vid.starting = true; vid.taps = []; vid.result = null; const token = ++vid.token;
+  $('#tapStatus').textContent = '音の準備中…'; renderTaps(); setVidBtn();
+  let fired = false; const go = () => { if (fired) return; fired = true; if (token !== vid.token) return; vid.starting = false;
+    /* resume 完了後の同じ瞬間に音の時計と動画の時計（performance.now）を取って対応付ける */
+    const acNow = AC.currentTime, perfNow = performance.now(); const lead = 0.1;
+    vid.spb = 60 / (state.song.bpm * vid.trueRate); vid.perfStart = perfNow + lead * 1000; vid.duration = vid.trueOffset + vid.beats * vid.spb + 0.8; vid.outLat = AC.outputLatency || AC.baseLatency || 0; vid.playing = true;
+    const bus = AC.createGain(); bus.gain.value = 1; bus.connect(master); vidBus = bus;
+    for (let k = 0; k < vid.beats; k++) clickAt(acNow + lead + vid.trueOffset + k * vid.spb, k % 4 === 0, bus);
+    if (!syncSession.firstStart) syncSession.firstStart = perfNow; vid.attemptStart = perfNow;
+    $('#tapStatus').textContent = 'クリックが鳴り始めたら最初の拍から 8 回タップ（Space か文字キー。Esc で中止）。'; renderTaps(); setVidBtn(); };
+  try { const p = AC.resume(); if (p && p.then) p.then(go, go); else go(); } catch (_) { go(); } setTimeout(go, 400); }
+function retryVideo() { startVideo(); }
+function abortVideo(msg) { if (!vid.playing && !vid.starting) return; vid.token++; vid.playing = false; vid.starting = false; killVidBus(); $('#tapStatus').textContent = msg || '中止しました。「やり直し」で最初から。'; renderTaps(); setVidBtn(); }
+function tap() { if (!vid.playing || vid.taps.length >= 8) return; const t = videoTime(); if (t < 0) return; vid.taps.push(t); tapTick(); renderTaps(); setVidBtn();
+  if (vid.taps.length === 8) finishTaps(); }
+function finishTaps() { const ts = vid.taps; const f = fitTaps(ts); const bpm = state.song.bpm; const rate = (60 / bpm) / f.b; const now = performance.now();
+  const r = { n: syncSession.attempts.length + 1, offset: f.a, rate, spb: f.b, res: f.res, maxAbs: f.maxAbs, elapsed: (now - vid.attemptStart) / 1000, total: (now - syncSession.firstStart) / 1000, trueOffset: vid.trueOffset, trueRate: vid.trueRate, errOffset: f.a - vid.trueOffset, errRate: rate - vid.trueRate, outLat: vid.outLat };
+  vid.result = r; syncSession.attempts.push(r); state.sync.offset = f.a; state.sync.rate = rate; state.sync.res = f.res; state.sync.elapsed = r.elapsed; state.sync.done = true;
+  /* 8 拍そろったら動画を終え、残りのクリックも止める。再計測は「やり直し」からだけ */
+  vid.playing = false; killVidBus(); setVidBtn();
+  $('#tapStatus').textContent = `8 拍そろいました。推定値を譜面の sync に適用し、動画は止めました。再計測は「やり直し」ボタンから（Space では始まりません）。`; renderSync(); renderJSON(); }
+function renderTaps() { const box = $('#tapbox'); box.innerHTML = ''; for (let i = 0; i < 8; i++) { const s = document.createElement('span'); if (i < vid.taps.length) s.className = vid.taps.length === 8 ? 'ok' : 'on'; box.appendChild(s); }
+  if (vid.playing && vid.taps.length < 8) $('#tapStatus').textContent = vid.taps.length ? `タップ ${vid.taps.length} / 8（Esc で中止）` : 'クリックが鳴り始めたら最初の拍から 8 回タップ（Space か文字キー。Esc で中止）。'; }
+function renderSync() { const r = vid.result; const el = $('#syncStats'); const tr = $('#syncTruth'); const ul = $('#attempts'); ul.innerHTML = '';
+  if (!r) { el.innerHTML = stat('推定オフセット', '—', '拍 0 の動画時刻') + stat('テンポ比', '—', '動画 ÷ 譜面 BPM') + stat('残差 RMS', '—', 'ms') + stat('かかった時間', '—', '再生開始→8 拍目'); tr.textContent = '未計測。JSON の sync は offset 0 / rate 1 のままです。'; return; }
+  const sigma = r.res * 1000; const lat = r.outLat * 1000; el.innerHTML = stat('推定オフセット', r.offset.toFixed(3) + ' s', `真値 ${r.trueOffset.toFixed(3)} s（誤差 ${(r.errOffset * 1000).toFixed(0)} ms、出力遅延 ${lat.toFixed(0)} ms を引くと ${(r.errOffset * 1000 - lat).toFixed(0)} ms）`, Math.abs(r.errOffset - r.outLat) > 0.05 ? 'warn' : 'good') + stat('テンポ比', r.rate.toFixed(4), `真値 ${r.trueRate.toFixed(2)}（誤差 ${(r.errRate * 100).toFixed(2)}%）`, Math.abs(r.errRate) > 0.01 ? 'warn' : 'good') + stat('残差 RMS', sigma.toFixed(1) + ' ms', `最大 ${(r.maxAbs * 1000).toFixed(0)} ms`, sigma > 40 ? 'bad' : sigma > 20 ? 'warn' : 'good') + stat('かかった時間', r.elapsed.toFixed(1) + ' s', `累計 ${r.total.toFixed(1)} s（${r.n} 回目）`);
+  tr.innerHTML = `真値はダミー動画の設定値（譜面 BPM ${state.song.bpm} × ${r.trueRate} = 動画 ${(state.song.bpm * r.trueRate).toFixed(1)} BPM、拍 0 は ${r.trueOffset.toFixed(3)} s）。音の出力遅延（AudioContext.outputLatency／baseLatency）は ${lat.toFixed(0)} ms${r.outLat ? '' : '（このブラウザは報告しないので 0 扱い）'}。それを引いた誤差が反応の癖です。残差が 30 ms を超えるなら「やり直し」が妥当です。`;
+  for (const a of syncSession.attempts.slice().reverse()) { const li = document.createElement('li'); li.textContent = `${a.n} 回目: オフセット ${a.offset.toFixed(3)} s（誤差 ${(a.errOffset * 1000).toFixed(0)} ms、遅延補正後 ${(a.errOffset * 1000 - a.outLat * 1000).toFixed(0)} ms）、テンポ比 ${a.rate.toFixed(4)}（誤差 ${(a.errRate * 100).toFixed(2)}%）、残差 ${(a.res * 1000).toFixed(1)} ms、${a.elapsed.toFixed(1)} 秒`; ul.appendChild(li); } }
+function drawVideo() { const { w, h } = sizeCanvas(video); const ctx = video.getContext('2d'); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#3a3f4a'; ctx.fillRect(0, 0, w, h); ctx.fillStyle = '#2b2f38'; ctx.fillRect(0, h - 8, w, 8);
+  const vt = vid.playing ? videoTime() : 0; if (vid.playing && vt > vid.duration) { vid.playing = false; killVidBus(); setVidBtn(); if (vid.taps.length < 8) $('#tapStatus').textContent = `${vid.taps.length} / 8 で動画が終わりました。「やり直し」で最初から。`; }
+  ctx.fillStyle = '#9a978f'; ctx.font = `500 ${Math.round(h * 0.085)}px "Zen Kaku Gothic New", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('ダミー動画（灰矩形＋クリック音）', w / 2, h * 0.3);
+  const k = vid.playing ? Math.floor((vt - vid.trueOffset) / vid.spb) : -1; const since = vid.playing ? vt - vid.trueOffset - k * vid.spb : 1;
+  if (k >= 0 && k < vid.beats) { const flash = Math.max(0, 1 - since / 0.14); ctx.beginPath(); ctx.arc(w / 2, h * 0.58, h * 0.1 + flash * h * 0.05, 0, Math.PI * 2); ctx.fillStyle = k % 4 === 0 ? `rgba(242,164,82,${0.25 + flash * 0.75})` : `rgba(98,166,242,${0.25 + flash * 0.75})`; ctx.fill(); ctx.fillStyle = '#0b0d12'; ctx.font = `700 ${Math.round(h * 0.12)}px Rajdhani, sans-serif`; ctx.fillText(String(k + 1), w / 2, h * 0.58); }
+  else if (vid.playing) { ctx.fillStyle = '#c9c6bd'; ctx.font = `500 ${Math.round(h * 0.075)}px "Zen Kaku Gothic New", sans-serif`; ctx.fillText(k < 0 ? 'まもなくクリックが始まります…' : 'クリック終了', w / 2, h * 0.58); }
+  else { ctx.fillStyle = '#c9c6bd'; ctx.font = `500 ${Math.round(h * 0.075)}px "Zen Kaku Gothic New", sans-serif`; ctx.fillText(vid.starting ? '音の準備中…' : vid.result ? '計測済み。「やり直し」で再計測' : '「再生して 8 拍タップ」か Space で開始', w / 2, h * 0.58); }
+  if (vid.duration > 0) { const p = Math.min(1, vt / vid.duration); ctx.fillStyle = '#62a6f2'; ctx.fillRect(0, h - 8, w * p, 8);
+    ctx.fillStyle = '#f2a452'; for (let i = 0; i < vid.beats; i++) { const x = (vid.trueOffset + i * vid.spb) / vid.duration * w; ctx.fillRect(x, h - 8, 1, i % 4 === 0 ? 8 : 4); }
+    ctx.fillStyle = '#ffd766'; for (const t of vid.taps) { const x = t / vid.duration * w; ctx.fillRect(x - 1, h - 14, 2, 6); } }
+  ctx.fillStyle = '#f4f2ea'; ctx.font = `600 ${Math.round(h * 0.09)}px Rajdhani, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(fmtTime(vid.playing ? vt : 0) + '.' + String(Math.floor((vid.playing ? vt : 0) * 10 % 10)), 10, 8);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#9a978f'; ctx.font = `500 ${Math.round(h * 0.07)}px "Zen Kaku Gothic New", sans-serif`; ctx.fillText(`タップ ${vid.taps.length} / 8`, w - 10, 10); }
+$('#vidStart').addEventListener('click', () => { if (vid.starting) return; if (vid.playing) tap(); else startVideo(); });
+$('#vidRetry').addEventListener('click', retryVideo);
+$('#tapBtn').addEventListener('click', () => { if (vid.starting) return; if (!vid.playing) startVideo(); else tap(); });
+$('#videoId').addEventListener('input', e => { state.sync.videoId = e.target.value.trim(); save(); renderJSON(); });
+
+/* ---------- 入力: MIDI ---------- */
+const drop = $('#drop');
+function handleFile(file) { if (!file) return; const rd = new FileReader();
+  rd.onload = () => { try { const song = parseMidi(rd.result, file.name); $('#fileNote').innerHTML = `<b>${esc(file.name)}</b>（${(file.size / 1024).toFixed(1)} KB）を読みました: ${song.tracks.length} 行${song.tracks.some(t => t.split) ? '（複数チャンネルのトラックは ch 別に分けました）' : ''}。ドラム以外で音数の多い行を選びました。`; loadSong(song); }
+    catch (e) { $('#fileNote').innerHTML = `<b>読めませんでした:</b> ${esc(e.message || String(e))}`; } };
+  rd.onerror = () => { $('#fileNote').textContent = 'ファイルを読み込めませんでした。'; }; rd.readAsArrayBuffer(file); }
+$('#file').addEventListener('change', e => { handleFile(e.target.files && e.target.files[0]); e.target.value = ''; });
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => { const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; handleFile(f); });
+window.addEventListener('dragover', e => e.preventDefault()); window.addEventListener('drop', e => { e.preventDefault(); if (e.target !== drop && !drop.contains(e.target)) handleFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]); });
+$('#exTwinkle').addEventListener('click', () => { $('#fileNote').textContent = '内蔵の「きらきら星」を読みました。'; loadSong(EXAMPLES.twinkle()); });
+$('#exCanon').addEventListener('click', () => { $('#fileNote').textContent = '内蔵の「カノン進行」を読みました（三和音なので間引きの差が出ます）。'; loadSong(EXAMPLES.canon()); });
+
+/* ---------- 設定 UI ---------- */
+function fillSelect(sel, obj) { sel.innerHTML = ''; for (const [k, v] of Object.entries(obj)) { const o = document.createElement('option'); o.value = k; o.textContent = v.name; sel.appendChild(o); } }
+fillSelect($('#layout'), PRESETS);
+const blur = e => e.target.blur();
+$('#layout').addEventListener('change', e => { state.layout = e.target.value; save(); rebuild(); blur(e); });
+document.querySelectorAll('input[name=fold]').forEach(r => r.addEventListener('change', e => { state.fold = e.target.value; save(); rebuild(); blur(e); }));
+document.querySelectorAll('input[name=limit]').forEach(r => r.addEventListener('change', e => { state.limit = +e.target.value; save(); rebuild(); blur(e); }));
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (b) b.blur(); });
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+/* ---------- キー入力（物理キー。e.repeat は捨てる） ---------- */
+window.addEventListener('keydown', e => { if (e.repeat) return; const t = e.target;
+  if (t && t.matches && t.matches('input[type=text],textarea,select')) { if (e.code === 'Escape') t.blur(); return; }
+  if (vid.starting) { if (e.code === 'Space' || e.code === 'Escape') e.preventDefault(); if (e.code === 'Escape') abortVideo(); return; }
+  if (vid.playing) {
+    if (e.code === 'Escape') { e.preventDefault(); abortVideo(); return; }
+    /* 修飾キー単独・修飾キー付き・Tab・Fn などはタップにしない（Ctrl+C などの誤記録を防ぐ） */
+    if (e.ctrlKey || e.metaKey || e.altKey || /^(Shift|Control|Alt|Meta|Tab|CapsLock|F\d|ContextMenu|OS|NumLock|ScrollLock)/.test(e.code)) return;
+    e.preventDefault(); if (vid.taps.length < 8) tap(); return; }
+  if (e.code === 'Space') { e.preventDefault(); if (player) { stopPlay(); return; }
+    if (vid.result) { $('#tapStatus').textContent = '計測済みです。再計測は「やり直し」ボタンから。'; return; } startVideo(); return; }
+  if (e.code === 'Escape') { stopPlay(); } });
+
+/* ---------- 描画ループと追従 ---------- */
+function frame() { if (rollDirty || player) { rollDirty = false; drawRoll(); } drawVideo(); requestAnimationFrame(frame); }
+if (window.ResizeObserver) { const ro = new ResizeObserver(() => { rollDirty = true; }); ro.observe(roll.parentElement); ro.observe(video.parentElement); }
+window.addEventListener('resize', () => { rollDirty = true; });
+
+/* ---------- 起動: 内蔵曲を入れた状態で始める ---------- */
+syncControls(); renderSync(); renderTaps();
+$('#fileNote').textContent = '内蔵の「カノン進行」が入っています（1 オクターブ配列なので折り畳みの差が見えます）。MIDI をドロップすると置き換わります。';
+loadSong(EXAMPLES.canon());
+requestAnimationFrame(frame);
+window.__m5 = { parseMidi, buildVariant, fitTaps, makeClock, PRESETS, EXAMPLES };
+})();
+</script>

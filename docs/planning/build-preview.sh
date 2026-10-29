@@ -1,0 +1,8 @@
+#!/bin/sh
+# Wraps artifact-style mock files (no doctype/head/body) into standalone pages for local viewing.
+mkdir -p mocks/preview
+for f in mocks/*.html; do
+  b=$(basename "$f")
+  { printf '%s\n' '<!doctype html>' '<html lang="ja">' '<head>' '<meta charset="utf-8">' '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">' '<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style>' '</head>' '<body>'; cat "$f"; printf '%s\n' '</body>' '</html>'; } > "mocks/preview/$b"
+done
+ls mocks/preview

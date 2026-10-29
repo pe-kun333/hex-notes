@@ -1,0 +1,501 @@
+<title>ヘクサノート 配列探検</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Rajdhani:wght@500;600;700&display=swap">
+<style>
+/* Layout: dark stage (canvas with up to 3 keyboard diagrams stacked) + settings rail on the right; the rail stacks under the stage on phones. */
+:root{
+  --bg:#f3f1ec; --fg:#1d1b17; --muted:#6b6660; --panel:#fbfaf7; --line:#d9d4ca; --field:#ffffff;
+  --accent:#d9672b; --accent-2:#2b7fd9; --good:#2f9e5b; --warn:#d9a52b; --bad:#d94b4b; --on-accent:#ffffff;
+  --stage:#0b0d12; --stage-fg:#ecebe6; --stage-muted:#9a978f;
+  --row0:#c08cf0; --row1:#62a6f2; --row2:#52d490; --row3:#f2a452;
+  --font-body:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  --font-num:"Rajdhani","Zen Kaku Gothic New",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#15171c; --fg:#ecebe6; --muted:#9a978f; --panel:#1d2027; --line:#2e323b; --field:#262a33; --accent:#f08a4b; --accent-2:#5aa0f0; --good:#4cc47a; --warn:#e8bb4a; --bad:#f06a6a; --on-accent:#ffffff; --stage:#0b0d12; --stage-fg:#ecebe6; --stage-muted:#9a978f; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#15171c; --fg:#ecebe6; --muted:#9a978f; --panel:#1d2027; --line:#2e323b; --field:#262a33; --accent:#f08a4b; --accent-2:#5aa0f0; --good:#4cc47a; --warn:#e8bb4a; --bad:#f06a6a; --on-accent:#ffffff; --stage:#0b0d12; --stage-fg:#ecebe6; --stage-muted:#9a978f; color-scheme:dark }
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.5}
+*{box-sizing:border-box}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-rows:auto minmax(0,1fr);height:100%;min-height:100%}
+header.top{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px;white-space:nowrap}
+.brand svg{width:22px;height:22px;fill:var(--accent)}
+.brand .sub{font-weight:400;color:var(--muted);font-size:12px;letter-spacing:.04em}
+.status{color:var(--muted);font-size:12px;flex:1 1 240px;min-width:0}
+.status b{color:var(--fg)}
+button{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--field);color:var(--fg);border-radius:6px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+button.small{padding:4px 9px;font-size:12px}
+main{position:relative;min-width:0;min-height:0;background:var(--stage);overflow:auto;scrollbar-gutter:stable;padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
+canvas{display:block;width:100%;touch-action:pan-y}
+.stageNote{color:var(--stage-muted);font-size:12px;padding:6px 16px 14px;margin:0}
+.stageNote b{color:var(--stage-fg)}
+aside{overflow:auto;border-left:1px solid var(--line);background:var(--panel);padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px;align-content:start;min-width:0}
+fieldset{border:0;margin:0;padding:0;display:grid;gap:8px;min-width:0}
+legend{font-weight:700;font-size:12px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;padding:0;margin-bottom:4px}
+.row{display:grid;grid-template-columns:84px minmax(0,1fr);align-items:center;gap:8px;min-width:0}
+.row label,.row .lab{color:var(--muted);font-size:12px;min-width:0}
+select,input[type=range],input[type=text],input[type=number]{width:100%;min-width:0;font:inherit}
+select,input[type=text],input[type=number]{padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--fg)}
+input[type=number]{font-family:var(--font-num);font-size:14px;font-variant-numeric:tabular-nums}
+.val{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:13px;color:var(--fg);min-width:52px;text-align:right}
+.range{display:flex;align-items:center;gap:8px;min-width:0}
+.checks{display:grid;gap:6px}
+.checks label{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;min-width:0}
+.seg label{flex:1;text-align:center;padding:5px 4px;cursor:pointer;font-size:12px;color:var(--muted);position:relative;min-width:0}
+.seg input{position:absolute;opacity:0;inset:0;margin:0}
+.seg label:has(input:checked){background:var(--accent-2);color:var(--on-accent)}
+.note{font-size:12px;color:var(--muted);margin:0;min-width:0}
+.note b{color:var(--fg)}
+.note .ok{color:var(--good);font-weight:700}
+.note .ng{color:var(--bad);font-weight:700}
+.note .mid{color:var(--warn);font-weight:700}
+.kbd{font-family:var(--font-num);border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:12px}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+.rose{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px;align-items:center;min-width:0}
+.rose svg{width:120px;height:106px;display:block}
+.rose svg .hex{fill:var(--stage);stroke:var(--line)}
+.rose svg text{font-family:var(--font-num);font-weight:700;font-size:15px;fill:var(--fg);text-anchor:middle;dominant-baseline:middle}
+.rose svg text.dir{font-family:var(--font-body);font-weight:500;font-size:9px;fill:var(--muted)}
+.rose svg .c{fill:var(--accent)}
+.stag{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.stag label{display:grid;gap:2px;font-size:11px;color:var(--muted);min-width:0}
+table.phase{width:100%;border-collapse:collapse;font-size:12px}
+table.phase th{text-align:left;color:var(--muted);font-weight:500;padding:2px 4px;border-bottom:1px solid var(--line)}
+table.phase td{padding:3px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+table.phase td.num{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:13px}
+.ok{color:var(--good);font-weight:700}
+.ng{color:var(--bad);font-weight:700}
+.mid{color:var(--warn);font-weight:700}
+.dim{color:var(--muted)}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto;height:auto}
+  main{overflow:visible;scrollbar-gutter:auto}
+  aside{border-left:0;border-top:1px solid var(--line)}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5 21.5 7v10L12 22.5 2.5 17V7z"/></svg>ヘクサノート<span class="sub">配列探検 v0.2</span></div>
+    <div class="status" id="status">六角格子と物理の千鳥配列のずれを、鍵盤図 3 種×配列 6 種で見比べます。キーを押す（またはセルをクリック）と音が鳴り、6 隣接と半音差が光ります。<b>赤い辺</b>は申告した段ずれでは隣接が崩れる箇所です。</div>
+  </header>
+  <main id="main">
+    <canvas id="stage" aria-label="鍵盤図"></canvas>
+    <p class="stageNote" id="stageNote"></p>
+  </main>
+  <aside>
+    <fieldset>
+      <legend>配列</legend>
+      <div class="row"><label for="layout">配列</label><select id="layout"></select></div>
+      <p class="note" id="layoutDesc"></p>
+      <div class="rose">
+        <svg id="rose" viewBox="-70 -60 140 124" aria-label="6 方向の半音差">
+          <polygon class="hex" points="0,-34 29.4,-17 29.4,17 0,34 -29.4,17 -29.4,-17"/>
+          <text class="c" x="0" y="-4" id="roseC">半音</text><text class="dir" x="0" y="10">6 方向の差</text>
+          <text class="dir" x="50" y="-10">右</text><text id="rR" x="50" y="4">+2</text>
+          <text class="dir" x="-50" y="-10">左</text><text id="rL" x="-50" y="4">−2</text>
+          <text class="dir" x="30" y="-52">右上</text><text id="rUR" x="30" y="-39">+7</text>
+          <text class="dir" x="-30" y="-52">左上</text><text id="rUL" x="-30" y="-39">+5</text>
+          <text class="dir" x="30" y="40">右下</text><text id="rDR" x="30" y="53">−5</text>
+          <text class="dir" x="-30" y="40">左下</text><text id="rDL" x="-30" y="53">−7</text>
+        </svg>
+        <p class="note" id="roseNote"></p>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>鍵盤図</legend>
+      <div class="row"><span class="lab">格子</span>
+        <div class="seg" id="gridSeg">
+          <label><input type="radio" name="grid" value="all" checked><span>3 つ並べる</span></label>
+          <label><input type="radio" name="grid" value="hex"><span>①正六角</span></label>
+          <label><input type="radio" name="grid" value="phys"><span>②物理</span></label>
+          <label><input type="radio" name="grid" value="quarter"><span>③均等¼</span></label>
+        </div></div>
+      <div class="row"><label for="upx">1u の px</label><div class="range"><input type="range" id="upx" min="40" max="72" step="2" value="52"><span class="val" id="upxVal">52 px</span></div></div>
+      <div class="row"><span class="lab">A–Q 境界の規約</span>
+        <div class="seg">
+          <label><input type="radio" name="conv" value="qw" checked><span>A の左上＝Q</span></label>
+          <label><input type="radio" name="conv" value="tq"><span>A の右上＝Q</span></label>
+        </div></div>
+      <p class="note" id="convNote"></p>
+      <div class="checks">
+        <label><input type="checkbox" id="fallback"> 退避: 正六角のまま文字だけで押す</label>
+      </div>
+      <p class="note" id="fallbackNote"></p>
+    </fieldset>
+    <fieldset>
+      <legend>表示</legend>
+      <div class="row"><label for="labels">ラベル</label><select id="labels">
+        <option value="all" selected>全部（キー＋音名＋度数）</option><option value="key">キーの文字</option><option value="note">音名</option><option value="deg">度数</option></select></div>
+      <div class="row"><label for="tonic">調（主音）</label><select id="tonic"></select></div>
+      <div class="row"><label for="trans">移調</label><div class="range"><input type="range" id="trans" min="-6" max="6" step="1" value="0"><span class="val" id="transVal">0 半音</span></div></div>
+      <p class="note" id="transNote"></p>
+    </fieldset>
+    <fieldset>
+      <legend>三和音</legend>
+      <div class="btns" id="chordBtns"></div>
+      <div class="checks"><label><input type="checkbox" id="autoChord" checked> 見本として C → Am → F → G を巡回</label></div>
+      <p class="note" id="chordNote"></p>
+    </fieldset>
+    <fieldset>
+      <legend>段ずれ（自己申告）</legend>
+      <div class="row"><label for="stagSel">端末</label><select id="stagSel"></select></div>
+      <div class="stag">
+        <label>数字–Q（u）<input type="number" id="st0" step="0.25" min="-1" max="1.5" value="0.5"></label>
+        <label>Q–A（u）<input type="number" id="st1" step="0.25" min="-1" max="1.5" value="0.25"></label>
+        <label>A–Z（u）<input type="number" id="st2" step="0.25" min="-1" max="1.5" value="0.5"></label>
+      </div>
+      <div class="row"><label for="stagName">名前</label><input type="text" id="stagName" placeholder="例: ノート PC（JIS）" maxlength="24"></div>
+      <div class="btns"><button class="small" id="stagSave">この端末として保存</button><button class="small" id="stagDel">削除</button></div>
+      <p class="note" id="stagNote">値は「上の段が下の段より何キー幅（u）左にあるか」。定規で 1u（≈19.05 mm）に対する段のずれを測り、0.25 刻みで入れます。仕様の「Z–数字」は隣接しない段なので、入力項は「数字–Q」に読み替えています。</p>
+      <table class="phase"><thead><tr><th>段間</th><th>申告</th><th id="phaseCol">黒鍵の位相</th><th>この配列</th></tr></thead><tbody id="phaseBody"></tbody></table>
+      <p class="note" id="phaseNote"></p>
+    </fieldset>
+    <fieldset>
+      <legend>操作</legend>
+      <p class="note">文字キー・数字キーを押すと、その配列の音が鳴り、6 隣接に半音差が出ます。セルのクリック／タップでも同じ。<span class="kbd">Esc</span> で三和音の点灯（と見本の巡回）を消す。Ctrl／Alt 付きのキーはページに渡します。</p>
+      <p class="note" id="layoutMapNote"></p>
+    </fieldset>
+  </aside>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const SQ3 = Math.sqrt(3);
+
+/* ---------- キー表（m1-core と同じ） ---------- */
+const ROWS = [
+  ['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','Digit0'],
+  ['KeyQ','KeyW','KeyE','KeyR','KeyT','KeyY','KeyU','KeyI','KeyO','KeyP'],
+  ['KeyA','KeyS','KeyD','KeyF','KeyG','KeyH','KeyJ','KeyK','KeyL','Semicolon'],
+  ['KeyZ','KeyX','KeyC','KeyV','KeyB','KeyN','KeyM','Comma','Period','Slash'],
+];
+const ROW_OFF = [0, 0.5, 1.0, 1.5];                      // 正六角格子（均等 1/2 ずれ）
+const SPECIAL = { Semicolon:';', Comma:',', Period:'.', Slash:'/' };
+const ROW_NAMES = ['数字段', 'Q 段', 'A 段', 'Z 段'];
+const GAP_NAMES = ['数字–Q', 'Q–A', 'A–Z'];
+const ROW_COLORS = ['#c08cf0', '#62a6f2', '#52d490', '#f2a452'];
+const KEYS = [];
+ROWS.forEach((r, ri) => r.forEach((code, ci) => KEYS.push({ code, row: ri, col: ci, label: SPECIAL[code] || code.replace(/^Key|^Digit/, '') })));
+const byCode = Object.fromEntries(KEYS.map(k => [k.code, k]));
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const DEG_NAMES = ['1','♭2','2','♭3','3','4','♯4','5','♭6','6','♭7','7'];
+const pc = m => ((m % 12) + 12) % 12;
+const noteName = m => NOTE_NAMES[pc(m)] + (Math.floor(m / 12) - 1);
+const isBlack = m => [1,3,6,8,10].includes(pc(m));
+const fmtU = v => { const t = { '0':'0', '0.25':'1/4', '0.5':'1/2', '0.75':'3/4', '1':'1' }[String(v)]; return t || String(v); };
+const sgn = d => (d > 0 ? '+' : d < 0 ? '−' : '±') + Math.abs(d);
+
+/* ---------- 段ずれプリセット（v = [数字→Q, Q→A, A→Z] の各ずれ、u 単位） ---------- */
+const STAG_BUILTIN = [
+  { id: 'ansi',  name: 'ANSI 標準（1/2・1/4・1/2）', v: [0.5, 0.25, 0.5] },
+  { id: 'q4',    name: '均等 1/4u（コンパクト機）',   v: [0.25, 0.25, 0.25] },
+  { id: 'h2',    name: '均等 1/2u',                   v: [0.5, 0.5, 0.5] },
+  { id: 'ortho', name: 'ortholinear（ずれ 0）',       v: [0, 0, 0] },
+];
+const LS_KEY = 'hexnote-m2-staggers';
+let savedStags = [];
+try { const j = JSON.parse(localStorage.getItem(LS_KEY) || '[]'); if (Array.isArray(j)) savedStags = j.filter(s => s && typeof s.name === 'string' && Array.isArray(s.v) && s.v.length === 3).map(s => ({ id: 'u:' + s.name, name: s.name, v: s.v.map(Number) })); } catch (e) {}
+const persistStags = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(savedStags.map(s => ({ name: s.name, v: s.v })))); } catch (e) {} };
+const physOffFor = v => [0, v[0], v[0] + v[1], v[0] + v[1] + v[2]];
+
+/* ---------- 配列プリセット（m1-core の定義を流用。等方配列は六角列 hc で計算。Harmonic／Jankó は C4–G4 の三和音が入るよう基準音を 55 に） ---------- */
+const LAYOUTS = {
+  garage: { name: 'Ableton 型 1 段＋上段黒鍵', desc: 'A 段が白鍵（A = C4 … ; = E5）、Q 段が黒鍵（W = C#4）。黒鍵の位相は Q–A の段ずれ（ANSI では 1/4u）で決まる。', gaps: [1],
+    map() { const m = {}; [60,62,64,65,67,69,71,72,74,76].forEach((p, i) => m[ROWS[2][i]] = p); Object.assign(m, { KeyW:61, KeyE:63, KeyT:66, KeyY:68, KeyU:70, KeyO:73, KeyP:75 }); return m; } },
+  fl: { name: 'VMPK 型 2 段×2（m1 の fl）', desc: 'Z 段と Q 段が白鍵（Z = C3、Q = C4）、A 段と数字段が黒鍵。位相は 数字–Q と A–Z の段ずれ（ANSI では共に 1/2u）で決まる。', gaps: [0, 2],
+    map() { const m = {}; [48,50,52,53,55,57,59,60,62,64].forEach((p, i) => m[ROWS[3][i]] = p); Object.assign(m, { KeyS:49, KeyD:51, KeyG:54, KeyH:56, KeyJ:58, KeyL:61, Semicolon:63 });
+      [60,62,64,65,67,69,71,72,74,76].forEach((p, i) => m[ROWS[1][i]] = p); Object.assign(m, { Digit2:61, Digit3:63, Digit5:66, Digit6:68, Digit7:70, Digit9:73, Digit0:75 }); return m; } },
+  genshin: { name: '原神 3×7 白鍵のみ', desc: 'Q・A・Z 段の左 7 キーが高・中・低の白鍵（ド〜シ）。黒鍵が無いので段ずれの位相は問題にならないが、隣接に音程の意味も無い。', gaps: [],
+    map() { const m = {}; const nat = [0, 2, 4, 5, 7, 9, 11]; [[1, 72], [2, 60], [3, 48]].forEach(([r, base]) => { for (let i = 0; i < 7; i++) m[ROWS[r][i]] = base + nat[i]; }); return m; } },
+  wicki: { name: 'Wicki–Hayden（右 +2・右上 +7・左上 +5）', desc: 'どのセルから始めても和音・旋律の形が同じ（等方）。移調 +2 半音 ＝ 右へ 1 列。段をまたぐ隣接が全部意味を持つので、A–Q 境界のずれがそのまま効く。長三和音は根音・右上に 5 度・右へ 2 つに 3 度（3 度は隣接しない）。', gaps: [0, 1, 2], iso: [2, 7, 5],
+    map(hc) { const m = {}; KEYS.forEach(k => m[k.code] = 48 + 2 * hc(k) + 5 * (3 - k.row)); return m; } },
+  harmonic: { name: 'Harmonic Table（右 +1・右上 +4・左上 +3）', desc: '三和音が小さな三角形になる（根音→右上に 3 度→左上に 5 度。5 度は根音の真上 2 段）。移調 +1 半音 ＝ 右へ 1 列。', gaps: [0, 1, 2], iso: [1, 4, 3],
+    map(hc) { const m = {}; KEYS.forEach(k => m[k.code] = 55 + hc(k) + 3 * (3 - k.row)); return m; } },
+  janko: { name: 'Jankó（右 +2・右上 +1・左上 −1）', desc: '各段が全音階、1 段上がるごとに半音下がる。2 段離れた段は同じ音の並び（1 列ずれ）なので、同じ指使いを上下どちらの段でも取れる。', gaps: [0, 1, 2], iso: [2, 1, -1],
+    map(hc) { const m = {}; KEYS.forEach(k => m[k.code] = 55 + 2 * hc(k) + (k.row - 3)); return m; } },
+};
+const CHORDS = { C: [60, 64, 67], Am: [57, 60, 64], F: [53, 57, 60], G: [55, 59, 62] };
+const CHORD_ORDER = ['C', 'Am', 'F', 'G'];
+const TONE_NAMES = ['根音', '3 度', '5 度'];
+
+/* 6 方向: 辺の順（pointy-top、頂点 i は角度 −30°+60°i） = 右・右下・左下・左・左上・右上 */
+const DIRS = [
+  { id: 'R',  name: '右',   dr: 0,  dc: 1 },
+  { id: 'DR', name: '右下', dr: 1,  dc: 0 },
+  { id: 'DL', name: '左下', dr: 1,  dc: -1 },
+  { id: 'L',  name: '左',   dr: 0,  dc: -1 },
+  { id: 'UL', name: '左上', dr: -1, dc: 0 },
+  { id: 'UR', name: '右上', dr: -1, dc: 1 },
+];
+const IDEAL_DX = { R: 1, UL: -0.5, UR: 0.5 };            // 六角格子で隣が物理 x 方向に何 u 離れているはずか
+
+/* ---------- 状態 ---------- */
+const state = { layout: 'garage', grid: 'all', labels: 'all', tonic: 0, trans: 0, conv: 'qw', u: 52, stagId: 'ansi', stag: [0.5, 0.25, 0.5], stagName: 'ANSI 標準（1/2・1/4・1/2）',
+  fallback: false, chord: 'C', auto: true, mapping: {}, intervals: {}, pressed: new Map() };
+let cellIndex = new Map();
+const hc = k => k.col + (state.conv === 'tq' && k.row >= 2 ? -1 : 0);
+function rebuildIndex() { cellIndex = new Map(); KEYS.forEach(k => cellIndex.set(k.row + ',' + hc(k), k)); }
+const neighbor = (k, d) => cellIndex.get((k.row + d.dr) + ',' + (hc(k) + d.dc)) || null;
+const midiOf = k => state.mapping[k.code];
+const tonicNow = () => pc(state.tonic + state.trans);
+/* 六角距離（軸座標 q = hc, r = row。DIRS の 6 方向がちょうど軸座標の 6 隣接） */
+const hexDist = (a, b) => { const dq = hc(b) - hc(a), dr = b.row - a.row; return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2; };
+let dirty = true; const invalidate = () => { dirty = true; };
+
+function rebuildMapping() {
+  rebuildIndex();
+  state.mapping = LAYOUTS[state.layout].map(hc);
+  const iv = {};
+  for (const d of DIRS) { const cnt = new Map(); for (const k of KEYS) { const a = midiOf(k); if (a == null) continue; const n = neighbor(k, d); if (!n) continue; const b = midiOf(n); if (b == null) continue; const diff = b - a; cnt.set(diff, (cnt.get(diff) || 0) + 1); }
+    const list = [...cnt.entries()].sort((x, y) => y[1] - x[1]); iv[d.id] = { list, text: list.length === 0 ? '—' : list.length === 1 ? sgn(list[0][0]) : list.slice(0, 2).map(e => sgn(e[0])).join('/') + (list.length > 2 ? '…' : ''), uniform: list.length === 1 }; }
+  state.intervals = iv;
+}
+
+/* 隣接の崩れ: 六角格子の隣（右・左上・右上）が、物理 x 方向でどれだけ理想からずれているか */
+function redPairs(physV) { const off = physOffFor(physV); const out = []; for (const k of KEYS) for (const d of DIRS) { if (!(d.id in IDEAL_DX)) continue; const n = neighbor(k, d); if (!n) continue;
+  const dx = (off[n.row] + n.col) - (off[k.row] + k.col); const dev = Math.abs(dx - IDEAL_DX[d.id]); if (dev >= 0.2) out.push({ a: k, b: n, dev, gap: Math.min(k.row, n.row) }); } return out; }
+function gapDevs(physV) { // 段間ごとの「六角格子 1/2 ずれ」との差（u）
+  const off = physOffFor(physV); const hx = [0, 1, 2, 3].map(r => ROW_OFF[r] + (state.conv === 'tq' && r >= 2 ? -1 : 0)); return [0, 1, 2].map(g => (hx[g + 1] - hx[g]) - (off[g + 1] - off[g])); }
+
+/* ---------- 鍵盤図 3 種（番号は種類で固定: ①六角 ②物理 ③均等 1/4u） ---------- */
+const GRIDS = {
+  hex:     { num: '①', title: () => state.fallback ? '正六角格子（退避: 文字だけで押す）' : '正六角格子（均等 1/2 ずれ）', pos: k => ({ gx: ROW_OFF[k.row] + hc(k), gy: k.row * SQ3 / 2 }), shrink: 1, rowH: SQ3 / 2, phys: () => state.stag, touching: true },
+  phys:    { num: '②', title: () => `物理座標のゆがみ六角（申告: ${state.stag.map(fmtU).join('・')}）`, pos: k => ({ gx: physOffFor(state.stag)[k.row] + k.col, gy: k.row }), shrink: 0.9, rowH: 1, phys: () => state.stag, touching: false },
+  quarter: { num: '③', title: () => '均等 1/4u（コンパクト機の物理座標）', pos: k => ({ gx: 0.25 * k.row + k.col, gy: k.row }), shrink: 0.9, rowH: 1, phys: () => [0.25, 0.25, 0.25], touching: false },
+};
+const visibleGrids = () => state.fallback ? ['hex'] : state.grid === 'all' ? ['hex', 'phys', 'quarter'] : [state.grid];
+
+/* ---------- Canvas ---------- */
+const main = $('#main'), canvas = $('#stage'), ctx = canvas.getContext('2d');
+let sections = [], W = 0, H = 0, uEff = 52;
+function layout() {
+  W = main.clientWidth; if (W < 40) return; const pad = 16; uEff = Math.min(state.u, (W - 2 * pad) / 12);
+  sections = []; let y = 10; const iv = state.intervals; if (!iv.R) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.font = '500 11px "Zen Kaku Gothic New", sans-serif';
+  for (const gid of visibleGrids()) { const g = GRIDS[gid]; const size = uEff / SQ3 * g.shrink; const cells = new Map();
+    const red = redPairs(g.phys());
+    const devs = gapDevs(g.phys()); const badGaps = devs.map((d, i) => Math.abs(d) >= 0.2 ? `${GAP_NAMES[i]} ${fmtU(Math.round(Math.abs(d) * 4) / 4)}u` : null).filter(Boolean);
+    const l2 = `右 ${iv.R.text} ・ 右上 ${iv.UR.text} ・ 左上 ${iv.UL.text}（半音）`, l3 = `崩れる隣接 ${red.length} 組${badGaps.length ? '（' + badGaps.join('、') + ' ずれ）' : ''}`;
+    const twoLine = W < 720 || ctx.measureText(l2 + '　' + l3).width > W - 90;   // 1 行版が右端の「崩れ」凡例と重なるなら 2 行に
+    const titleH = twoLine ? 56 : 40; const top = y + titleH;
+    for (const k of KEYS) { const p = g.pos(k); cells.set(k.code, { k, cx: pad + (p.gx + 0.5) * uEff, cy: top + size + p.gy * uEff }); }
+    const h = titleH + 2 * size + 3 * g.rowH * uEff + 16; sections.push({ gid, g, y, top, size, cells, red, h, l2, l3, twoLine }); y += h; }
+  H = y + 6; const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + 'px'; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  updateStageNote(); invalidate();
+}
+function hexPath(c, cx, cy, r) { c.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 180 * (60 * i - 30); const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a); i ? c.lineTo(x, y) : c.moveTo(x, y); } c.closePath(); }
+const hexVert = (cx, cy, r, i) => { const a = Math.PI / 180 * (60 * i - 30); return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
+
+/* ---------- 三和音: 構成音ごとに 1 セルだけ選ぶ ----------
+   候補 = その音高（±1〜2 オクターブも可）を持つ全セル。組合せの中で オクターブが和音全体で揃う → 隣接ペア数が最多 → 六角距離の総和が最小 → オクターブずれが最小
+   → 根音の段が低い（Z 段寄り）→ 全体の段が低い、の順で選ぶ。これで W–H・Harmonic・Jankó は移調しても同じ形のまま動く。 */
+function dirText(dq, dr) { const parts = []; let q = dq, r = dr;
+  if (r < 0) { const ur = Math.max(0, Math.min(q, -r)); const ul = -r - ur; q -= ur; if (ur) parts.push('右上' + ur); if (ul) parts.push('左上' + ul); }
+  else if (r > 0) { const dl = Math.max(0, Math.min(-q, r)); const dd = r - dl; q += dl; if (dd) parts.push('右下' + dd); if (dl) parts.push('左下' + dl); }
+  if (q > 0) parts.push('右' + q); else if (q < 0) parts.push('左' + (-q));
+  return parts.length ? parts.join('・') : '同じ'; }
+function computeChord(chordName, trans) {
+  const empty = { codes: [], tones: [], set: new Set(), missing: [], shapeKey: '', shapeText: '', alt: 0, mixed: false };
+  if (!chordName) return empty;
+  const missing = []; const cands = [];
+  CHORDS[chordName].forEach((p0, ti) => { const p = p0 + trans; const out = []; for (const alt of [0, -12, 12, -24, 24]) for (const k of KEYS) if (midiOf(k) === p + alt) out.push({ k, alt, ti }); if (out.length) cands.push(out); else missing.push(NOTE_NAMES[pc(p)]); });
+  if (!cands.length) return Object.assign({}, empty, { missing });
+  let best = null;
+  const score = pick => { let adj = 0, dist = 0; for (let i = 0; i < pick.length; i++) for (let j = i + 1; j < pick.length; j++) { const d = hexDist(pick[i].k, pick[j].k); dist += d; if (d === 1) adj++; }
+    const alts = new Set(pick.map(p => p.alt)); const oct = pick.reduce((a, p) => a + Math.abs(p.alt) / 12, 0) + (alts.size - 1) * 2;
+    const s = [alts.size - 1, -adj, dist, oct, -pick[0].k.row, -pick.reduce((a, p) => a + p.k.row, 0)];
+    if (!best) { best = { s, pick }; return; } for (let i = 0; i < s.length; i++) { if (s[i] < best.s[i]) { best = { s, pick }; return; } if (s[i] > best.s[i]) return; } };
+  const rec = (i, pick) => { if (i === cands.length) { score(pick); return; } for (const c of cands[i]) rec(i + 1, pick.concat([c])); };
+  rec(0, []);
+  const pick = best.pick; const root = pick[0].k; const alts = new Set(pick.map(p => p.alt));
+  const offs = pick.map(p => [hc(p.k) - hc(root), p.k.row - root.row]);
+  const shapeText = pick.slice(1).map((p, i) => `${TONE_NAMES[p.ti]} ${dirText(offs[i + 1][0], offs[i + 1][1])}`).join('・');
+  return { codes: pick.map(p => p.k.code), tones: pick.map(p => p.ti), set: new Set(pick.map(p => p.k.code)), missing, shapeKey: offs.map(o => o.join(',')).join('|'), shapeText, alt: alts.size === 1 ? [...alts][0] : 0, mixed: alts.size > 1 };
+}
+let chordInfo = computeChord(null, 0);
+function recomputeChord() { chordInfo = computeChord(state.chord, state.trans); invalidate(); }
+function components(set) { const seen = new Set(); const comps = []; for (const code of set) { if (seen.has(code)) continue; const comp = []; const st = [code]; seen.add(code);
+  while (st.length) { const c = st.pop(); comp.push(c); for (const d of DIRS) { const n = neighbor(byCode[c], d); if (n && set.has(n.code) && !seen.has(n.code)) { seen.add(n.code); st.push(n.code); } } } comps.push(comp); } return comps; }
+function hull(pts) { pts = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]); if (pts.length < 3) return pts; const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = []; for (const p of pts) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  const up = []; for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); } return lo.slice(0, -1).concat(up.slice(0, -1)); }
+
+function draw() {
+  ctx.clearRect(0, 0, W, H); ctx.fillStyle = '#0b0d12'; ctx.fillRect(0, 0, W, H);
+  const chord = chordInfo.set; const comps = components(chord);
+  const tonic = tonicNow();
+  for (const s of sections) {
+    const { g, size, cells, red, l2, l3, twoLine } = s; const inr = size * SQ3 / 2;
+    // 見出し
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#ecebe6'; ctx.font = '700 13px "Zen Kaku Gothic New", sans-serif';
+    ctx.fillText(`${g.num} ${g.title()}`, 16, s.y + 15);
+    ctx.fillStyle = '#9a978f'; ctx.font = '500 11px "Zen Kaku Gothic New", sans-serif';
+    if (twoLine) { ctx.fillText(l2, 16, s.y + 31); ctx.fillStyle = red.length ? '#ff8a8a' : '#9a978f'; ctx.fillText(l3, 16, s.y + 47); }
+    else { ctx.fillText(l2 + '　' + l3, 16, s.y + 31); if (red.length) { ctx.fillStyle = '#ff5a5a'; ctx.fillRect(W - 16 - 54, s.y + 23, 10, 3); ctx.fillStyle = '#9a978f'; ctx.fillText('崩れ', W - 16 - 40, s.y + 31); } }
+    // セル（三和音のセルは基礎の縁取りを描かず、不透明の橙で塗る → 一塊の共有辺が透けない）
+    for (const c of cells.values()) { const k = c.k; const m = midiOf(k); const col = ROW_COLORS[k.row]; const pressed = state.pressed.has(k.code); const inChord = chord.has(k.code);
+      hexPath(ctx, c.cx, c.cy, size);
+      if (inChord) { ctx.fillStyle = '#b35a2e'; ctx.fill(); }
+      else if (m == null) { ctx.fillStyle = '#12151d'; ctx.fill(); ctx.strokeStyle = '#262c38'; ctx.lineWidth = 1; ctx.stroke(); }
+      else { ctx.fillStyle = isBlack(m) ? '#1a1f2b' : col; ctx.globalAlpha = isBlack(m) ? 1 : 0.22; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = col; ctx.lineWidth = isBlack(m) ? 1.6 : 1; ctx.stroke(); }
+      if (pressed) { hexPath(ctx, c.cx, c.cy, size); ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.35; ctx.fill(); ctx.globalAlpha = 1; }
+    }
+    // 三和音: 共有辺を消した外周を描く（触れない格子では橋を 1 回だけ渡す）。離れていれば薄い殻で囲む
+    if (chord.size) { ctx.save();
+      ctx.strokeStyle = '#ffd9c4'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+      for (const code of chord) { const c = cells.get(code); for (let i = 0; i < 6; i++) { const n = neighbor(c.k, DIRS[i]); if (n && chord.has(n.code)) { if (!g.touching && code < n.code) { const nc = cells.get(n.code); ctx.save(); ctx.strokeStyle = '#d9672b'; ctx.globalAlpha = 0.35; ctx.lineWidth = size * 0.8; ctx.lineCap = 'butt'; ctx.beginPath(); ctx.moveTo(c.cx, c.cy); ctx.lineTo(nc.cx, nc.cy); ctx.stroke(); ctx.restore(); } continue; }
+        const [x1, y1] = hexVert(c.cx, c.cy, size, i), [x2, y2] = hexVert(c.cx, c.cy, size, (i + 1) % 6); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); } }
+      if (comps.length > 1) { const pts = []; for (const code of chord) { const c = cells.get(code); for (let i = 0; i < 6; i++) pts.push(hexVert(c.cx, c.cy, size, i)); }
+        const hl = hull(pts); if (hl.length >= 3) { const cx0 = hl.reduce((a, p) => a + p[0], 0) / hl.length, cy0 = hl.reduce((a, p) => a + p[1], 0) / hl.length; const ex = 0.18 * uEff;
+          ctx.beginPath(); hl.forEach((p, i) => { const dx = p[0] - cx0, dy = p[1] - cy0, d = Math.hypot(dx, dy) || 1; const x = p[0] + dx / d * ex, y = p[1] + dy / d * ex; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath();
+          ctx.fillStyle = '#d9672b'; ctx.globalAlpha = 0.1; ctx.fill(); ctx.globalAlpha = 0.5; ctx.setLineDash([6, 5]); ctx.strokeStyle = '#f2a452'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; } }
+      ctx.restore(); }
+    // 赤: 隣接が崩れる辺
+    ctx.save(); ctx.strokeStyle = '#ff4d4d'; ctx.lineCap = 'round';
+    for (const p of red) { const a = cells.get(p.a.code), b = cells.get(p.b.code); const dx = b.cx - a.cx, dy = b.cy - a.cy, d = Math.hypot(dx, dy) || 1; const ux = dx / d, uy = dy / d; ctx.lineWidth = p.dev >= 0.5 ? 4 : 3;
+      if (d <= 2 * inr * 1.03) { const mx = (a.cx + b.cx) / 2, my = (a.cy + b.cy) / 2; ctx.beginPath(); ctx.moveTo(mx - uy * size / 2, my + ux * size / 2); ctx.lineTo(mx + uy * size / 2, my - ux * size / 2); ctx.stroke(); }
+      else { ctx.beginPath(); ctx.moveTo(a.cx + ux * inr * 0.98, a.cy + uy * inr * 0.98); ctx.lineTo(b.cx - ux * inr * 0.98, b.cy - uy * inr * 0.98); ctx.stroke(); } }
+    ctx.restore();
+    // ラベル
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const c of cells.values()) { const k = c.k; const m = midiOf(k); const inChord = chord.has(k.code); const bright = inChord || state.pressed.has(k.code);
+      const mode = state.labels; const big = Math.round(uEff * (mode === 'all' ? 0.3 : 0.36)); const small = Math.max(8, Math.round(uEff * 0.19)); const compact = uEff < 44;
+      const keyTxt = k.label; const noteTxt = m == null ? '' : noteName(m); const degTxt = m == null ? '' : DEG_NAMES[pc(m - tonic)];
+      const dim = m == null; const fg = dim ? '#4a5160' : bright ? '#ffffff' : '#ecebe6';
+      if (mode === 'key') { ctx.fillStyle = fg; ctx.font = `700 ${big}px "Rajdhani", sans-serif`; ctx.fillText(keyTxt, c.cx, c.cy + 1); }
+      else if (mode === 'note') { ctx.fillStyle = fg; ctx.font = `700 ${Math.round(uEff * 0.3)}px "Rajdhani", sans-serif`; ctx.fillText(noteTxt || keyTxt, c.cx, c.cy - (uEff < 28 ? 0 : small * 0.35)); if (uEff >= 28) { ctx.fillStyle = dim ? '#4a5160' : '#b9b6ad'; ctx.font = `600 ${small}px "Rajdhani", sans-serif`; ctx.fillText(noteTxt ? keyTxt : '', c.cx, c.cy + small * 0.95); } }
+      else if (mode === 'deg') { ctx.fillStyle = fg; ctx.font = `700 ${Math.round(uEff * 0.32)}px "Rajdhani", sans-serif`; ctx.fillText(degTxt || keyTxt, c.cx, c.cy - (uEff < 28 ? 0 : small * 0.35)); if (uEff >= 28) { ctx.fillStyle = dim ? '#4a5160' : '#b9b6ad'; ctx.font = `600 ${small}px "Rajdhani", sans-serif`; ctx.fillText(degTxt ? keyTxt : '', c.cx, c.cy + small * 0.95); } }
+      else { if (compact) { // 狭い幅: キーを上、下 1 行に「音名 度数」
+          ctx.fillStyle = fg; ctx.font = `700 ${Math.round(uEff * 0.3)}px "Rajdhani", sans-serif`; ctx.fillText(keyTxt, c.cx, c.cy - small * 0.45);
+          ctx.font = `600 ${small}px "Rajdhani", sans-serif`; const w1 = ctx.measureText(noteTxt).width, w2 = degTxt ? ctx.measureText(degTxt).width : 0, gap = degTxt ? 3 : 0; const x0 = c.cx - (w1 + gap + w2) / 2;
+          ctx.textAlign = 'left'; ctx.fillStyle = dim ? '#4a5160' : '#b9b6ad'; ctx.fillText(noteTxt, x0, c.cy + small * 0.8); if (degTxt) { ctx.fillStyle = '#f2a452'; ctx.fillText(degTxt, x0 + w1 + gap, c.cy + small * 0.8); } ctx.textAlign = 'center'; }
+        else { ctx.fillStyle = fg; ctx.font = `700 ${big}px "Rajdhani", sans-serif`; ctx.fillText(keyTxt, c.cx, c.cy - uEff * 0.17); ctx.fillStyle = dim ? '#4a5160' : '#d8d5cc'; ctx.font = `600 ${small}px "Rajdhani", sans-serif`; ctx.fillText(noteTxt, c.cx, c.cy + uEff * 0.1); ctx.fillStyle = dim ? '#4a5160' : '#f2a452'; ctx.fillText(degTxt, c.cx, c.cy + uEff * 0.3); } }
+      if (m != null && isBlack(m) && !compact && mode !== 'note') { ctx.fillStyle = ROW_COLORS[k.row]; ctx.font = `600 ${small}px "Rajdhani", sans-serif`; ctx.fillText('♯', c.cx + inr * 0.62, c.cy - size * 0.55); }
+    }
+    // 押鍵: 本セルを白く縁取り、6 隣接を薄く光らせて半音差を出す
+    for (const code of state.pressed.keys()) { const c = cells.get(code); if (!c) continue; const m = midiOf(c.k);
+      for (const d of DIRS) { const n = neighbor(c.k, d); if (!n) continue; const nc = cells.get(n.code); hexPath(ctx, nc.cx, nc.cy, size * 0.96); ctx.strokeStyle = '#5aa0f0'; ctx.lineWidth = 2; ctx.globalAlpha = 0.75; ctx.stroke(); ctx.fillStyle = '#5aa0f0'; ctx.globalAlpha = 0.14; ctx.fill(); ctx.globalAlpha = 1;
+        const nm = midiOf(n); if (m != null && nm != null) { const mx = (c.cx + nc.cx) / 2, my = (c.cy + nc.cy) / 2; const t = sgn(nm - m); ctx.font = `700 ${Math.max(9, Math.round(uEff * 0.2))}px "Rajdhani", sans-serif`; const tw = ctx.measureText(t).width + 8; ctx.fillStyle = '#0b0d12'; ctx.globalAlpha = 0.9; ctx.beginPath(); ctx.roundRect(mx - tw / 2, my - 7, tw, 14, 7); ctx.fill(); ctx.globalAlpha = 1; ctx.fillStyle = '#9ccaff'; ctx.fillText(t, mx, my + 1); } }
+      hexPath(ctx, c.cx, c.cy, size); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke(); ctx.shadowColor = ROW_COLORS[c.k.row]; ctx.shadowBlur = 18; ctx.stroke(); ctx.shadowBlur = 0; }
+  }
+}
+if (!ctx.roundRect) { ctx.roundRect = function (x, y, w, h, r) { this.moveTo(x + r, y); this.lineTo(x + w - r, y); this.arcTo(x + w, y, x + w, y + r, r); this.lineTo(x + w, y + h - r); this.arcTo(x + w, y + h, x + w - r, y + h, r); this.lineTo(x + r, y + h); this.arcTo(x, y + h, x, y + h - r, r); this.lineTo(x, y + r); this.arcTo(x, y, x + r, y, r); }; }
+
+/* ---------- 音（m1-core の合成ピアノ） ---------- */
+let AC = null, master = null;
+function ensureAudio() { if (AC) { if (AC.state === 'suspended') AC.resume(); return; } try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; } const comp = AC.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4; master = AC.createGain(); master.gain.value = 0.7; master.connect(comp); comp.connect(AC.destination); }
+function playNote(midi, vel = 0.7, dur = 1.2) { if (!AC) return; const f = 440 * Math.pow(2, (midi - 69) / 12); const t = AC.currentTime; const out = AC.createGain(); out.gain.value = 1; out.connect(master);
+  const bright = Math.max(0.35, Math.min(1.3, 1.4 - (midi - 48) / 40)); const partials = [[1, 1], [2, 0.5], [3, 0.26], [4, 0.12], [5.01, 0.06], [6.02, 0.03]];
+  for (const [h, a] of partials) { const o = AC.createOscillator(); o.type = 'sine'; o.frequency.value = f * h; const g = AC.createGain(); const decay = dur * bright / (0.35 + h * 0.5);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a * vel * 0.28, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0003, t + decay); o.connect(g); g.connect(out); o.start(t); o.stop(t + decay + 0.05); }
+  const buf = AC.createBuffer(1, 2205, AC.sampleRate); const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / 300); const n = AC.createBufferSource(); n.buffer = buf; const ng = AC.createGain(); ng.gain.value = vel * 0.08; const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = Math.min(12000, f * 2); n.connect(bp); bp.connect(ng); ng.connect(out); n.start(t); }
+
+/* ---------- 入力 ---------- */
+function press(code) { const k = byCode[code]; if (!k || state.pressed.has(code)) return; state.pressed.set(code, performance.now()); invalidate(); ensureAudio(); const m = midiOf(k); if (m != null) playNote(m, 0.6, 1.2);
+  const parts = DIRS.map(d => { const n = neighbor(k, d); if (!n) return null; const nm = midiOf(n); return `${d.name} ${n.label}${nm != null && m != null ? '（' + sgn(nm - m) + '）' : ''}`; }).filter(Boolean);
+  $('#status').innerHTML = `<b>${k.label}</b> ＝ ${m == null ? 'この配列では音なし' : noteName(m) + '（度数 ' + DEG_NAMES[pc(m - tonicNow())] + '）'}。隣接: ${parts.join('、')}`; }
+function release(code) { if (state.pressed.delete(code)) invalidate(); }
+function stopAuto() { state.auto = false; $('#autoChord').checked = false; }
+const isFormTarget = t => t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA');
+window.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;              // Ctrl+R・Ctrl+Shift+I・Ctrl+C などはページに渡す
+  if (e.code === 'Escape') { stopAuto(); setChord(null); if (isFormTarget(e.target)) e.target.blur(); return; }
+  if (e.repeat || isFormTarget(e.target)) return;
+  if (byCode[e.code]) { e.preventDefault(); press(e.code); } });
+window.addEventListener('keyup', e => { if (e.ctrlKey || e.metaKey || e.altKey) return; if (byCode[e.code]) release(e.code); });
+window.addEventListener('blur', () => { state.pressed.clear(); invalidate(); });
+const touches = new Map();
+canvas.addEventListener('pointerdown', e => { const r = canvas.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top; let best = null, bd = 1e9;
+  for (const s of sections) for (const c of s.cells.values()) { const d = Math.hypot(c.cx - x, c.cy - y); if (d < bd) { bd = d; best = { c, s }; } }
+  if (best && bd <= best.s.size) { touches.set(e.pointerId, best.c.k.code); press(best.c.k.code); try { canvas.setPointerCapture(e.pointerId); } catch (err) {} } });
+const endTouch = e => { const code = touches.get(e.pointerId); if (code) { release(code); touches.delete(e.pointerId); } };   // 縦スクロール開始時は pointercancel で離す
+canvas.addEventListener('pointerup', endTouch); canvas.addEventListener('pointercancel', endTouch);
+
+/* ---------- UI ---------- */
+function fillSelect(sel, entries) { sel.innerHTML = ''; for (const [k, name] of entries) { const o = document.createElement('option'); o.value = k; o.textContent = name; sel.appendChild(o); } }
+fillSelect($('#layout'), Object.entries(LAYOUTS).map(([k, v]) => [k, v.name]));
+fillSelect($('#tonic'), NOTE_NAMES.map((n, i) => [String(i), n + (i === 0 ? '（ハ長調）' : '')]));
+const chordBtns = $('#chordBtns');
+for (const c of CHORD_ORDER) { const b = document.createElement('button'); b.textContent = c; b.dataset.chord = c; b.addEventListener('click', e => { stopAuto(); setChord(c); ensureAudio();
+  const played = chordInfo.codes.map(code => midiOf(byCode[code])); (played.length ? played : CHORDS[c].map(p => p + state.trans)).forEach(p => playNote(p, 0.45, 1.4)); e.currentTarget.blur(); }); chordBtns.appendChild(b); }
+const clearBtn = document.createElement('button'); clearBtn.textContent = '消す'; clearBtn.addEventListener('click', e => { stopAuto(); setChord(null); e.currentTarget.blur(); }); chordBtns.appendChild(clearBtn);
+function setChord(c) { state.chord = c; for (const b of chordBtns.querySelectorAll('button[data-chord]')) b.setAttribute('aria-pressed', String(b.dataset.chord === c)); recomputeChord(); updateChordNote(); }
+
+function updateChordNote() { const el = $('#chordNote'); if (!state.chord) { el.textContent = '三和音を押すと構成音ごとに 1 セルが点灯します。隣接なら共有辺を消して一塊、離れていれば薄い殻で囲みます。'; return; }
+  const ci = chordInfo; const comps = components(ci.set); const root = NOTE_NAMES[pc(CHORDS[state.chord][0] + state.trans)]; const nm = state.chord.replace(/^[A-G]#?/, '');
+  const lab = codes => codes.map(c => byCode[c].label).join('・');
+  const shape = ci.set.size === 0 ? 'この配列には構成音がありません' : ci.set.size === 1 ? '1 セルのみ' : comps.length === 1 ? `<span class="ok">一塊</span>（${ci.set.size} セルが隣接）` : `<span class="mid">${comps.length} つに分かれる</span>（殻で表示）`;
+  let keep = '';
+  if (state.trans && ci.codes.length === 3) { const base = computeChord(state.chord, 0); if (base.codes.length === 3) keep = base.shapeKey === ci.shapeKey ? `<span class="ok">移調しても形は同じ</span>（${lab(base.codes)} → ${lab(ci.codes)}）` : `<span class="ng">移調で形が変わる</span>（${base.shapeText} → ${ci.shapeText}）`; }
+  const oct = ci.mixed ? '。オクターブ混在' : ci.alt ? `。音域に合わせて ${sgn(ci.alt / 12)} オクターブ` : '';
+  el.innerHTML = `${state.chord}${state.trans ? ' → ' + root + nm + '（' + sgn(state.trans) + ' 半音）' : ''}: ${ci.codes.length ? '<b>' + lab(ci.codes) + '</b> ' : ''}${shape}${ci.shapeText ? '。形: ' + ci.shapeText : ''}${keep ? '。' + keep : ''}${oct}${ci.missing.length ? '。<span class="ng">この配列にない音: ' + ci.missing.join('・') + '</span>' : ''}`; }
+
+function updateLayoutUI() { const L = LAYOUTS[state.layout]; $('#layoutDesc').textContent = L.desc; const iv = state.intervals;
+  for (const d of DIRS) { const el = $('#r' + d.id); el.textContent = iv[d.id].text; el.style.fontSize = iv[d.id].text.length > 3 ? '10px' : ''; }
+  const uni = DIRS.every(d => iv[d.id].uniform || iv[d.id].list.length === 0);
+  $('#roseNote').innerHTML = uni ? '6 方向の半音差が全セルで同じ（<b>等方</b>）。どのセルでも隣接の意味が一定。' : '方向ごとの差が場所で変わる（<b>非等方</b>: 白鍵同士は +2、E–F・B–C は +1 など）。「/」は多い順に 2 つ。';
+  const mapped = KEYS.filter(k => midiOf(k) != null); const lo = Math.min(...mapped.map(midiOf)), hi = Math.max(...mapped.map(midiOf));
+  $('#layoutMapNote').textContent = `この配列で音のあるキー: ${mapped.length} / 40、音域 ${noteName(lo)}〜${noteName(hi)}。`;
+  const tn = { wicki: '+2 半音 ＝ 右へ 1 列、+5 ＝ 左上へ 1 段、+7 ＝ 右上へ 1 段。どこへ動かしても和音の形は同じ。', harmonic: '+1 半音 ＝ 右へ 1 列、+3 ＝ 左上、+4 ＝ 右上。形は同じ。', janko: '+2 半音 ＝ 右へ 1 列、+1 ＝ 右上、−1 ＝ 左上。形は同じ。', garage: 'ピアノ型では黒鍵をまたぐと形が変わる（C → D♭ で指の形が崩れる）。', fl: 'ピアノ型では黒鍵をまたぐと形が変わる。', genshin: '白鍵しか無いので、半音の移調では音が無くなる。' };
+  $('#transNote').innerHTML = `${tn[state.layout]}　度数は「調＋移調」を主音として表示。`;
+  updatePhase(); }
+
+function updatePhase() { const L = LAYOUTS[state.layout]; const iso = !!L.iso; $('#phaseCol').textContent = iso ? '六角との位相' : '黒鍵の位相'; const tb = $('#phaseBody'); tb.innerHTML = ''; let worst = 0, relevant = 0;
+  const LV = ['ok', 'mid', 'ng'];
+  state.stag.forEach((v, i) => { const ph = ((v % 1) + 1) % 1; const err = Math.abs(ph - 0.5); const lv = err <= 0.125 ? 0 : err <= 0.375 ? 1 : 2;
+    const txt = lv === 0 ? (iso ? '合う（1/2u ずれ）' : '合う（黒鍵が白鍵の間）') : lv === 1 ? `${fmtU(Math.round(err * 4) / 4)}u ずれる` : (iso ? '合わない（真上）' : '合わない（黒鍵が真上）');
+    const rel = L.gaps.includes(i); if (rel) { relevant++; worst = Math.max(worst, lv); }
+    const tr = document.createElement('tr'); tr.innerHTML = `<td>${GAP_NAMES[i]}</td><td class="num">${fmtU(v)}</td><td class="${LV[lv]}">${txt}</td><td>${rel ? '●' : '<span class="dim">—</span>'}</td>`; tb.appendChild(tr); });
+  const note = $('#phaseNote'); const head = `この端末（${state.stagName}）× <b>${L.name.split('（')[0]}</b>: `;
+  if (relevant === 0) note.innerHTML = `<b>${L.name.split('（')[0]}</b> は黒鍵も段またぎの意味も無いので、位相は関係なし。`;
+  else if (worst === 0) note.innerHTML = head + (iso ? '<span class="ok">段ずれが六角格子と合う</span>。' : '<span class="ok">黒鍵の位相が六角格子と合う</span>。');
+  else if (worst === 1) note.innerHTML = head + (iso ? '<span class="mid">1/4u ずれる</span>（六角の隣接に寄るが真上ではない）。' : '<span class="mid">1/4u ずれる</span>（黒鍵は白鍵の間寄り）。') + '退避「正六角のまま文字だけで押す」か、鍵盤図を物理座標に歪めるかを比べてください。';
+  else note.innerHTML = head + '<span class="ng">位相が合わない</span>（真上）。退避「正六角のまま文字だけで押す」か、鍵盤図を物理座標に歪めるかを比べてください。'; }
+
+function updateConvNote() { $('#convNote').textContent = (state.conv === 'qw' ? '六角格子で A の左上を Q、右上を W にする（A 段を +1/4u 右へ寄せて格子に乗せる。ANSI では各ずれ 1/4u）。' : '六角格子で A の右上を Q、左上を空き（Tab 側）にする（A・Z 段を −3/4u 左へ寄せる。ずれは大きいが Q の真下に近い A を Q の隣と読む規約）。') + '仕様の「A の左上＝W」は A を +1.25u 動かすことになり六角格子で成立しないため、「A の右上＝Q」を対案にした（hc() の 1 行で差し替え可）。'; }
+function updateFallbackNote() { const el = $('#fallbackNote'); if (!state.fallback) { el.textContent = '段ずれが合わない端末では、鍵盤図を正六角のままにして文字だけで判定する退避があります。'; return; }
+  const off = physOffFor(state.stag); const rows = [1, 2, 3].map(r => `${ROW_NAMES[r]} ${sgn(Math.round(((ROW_OFF[r] + (state.conv === 'tq' && r >= 2 ? -1 : 0)) - off[r]) * 100) / 100)}u`);
+  el.innerHTML = `退避中: 鍵盤図は正六角のまま。判定は文字（物理キー）で行うので、六角の位置と実機の差は見た目だけ。<b>物理との差</b>（数字段を基準）: ${rows.join('、')}（申告: ${state.stagName}）。`; }
+function updateStageNote() { const g = visibleGrids(); const scaled = uEff < state.u - 0.5; const compact = uEff < 44 && state.labels === 'all';
+  $('#stageNote').innerHTML = `1u ＝ ${uEff.toFixed(0)} px${scaled ? '（幅に合わせて縮小）' : ''}。${compact ? '幅が狭いので度数は音名の横に小さく、♯印は省略。' : ''}<b>赤い辺</b>＝申告した段ずれ（${state.stagName}）では、その六角隣接が物理で 1/4u 以上ずれる組。<b>①</b>は六角格子に吸着、<b>②</b>は申告した段ずれの物理座標（行間 1.0u、六角は触れない）、<b>③</b>は均等 1/4u 機の物理座標。${g.length === 1 ? '「3 つ並べる」で比較できます。' : ''}`; }
+
+/* 段ずれ UI */
+function allStags() { return STAG_BUILTIN.concat(savedStags); }
+function fillStagSel() { const sel = $('#stagSel'); const entries = allStags().map(s => [s.id, s.name]); if (state.stagId === 'custom') entries.push(['custom', '（編集中・未保存）']); fillSelect(sel, entries); sel.value = state.stagId; $('#stagDel').disabled = !state.stagId.startsWith('u:'); }
+function applyStag(s) { state.stagId = s.id; state.stag = s.v.slice(); state.stagName = s.name; [0, 1, 2].forEach(i => $('#st' + i).value = s.v[i]); if (s.id.startsWith('u:')) $('#stagName').value = s.name; fillStagSel(); refresh(); }
+$('#stagSel').addEventListener('change', e => { const s = allStags().find(x => x.id === e.target.value); if (s) applyStag(s); e.target.blur(); });
+[0, 1, 2].forEach(i => $('#st' + i).addEventListener('input', () => { const v = [0, 1, 2].map(j => { const n = parseFloat($('#st' + j).value); return Number.isFinite(n) ? Math.round(n * 4) / 4 : 0; }); state.stag = v; state.stagId = 'custom'; state.stagName = ($('#stagName').value.trim() || '編集中') + '（未保存）'; fillStagSel(); refresh(); }));
+$('#stagSave').addEventListener('click', e => { let name = $('#stagName').value.trim(); if (!name) { name = '実機 ' + (savedStags.length + 1); $('#stagName').value = name; } const v = state.stag.slice(); const ex = savedStags.find(s => s.name === name); if (ex) ex.v = v; else savedStags.push({ id: 'u:' + name, name, v }); persistStags(); applyStag({ id: 'u:' + name, name, v }); $('#stagNote').innerHTML = `<b>${name}</b> を保存しました（この端末のブラウザに残ります）。`; e.currentTarget.blur(); });
+$('#stagDel').addEventListener('click', e => { if (!state.stagId.startsWith('u:')) return; const name = state.stagName; savedStags = savedStags.filter(s => s.id !== state.stagId); persistStags(); applyStag(STAG_BUILTIN[0]); $('#stagNote').innerHTML = `<b>${name}</b> を削除しました。`; e.currentTarget.blur(); });
+
+/* その他の設定（select／radio／checkbox は変更後に blur して、次の文字キーが頭文字ジャンプにならないようにする） */
+$('#layout').addEventListener('change', e => { state.layout = e.target.value; refresh(); e.target.blur(); });
+for (const r of document.querySelectorAll('input[name=grid]')) r.addEventListener('change', e => { state.grid = e.target.value; refresh(); e.target.blur(); });
+for (const r of document.querySelectorAll('input[name=conv]')) r.addEventListener('change', e => { state.conv = e.target.value; refresh(); e.target.blur(); });
+$('#upx').addEventListener('input', e => { state.u = +e.target.value; $('#upxVal').textContent = state.u + ' px'; refresh(); });
+$('#fallback').addEventListener('change', e => { state.fallback = e.target.checked; for (const r of document.querySelectorAll('input[name=grid]')) r.disabled = state.fallback; refresh(); e.target.blur(); });
+$('#labels').addEventListener('change', e => { state.labels = e.target.value; updateStageNote(); invalidate(); e.target.blur(); });
+$('#tonic').addEventListener('change', e => { state.tonic = +e.target.value; invalidate(); e.target.blur(); });
+function transText() { const t = state.trans; if (t === 0) return '0 半音'; const cols = (state.layout === 'wicki' || state.layout === 'janko') && t % 2 === 0 ? t / 2 : state.layout === 'harmonic' ? t : null; return sgn(t) + ' 半音' + (cols != null ? `（${cols > 0 ? '右' : '左'}へ ${Math.abs(cols)} 列）` : ''); }
+$('#trans').addEventListener('input', e => { state.trans = +e.target.value; $('#transVal').textContent = transText(); recomputeChord(); updateChordNote(); });
+$('#autoChord').addEventListener('change', e => { state.auto = e.target.checked; if (!state.auto) setChord(state.chord); e.target.blur(); });
+setInterval(() => { if (!state.auto) return; const i = CHORD_ORDER.indexOf(state.chord); setChord(CHORD_ORDER[(i + 1) % CHORD_ORDER.length]); }, 1600);
+
+function refresh() { rebuildMapping(); recomputeChord(); updateLayoutUI(); updateConvNote(); updateFallbackNote(); updateChordNote(); $('#transVal').textContent = transText(); layout(); }
+if (window.ResizeObserver) new ResizeObserver(() => layout()).observe(main); else window.addEventListener('resize', layout);
+fillStagSel(); refresh(); setChord('C');
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(invalidate);
+/* 描画は dirty のときだけ（入力・設定・押鍵・巡回で立つ）。毎フレームの塊計算を避ける */
+(function frame() { if (dirty) { dirty = false; try { draw(); } catch (e) { $('#stageNote').textContent = '描画エラー: ' + e.message; } } requestAnimationFrame(frame); })();
+})();
+</script>
