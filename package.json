@@ -24,7 +24,7 @@
     "check": "npm run licenses && npm run licenses:files && npm run charts:rights && npm run typecheck && npm test && npm run charts:validate"
   },
   "devDependencies": {
-    "@types/node": "24.19.2",
+    "@types/node": "26.6.5",
     "license-checker-rseidelsohn": "5.0.1",
     "prettier": "3.9.10",
     "typescript": "7.0.2",
