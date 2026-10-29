@@ -1,0 +1,457 @@
+<title>ヘクサノート 画面配置</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Rajdhani:wght@500;600;700&display=swap">
+<style>
+/* m0: 仮想画面枠を実寸 px の Canvas で描き、右の欄に設定と数値を並べる。電話幅では欄が下に積まれる。 */
+:root{
+  --bg:#f3f1ec; --fg:#1d1b17; --muted:#6b6660; --panel:#fbfaf7; --line:#d9d4ca; --field:#ffffff;
+  --accent:#d9672b; --accent-2:#2b7fd9; --good:#2f9e5b; --warn:#d9a52b; --bad:#d94b4b;
+  --font-body:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  --font-num:"Rajdhani","Zen Kaku Gothic New",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#15171c; --fg:#ecebe6; --muted:#9a978f; --panel:#1d2027; --line:#2e323b; --field:#262a33; --accent:#f08a4b; --accent-2:#5aa0f0; --good:#3fb86d; --warn:#e6b23a; --bad:#ef6464; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#15171c; --fg:#ecebe6; --muted:#9a978f; --panel:#1d2027; --line:#2e323b; --field:#262a33; --accent:#f08a4b; --accent-2:#5aa0f0; --good:#3fb86d; --warn:#e6b23a; --bad:#ef6464; color-scheme:dark }
+html,body{height:100%}
+html{scrollbar-gutter:stable}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.5}
+*{box-sizing:border-box}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 332px;grid-template-rows:auto minmax(0,1fr);min-height:100%}
+header.top{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px;min-width:0}
+.brand svg{width:22px;height:22px;fill:var(--accent);flex:none}
+.brand .sub{font-weight:400;color:var(--muted);font-size:12px;letter-spacing:.04em}
+.status{color:var(--muted);font-size:12px;flex:1 1 260px;min-width:0}
+.stageWrap{min-width:0;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:8px;align-content:start}
+.fitbox{width:100%;min-width:0;overflow:auto;border:1px solid var(--line);border-radius:8px;background:#0b0d12}
+.scaler{position:relative;overflow:hidden}
+canvas{display:block;transform-origin:0 0;touch-action:none}
+.scaleNote{margin:0;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 16px;min-width:0}
+.scaleNote b{color:var(--fg);font-family:var(--font-num);font-size:13px}
+aside{overflow:auto;border-left:1px solid var(--line);background:var(--panel);padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px;align-content:start;min-width:0}
+fieldset{border:0;margin:0;padding:0;display:grid;gap:8px;min-width:0}
+legend{font-weight:700;font-size:12px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;padding:0;margin-bottom:4px}
+.row{display:grid;grid-template-columns:92px minmax(0,1fr);align-items:center;gap:8px;min-width:0}
+.row label,.row .lab{color:var(--muted);font-size:12px}
+select,input[type=range]{width:100%;min-width:0;font:inherit}
+select{padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--fg)}
+.val{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:13px;color:var(--fg);min-width:64px;text-align:right}
+.range{display:flex;align-items:center;gap:8px;min-width:0}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;min-width:0}
+.seg label{flex:1;text-align:center;padding:5px 4px;cursor:pointer;font-size:12px;color:var(--muted);position:relative;min-width:0}
+.seg input{position:absolute;opacity:0;inset:0;margin:0}
+.seg label:has(input:checked){background:var(--accent-2);color:#fff}
+.seg label:focus-within{outline:2px solid var(--accent);outline-offset:-2px}
+.checks{display:grid;gap:6px}
+.checks label{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0}
+.note{font-size:12px;color:var(--muted);margin:0;min-width:0}
+.note b{color:var(--fg)}
+.nums{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 10px;font-size:12px;margin:0;min-width:0}
+.nums dt{color:var(--muted);white-space:nowrap}
+.nums dd{margin:0;font-family:var(--font-num);font-size:14px;font-variant-numeric:tabular-nums;min-width:0;overflow-wrap:anywhere}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-weight:700;font-size:12px;font-family:var(--font-body);line-height:1.5}
+.badge.ok{background:var(--good);color:#fff}
+.badge.ng{background:var(--bad);color:#fff}
+.badge.fit{background:var(--accent-2);color:#fff}
+.badge.nofit{background:var(--warn);color:#1d1b17}
+.verdict{display:grid;gap:4px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--field);min-width:0}
+.verdict .big{font-size:16px;font-weight:700}
+.verdict p{margin:0;font-size:12px;color:var(--muted)}
+table.sum{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}
+table.sum th,table.sum td{padding:4px 4px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+table.sum th{color:var(--muted);font-weight:500}
+table.sum th:first-child,table.sum td:first-child{text-align:left;white-space:normal;min-width:0}
+table.sum td{font-family:var(--font-num);font-size:13px}
+table.sum tr.cur td{background:color-mix(in srgb,var(--accent-2) 14%,transparent)}
+table.sum .badge{padding:0 7px;font-size:11px}
+.tableWrap{overflow:auto;min-width:0}
+@media (min-width:901px){ .stageWrap{position:sticky;top:0;align-self:start} }
+@media (max-width:900px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto;min-height:auto}
+  aside{border-left:0;border-top:1px solid var(--line);overflow:visible}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5 21.5 7v10L12 22.5 2.5 17V7z"/></svg>ヘクサノート<span class="sub">m0 画面配置と縦予算</span></div>
+    <div class="status">仮想画面枠を実寸 px で描き、YouTube プレイヤー（灰矩形）・落下域・鍵盤図の同居を見る。見本は自動で流れ続けます。文字キーを押すとそのセルが光って鳴ります（鍵盤図に無い段のキーは音だけ）。</div>
+  </header>
+
+  <section class="stageWrap">
+    <div class="fitbox" id="fitbox"><div class="scaler" id="scaler"><canvas id="screen" aria-label="仮想画面枠の実寸図"></canvas></div></div>
+    <p class="scaleNote"><span id="scaleNote"></span><span>基準速度 <b>0.5 px/ms</b>（HS ×1.0）、成立条件（落下方式）: 判定線まで <b>1.5 s</b> 以上かつセル <b>24 px</b> 以上。far-16 は落下域を持たないので成立判定は出さず、輪が舞台に<b>収まる／収まらない</b>で見る</span></p>
+  </section>
+
+  <aside>
+    <fieldset>
+      <legend>数値（実寸 px）</legend>
+      <div class="verdict"><div class="big" id="verdictBig"></div><p id="verdictWhy"></p></div>
+      <dl class="nums">
+        <dt>画面</dt><dd id="nScreen"></dd>
+        <dt>プレイヤー</dt><dd id="nPlayer"></dd>
+        <dt>舞台</dt><dd id="nStage"></dd>
+        <dt>セル</dt><dd id="nCell"></dd>
+        <dt>文字</dt><dd id="nFont"></dd>
+        <dt>鍵盤図</dt><dd id="nKb"></dd>
+        <dt>落下域</dt><dd id="nFall"></dd>
+        <dt>有効秒数 HS1.0</dt><dd id="nSec"></dd>
+        <dt>1.5 s に要る HS</dt><dd id="nNeed"></dd>
+        <dt>選択の速度</dt><dd id="nChosen"></dd>
+        <dt>段別の押し上げ</dt><dd id="nPush"></dd>
+        <dt>far-16 の余り</dt><dd id="nFar"></dd>
+      </dl>
+    </fieldset>
+    <fieldset>
+      <legend>3 配置の比較（落下方式・今の画面枠・段数・セルで）</legend>
+      <p class="note" id="sumModeNote" hidden>表は<b>落下方式</b>の値（far-16 選択中は上の印と条件が違う。far-16 に成立判定は無い）</p>
+      <div class="tableWrap"><table class="sum"><thead><tr><th>配置</th><th>落下域 px</th><th>s @HS1.0</th><th>要 HS</th><th>成立</th><th>far-16 最大セル</th></tr></thead><tbody id="sumBody"></tbody></table></div>
+      <p class="note">「要 HS」は 1.5 s を確保するための倍率。far-16 列は落下域を持たないとき鍵盤図を何 px のセルまで広げられるか（輪の張り出し込み）。</p>
+    </fieldset>
+    <fieldset>
+      <legend>配置</legend>
+      <div class="row"><span class="lab">配置</span>
+        <div class="seg">
+          <label><input type="radio" name="layout" value="split" checked><span>左右分割</span></label>
+          <label><input type="radio" name="layout" value="stack"><span>上下</span></label>
+          <label><input type="radio" name="layout" value="floor"><span>床兼用</span></label>
+        </div></div>
+      <p class="note" id="layoutDesc"></p>
+      <div class="row"><label for="screenSel">仮想画面枠</label><select id="screenSel">
+        <option value="1366x768">1366×768（ノート PC）</option><option value="1280x720">1280×720</option><option value="1440x900">1440×900</option><option value="1920x1080">1920×1080</option></select></div>
+      <div class="row"><label for="ph">プレイヤー</label><div class="range"><input type="range" id="ph" min="200" max="270" step="2" value="270"><span class="val" id="phVal">480×270</span></div></div>
+      <div class="checks"><label><input type="checkbox" id="minPlayer"> 規約の最小 200×200 の矩形で置く（16:9 を崩す）</label></div>
+      <p class="note">スライダーは 16:9 固定で、規約の最小 200×200 を高さで満たす下限は 356×200。上のチェックで 200×200 そのものも試せる。</p>
+    </fieldset>
+    <fieldset>
+      <legend>鍵盤図と落下域</legend>
+      <div class="row"><span class="lab">段数</span>
+        <div class="seg"><label><input type="radio" name="rows" value="2"><span>2 段</span></label><label><input type="radio" name="rows" value="4" checked><span>4 段</span></label></div></div>
+      <div class="row"><span class="lab">方式</span>
+        <div class="seg"><label><input type="radio" name="mode" value="fall" checked><span>落下</span></label><label><input type="radio" name="mode" value="far16"><span>far-16 リング収縮</span></label></div></div>
+      <p class="note" id="modeDesc"></p>
+      <div class="row"><span class="lab">セル寸法</span>
+        <div class="seg"><label><input type="radio" name="cell" value="24" checked><span>24 px</span></label><label><input type="radio" name="cell" value="26"><span>26 px</span></label><label><input type="radio" name="cell" value="28"><span>28 px</span></label></div></div>
+      <div class="row"><label for="travel">ハイスピード</label><div class="range"><input type="range" id="travel" min="0.8" max="2.0" step="0.1" value="1.5"><span class="val" id="travelVal">1.5 s</span></div></div>
+      <p class="note">判定線（または輪の開始）までの秒数。速度は「落下域の高さ ÷ 秒数」で決まり、右下に px/ms と基準 0.5 px/ms に対する倍率を出します。</p>
+    </fieldset>
+    <fieldset>
+      <legend>見本</legend>
+      <div class="row"><label for="song">曲</label><select id="song"><option value="twinkle">きらきら星（96 BPM）</option><option value="scale">スケール走り（120 BPM・8 分）</option></select></div>
+      <div class="row"><label for="tempo">テンポ</label><select id="tempo"><option value="100">100%</option><option value="150">150%（密度を上げる）</option><option value="200">200%（輪の重なりを見る）</option></select></div>
+      <div class="checks">
+        <label><input type="checkbox" id="sound"> 見本の音を鳴らす（合成ピアノ）</label>
+        <label><input type="checkbox" id="real"> 実寸 1:1 で表示（枠内スクロール）</label>
+      </div>
+    </fieldset>
+  </aside>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const SQ3 = Math.sqrt(3);
+
+/* ---------- キー表（m1-core と同じ） ---------- */
+const ROWS = [
+  ['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','Digit0'],
+  ['KeyQ','KeyW','KeyE','KeyR','KeyT','KeyY','KeyU','KeyI','KeyO','KeyP'],
+  ['KeyA','KeyS','KeyD','KeyF','KeyG','KeyH','KeyJ','KeyK','KeyL','Semicolon'],
+  ['KeyZ','KeyX','KeyC','KeyV','KeyB','KeyN','KeyM','Comma','Period','Slash'],
+];
+const ROW_OFF = [0, 0.5, 1.0, 1.5];
+const SPECIAL = { Semicolon:';', Comma:',', Period:'.', Slash:'/' };
+const KEYS = [];
+ROWS.forEach((r, ri) => r.forEach((code, ci) => KEYS.push({ code, row: ri, col: ci, label: SPECIAL[code] || code.replace(/^Key|^Digit/, ''), gx: ROW_OFF[ri] + ci })));
+const byCodeAll = Object.fromEntries(KEYS.map(k => [k.code, k]));
+const ROW_COLORS = ['#c08cf0', '#62a6f2', '#52d490', '#f2a452'];
+const hexDist = (a, b) => { const dq = a.col - b.col, dr = a.row - b.row; return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2; };
+
+/* 配列: 4 段は FL 風 2 オクターブ、2 段は GarageBand 風 1 オクターブ（A 段白鍵・Q 段黒鍵） */
+const PRESETS = {
+  fl: { name: 'ピアノ風・2 オクターブ', rows: [0, 1, 2, 3],
+    map() { const m = {}; [48,50,52,53,55,57,59,60,62,64].forEach((p, i) => m[ROWS[3][i]] = p);
+      Object.assign(m, { KeyS:49, KeyD:51, KeyG:54, KeyH:56, KeyJ:58, KeyL:61, Semicolon:63 });
+      [60,62,64,65,67,69,71,72,74,76].forEach((p, i) => m[ROWS[1][i]] = p);
+      Object.assign(m, { Digit2:61, Digit3:63, Digit5:66, Digit6:68, Digit7:70, Digit9:73, Digit0:75 }); return m; } },
+  garage: { name: 'ピアノ風・1 オクターブ', rows: [1, 2],
+    map() { const m = {}; [60,62,64,65,67,69,71,72,74,76].forEach((p, i) => m[ROWS[2][i]] = p);
+      Object.assign(m, { KeyW:61, KeyE:63, KeyT:66, KeyY:68, KeyU:70, KeyO:73, KeyP:75 }); return m; } },
+};
+
+/* ---------- 内蔵の曲（m1-core から） ---------- */
+function mel(name, bpm, seq) { let b = 0; const notes = []; for (const [p, d] of seq) { if (p !== null) notes.push({ midi: p, beat: b, dur: d }); b += d; } return { name, bpm, notes, beats: b }; }
+const C=60, D=62, E=64, F=65, G_=67, A=69;
+const SONGS = {
+  twinkle: mel('きらきら星', 96, [[C,1],[C,1],[G_,1],[G_,1],[A,1],[A,1],[G_,2],[F,1],[F,1],[E,1],[E,1],[D,1],[D,1],[C,2],[G_,1],[G_,1],[F,1],[F,1],[E,1],[E,1],[D,2],[G_,1],[G_,1],[F,1],[F,1],[E,1],[E,1],[D,2],[C,1],[C,1],[G_,1],[G_,1],[A,1],[A,1],[G_,2],[F,1],[F,1],[E,1],[E,1],[D,1],[D,1],[C,2]]),
+  scale: mel('スケール走り', 120, [48,50,52,53,55,57,59,60,62,64,65,67,69,71,72,74,76,74,72,71,69,67,65,64,62,60,59,57,55,53,52,50,48].map((p, i, a) => [p, i === a.length - 1 ? 2 : .5])),
+};
+
+/* ---------- 定数 ---------- */
+const SCREENS = { '1366x768': [1366, 768], '1280x720': [1280, 720], '1440x900': [1440, 900], '1920x1080': [1920, 1080] };
+const CHROME = 100;        // ブラウザの枠（タブ・アドレスバー）の目安
+const BASE = 500;          // 基準速度 px/s（0.5 px/ms = HS ×1.0）
+const PAD = 12, GAP = 12;  // 画面内の余白
+const LINE_GAP = 0.8;      // 判定線と鍵盤図上端の隙間（R 単位）
+const KB_BOTTOM = 8;       // 鍵盤図の下の余白
+const RING_MAX = 2.6;      // far-16 の輪の開始半径（R 単位）
+const NEED_SEC = 1.5, MIN_CELL = 24, LEAD = 2.0;
+const LAYOUT_NAMES = { split: '左右分割', stack: '上下', floor: '床兼用' };
+const LAYOUT_DESC = {
+  split: '左右分割: プレイヤーを左に置き、右の列の全高を落下域＋鍵盤図に使う。縦予算がいちばん大きい。',
+  stack: '上下: プレイヤーを上に置き、その下に落下域と鍵盤図。プレイヤーの高さがそのまま落下域から減る。',
+  floor: '床兼用: 上下配置のまま、鍵盤図を落下域の床にしてセルに直接着地させる（段別着地）。判定線と鍵盤図の帯を持たないぶん落下域が伸びるが、段ごとに届く高さが違う。',
+};
+const MODE_DESC = {
+  fall: '落下: 上から六角セルが流れ、判定線（床兼用では自分のセル）に届いた瞬間が押し時。',
+  far16: 'far-16 リング収縮: 落下させず、鍵盤図の各セルの上で輪が縮み、セルの大きさに重なった瞬間が押し時（jubeat 型）。落下域が要らないので縦予算の対照になる。',
+};
+
+const S = { layout: 'split', screen: '1366x768', ph: 270, minPlayer: false, rows: 4, mode: 'fall', cell: 24, travel: 1.5, song: 'twinkle', tempo: 100, sound: false, real: false, chart: null, t0: performance.now() };
+
+/* ---------- 幾何（純関数。比較表でも使う） ---------- */
+function computeGeom(layout, mode, o = S) {
+  const [SW, SH] = SCREENS[o.screen]; const effH = SH - CHROME;
+  const ph = o.minPlayer ? 200 : o.ph, pw = o.minPlayer ? 200 : Math.round(o.ph * 16 / 9);
+  const preset = o.rows === 4 ? PRESETS.fl : PRESETS.garage; const rowsUsed = preset.rows;
+  const hexW = o.cell, R = hexW / SQ3;
+  const minGx = Math.min(...rowsUsed.map(r => ROW_OFF[r])), maxGx = Math.max(...rowsUsed.map(r => ROW_OFF[r])) + 9;
+  const kbW = (maxGx - minGx + 1) * hexW; const kbH = (2 + 1.5 * (rowsUsed.length - 1)) * R;
+  let player, stage; const hud = [];
+  if (layout === 'split') {
+    player = { x: PAD, y: CHROME + PAD, w: pw, h: ph };
+    stage = { x: PAD + pw + GAP, y: CHROME + PAD, w: SW - (PAD + pw + GAP) - PAD, h: effH - 2 * PAD };
+    hud.push({ x: PAD, y: player.y + ph + GAP, w: pw, h: stage.y + stage.h - (player.y + ph + GAP), label: 'スコア・曲名・設定（HUD）' });
+  } else {
+    player = { x: Math.round((SW - pw) / 2), y: CHROME + PAD, w: pw, h: ph };
+    const sy = CHROME + PAD + ph + GAP;
+    stage = { x: PAD, y: sy, w: SW - 2 * PAD, h: effH - PAD - ph - GAP - PAD };
+    hud.push({ x: PAD, y: player.y, w: player.x - GAP - PAD, h: ph, label: 'スコア・曲名（HUD）' },
+             { x: player.x + pw + GAP, y: player.y, w: SW - PAD - (player.x + pw + GAP), h: ph, label: '設定・練習パネル' });
+  }
+  const ringExtra = (RING_MAX - 0.93) * R;   // far-16 の輪の張り出し（セル縁 0.93R から開始半径まで。上下とも同じ）
+  const kbBottom = stage.y + stage.h - KB_BOTTOM - (mode === 'far16' ? ringExtra : 0); const kbTop = kbBottom - kbH; const kbLeft = stage.x + (stage.w - kbW) / 2;
+  const mapping = preset.map(); const cells = [];
+  for (const k of KEYS) if (rowsUsed.includes(k.row)) cells.push({ ...k, midi: mapping[k.code], cx: kbLeft + hexW * (k.gx - minGx + 0.5), cy: kbTop + R + 1.5 * R * rowsUsed.indexOf(k.row) });
+  const byCode = Object.fromEntries(cells.map(c => [c.code, c]));
+  const yLine = kbTop - LINE_GAP * R;
+  const cyTop = kbTop + R, cyBot = kbTop + R + 1.5 * R * (rowsUsed.length - 1);
+  const perCell = layout === 'floor';
+  const fallH = perCell ? cyTop - stage.y : yLine - stage.y; const fallHmax = perCell ? cyBot - stage.y : fallH;
+  const secBase = fallH / BASE; const speed = fallH / o.travel; const needHS = (fallH / NEED_SEC) / BASE;
+  const push = 1.5 * R * (rowsUsed.length - 1);
+  const spare = stage.h - KB_BOTTOM - kbH - 2 * ringExtra - 8;   // 輪の張り出しを上下 2 回引く
+  const wUnits = (maxGx - minGx + 1) + (RING_MAX - 0.93); const hUnitsR = (2 + 1.5 * (rowsUsed.length - 1)) + 2 * (RING_MAX - 0.93) + 0.6;   // 左右・上下の張り出し込み
+  const maxCell = Math.max(0, Math.floor(Math.min(stage.w * 0.95 / wUnits, (stage.h - KB_BOTTOM - 8) / hUnitsR * SQ3)));
+  const okFall = secBase >= NEED_SEC && o.cell >= MIN_CELL; const okFar = o.cell >= MIN_CELL && spare >= 0;
+  const ok = mode === 'far16' ? okFar : okFall;
+  return { SW, SH, effH, pw, ph, player, stage, hud, R, hexW, kbW, kbH, kbTop, kbLeft, rowsUsed, cells, byCode, yLine, perCell, fallH, fallHmax, secBase, speed, needHS, push, spare, maxCell, ok, okFall, okFar, fontPx: Math.round(R * 0.95), preset, mode, layout, minPlayer: !!o.minPlayer, ringExtra };
+}
+
+/* ---------- 譜面（自動再生の見本） ---------- */
+function buildChart() {
+  const song = SONGS[S.song]; const preset = S.rows === 4 ? PRESETS.fl : PRESETS.garage; const mapping = preset.map();
+  const byPitch = {}; for (const [code, m] of Object.entries(mapping)) (byPitch[m] ||= []).push(byCodeAll[code]);
+  const spb = 60 / song.bpm * (100 / S.tempo); let prev = null; const out = [];
+  for (const n of song.notes) {
+    let cands = null; for (const sh of [0, 12, -12, 24, -24]) if (byPitch[n.midi + sh]) { cands = byPitch[n.midi + sh]; break; }
+    if (!cands) continue;
+    const key = prev ? cands.reduce((a, b) => hexDist(a, prev) <= hexDist(b, prev) ? a : b) : cands[0];
+    out.push({ midi: mapping[key.code], code: key.code, t: LEAD + n.beat * spb, dur: n.dur * spb, hold: n.dur >= 1.5, lastLoop: -1 });   // 尾は付点 4 分（1.5 拍）以上だけ prev = key;
+  }
+  const endT = out.length ? out[out.length - 1].t + out[out.length - 1].dur : LEAD;
+  S.chart = { notes: out, period: endT + 1.5, name: song.name }; S.t0 = performance.now();
+}
+
+/* ---------- Canvas の大きさと縮小 ---------- */
+const canvas = $('#screen'); let G = computeGeom(S.layout, S.mode); let DPR = 1, SCALE = 1;
+function sizeCanvas() { DPR = Math.min(2, window.devicePixelRatio || 1); const w = Math.round(G.SW * DPR), h = Math.round(G.SH * DPR);
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; canvas.style.width = G.SW + 'px'; canvas.style.height = G.SH + 'px'; } }
+let fitKey = '';
+function fit() { const box = $('#fitbox'); const avail = Math.max(120, box.clientWidth); SCALE = S.real ? 1 : Math.min(1, avail / G.SW);
+  const key = [SCALE.toFixed(4), G.SW, G.SH, G.SW > avail, S.real].join('|'); if (key === fitKey) return; fitKey = key;
+  canvas.style.touchAction = S.real ? 'pan-x' : 'none';
+  const sc = $('#scaler'); sc.style.width = Math.round(G.SW * SCALE) + 'px'; sc.style.height = Math.round(G.SH * SCALE) + 'px'; canvas.style.transform = `scale(${SCALE})`;
+  $('#scaleNote').innerHTML = SCALE < 1 ? `縮小表示 <b>×${SCALE.toFixed(2)}</b>（px の値は右の数値欄が実寸）` : (G.SW > avail ? '実寸 <b>1:1</b>（枠内を横に動かして見る）' : '実寸 <b>1:1</b> で表示中'); }
+function syncTravelVal() { $('#travelVal').textContent = S.mode === 'fall' ? `${S.travel.toFixed(1)} s（HS ×${(G.speed / BASE).toFixed(2)}）` : `${S.travel.toFixed(1)} s`; }
+function applyGeom() { G = computeGeom(S.layout, S.mode); sizeCanvas(); fit(); renderNumbers(); syncTravelVal(); }
+if (window.ResizeObserver) new ResizeObserver(() => fit()).observe($('#fitbox')); else window.addEventListener('resize', fit);
+window.addEventListener('resize', () => { const d = Math.min(2, window.devicePixelRatio || 1); if (d !== DPR) sizeCanvas(); });
+
+/* ---------- 数値欄 ---------- */
+const f1 = v => (Math.round(v * 10) / 10).toString();
+function badge(ok, txt, kind) { const cls = kind === 'fit' ? (ok ? 'fit' : 'nofit') : (ok ? 'ok' : 'ng'); return `<span class="badge ${cls}">${txt || (ok ? '成立' : '不成立')}</span>`; }
+function renderNumbers() { const g = G;
+  $('#nScreen').textContent = `${g.SW}×${g.SH} → 有効 ${g.SW}×${g.effH}（枠 ${CHROME} px を引く）`;
+  $('#nPlayer').textContent = `${g.pw}×${g.ph} px（${g.minPlayer ? '規約の最小寸・16:9 ではない' : '16:9'}、前に何も置かない）`;
+  $('#nStage').textContent = `${Math.round(g.stage.w)}×${Math.round(g.stage.h)} px（落下域＋鍵盤図）`;
+  $('#nCell').textContent = `幅 ${g.hexW} px（R ${f1(g.R)}、高さ ${f1(2 * g.R)}、段ピッチ ${f1(1.5 * g.R)}）`;
+  $('#nFont').textContent = `${g.fontPx} px（キー文字、R×0.95）`;
+  $('#nKb').textContent = `${Math.round(g.kbW)}×${Math.round(g.kbH)} px（${g.rowsUsed.length} 段、${g.preset.name}）`;
+  if (S.mode === 'fall') {
+    $('#nFall').textContent = g.perCell ? `${Math.round(g.fallH)}〜${Math.round(g.fallHmax)} px（最上段〜最下段のセル中心まで）` : `${Math.round(g.fallH)} px（判定線まで）`;
+    $('#nSec').textContent = `${g.secBase.toFixed(2)} s（0.5 px/ms）` + (g.perCell ? `、最下段 ${(g.fallHmax / BASE).toFixed(2)} s` : '');
+    $('#nNeed').textContent = `×${g.needHS.toFixed(2)}（${(g.needHS * 0.5).toFixed(2)} px/ms）`;
+    $('#nChosen').textContent = `${S.travel.toFixed(1)} s → ${(g.speed / 1000).toFixed(2)} px/ms（HS ×${(g.speed / BASE).toFixed(2)}）`;
+  } else { $('#nFall').textContent = '— 落下域なし（輪はセル上で縮む）'; $('#nSec').textContent = '—'; $('#nNeed').textContent = '—'; $('#nChosen').textContent = `${S.travel.toFixed(1)} s で輪が ${f1(RING_MAX * g.R)} px → ${f1(0.93 * g.R)} px に縮む`; }
+  $('#nPush').textContent = `${Math.round(g.push)} px（最上段→最下段の中心差 = (段数−1)×段ピッチ。仕様の式「段数×セル高」なら ${Math.round(g.rowsUsed.length * 2 * g.R)} px）、鍵盤図高 ${Math.round(g.kbH)} px`;
+  $('#nFar').textContent = `余り高さ ${Math.round(g.spare)} px、セルは最大 ${g.maxCell} px まで広げられる（輪の張り出し ${Math.round(g.ringExtra)} px を上下左右に見込む）`;
+  const big = $('#verdictBig'), why = $('#verdictWhy');
+  if (S.mode === 'fall') { big.innerHTML = badge(g.okFall) + ` ${LAYOUT_NAMES[S.layout]}・落下`;
+    const parts = []; parts.push(`有効 ${g.secBase.toFixed(2)} s ${g.secBase >= NEED_SEC ? '≥' : '<'} 1.5 s`); parts.push(`セル ${g.hexW} px ${g.hexW >= MIN_CELL ? '≥' : '<'} 24 px`);
+    why.textContent = parts.join('、') + (g.okFall ? '。' : `。1.5 s を取るならハイスピードを ×${g.needHS.toFixed(2)} に落とす（${S.screen} の枠で）。`); }
+  else { big.innerHTML = badge(g.okFar, g.okFar ? '収まる' : '収まらない', 'fit') + ` ${LAYOUT_NAMES[S.layout]}・far-16`;
+    why.textContent = (g.okFar ? `輪（開始半径 ${f1(RING_MAX * g.R)} px）と鍵盤図が舞台に収まる（余り ${Math.round(g.spare)} px）。` : `鍵盤図と輪が舞台に収まらない（余り ${Math.round(g.spare)} px）。`) + '落下域が無いので「1.5 s」の成立判定は出さない（成立判定は落下方式のみ、下の比較表を参照）。輪が重なったとき読めるかは見本のテンポを上げて目で判断する。'; }
+  $('#sumModeNote').hidden = S.mode !== 'far16';
+  const tb = $('#sumBody'); tb.innerHTML = '';
+  for (const key of Object.keys(LAYOUT_NAMES)) { const a = computeGeom(key, 'fall'); const tr = document.createElement('tr'); if (key === S.layout) tr.className = 'cur';
+    tr.innerHTML = `<td>${LAYOUT_NAMES[key]}</td><td>${Math.round(a.fallH)}${a.perCell ? '〜' + Math.round(a.fallHmax) : ''}</td><td>${a.secBase.toFixed(2)}</td><td>×${a.needHS.toFixed(2)}</td><td>${badge(a.okFall)}</td><td>${a.maxCell} px</td>`; tb.appendChild(tr); }
+}
+
+/* ---------- 描画 ---------- */
+function hexPath(ctx, cx, cy, r) { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 180 * (60 * i - 30); const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.closePath(); }
+function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+const JP = (w, px) => `${w} ${px}px "Zen Kaku Gothic New", system-ui, sans-serif`;
+const NUM = (w, px) => `${w} ${px}px Rajdhani, "Zen Kaku Gothic New", sans-serif`;
+function dimV(ctx, x, y0, y1, lines, color, side) { ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.moveTo(x - 5, y0); ctx.lineTo(x + 5, y0); ctx.moveTo(x - 5, y1); ctx.lineTo(x + 5, y1); ctx.stroke();
+  ctx.textBaseline = 'middle'; ctx.textAlign = side === 'left' ? 'right' : 'left'; const tx = side === 'left' ? x - 8 : x + 8; const ym = (y0 + y1) / 2;
+  lines.forEach((l, i) => { ctx.font = i === 0 ? NUM(700, 15) : JP(500, 12); ctx.fillText(l, tx, ym + (i - (lines.length - 1) / 2) * 17); }); }
+function noteWidth(ctx, lines) { let w = 0; lines.forEach((l, i) => { ctx.font = i === 0 ? NUM(700, 15) : JP(500, 12); w = Math.max(w, ctx.measureText(l).width); }); return w; }
+/* 寸法注記: 左に入れば左、だめなら右、どちらも足りなければ舞台上部に中央寄せ */
+function placeDim(ctx, g, st, y0, y1, lines, color) { const w = noteWidth(ctx, lines); const leftRoom = g.kbLeft - st.x - 34, rightRoom = st.x + st.w - (g.kbLeft + g.kbW) - 34;
+  if (leftRoom >= w) dimV(ctx, Math.max(st.x + 10, g.kbLeft - 26), y0, y1, lines, color, 'left');
+  else if (rightRoom >= w) dimV(ctx, Math.min(st.x + st.w - 10, g.kbLeft + g.kbW + 26), y0, y1, lines, color, 'right');
+  else { const cx = st.x + st.w / 2, top = st.y + 70; ctx.fillStyle = 'rgba(11,13,18,0.7)'; roundRect(ctx, cx - w / 2 - 10, top - 10, w + 20, lines.length * 17 + 14, 6); ctx.fill();
+    ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; lines.forEach((l, i) => { ctx.font = i === 0 ? NUM(700, 15) : JP(500, 12); ctx.fillText(l, cx, top + 5 + i * 17); }); } }
+const pressed = {};
+function draw(now) { const g = G; const ctx = canvas.getContext('2d'); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const SW = g.SW, SH = g.SH;
+  const bg = ctx.createLinearGradient(0, 0, 0, SH); bg.addColorStop(0, '#0b0d12'); bg.addColorStop(1, '#151b28'); ctx.fillStyle = bg; ctx.fillRect(0, 0, SW, SH);
+  /* ブラウザの枠 */
+  ctx.fillStyle = '#262a33'; ctx.fillRect(0, 0, SW, CHROME); ctx.save(); ctx.beginPath(); ctx.rect(0, 0, SW, CHROME); ctx.clip(); ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1;
+  for (let x = -CHROME; x < SW + CHROME; x += 14) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + CHROME, CHROME); ctx.stroke(); } ctx.restore();
+  ctx.fillStyle = '#c9c6bd'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = JP(500, 14);
+  ctx.fillText(`ブラウザの枠（タブ・アドレスバー）≒ ${CHROME} px を引く → 有効高さ ${g.effH} px（画面 ${SW}×${SH}）`, SW / 2, CHROME / 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.beginPath(); ctx.moveTo(0, CHROME + 0.5); ctx.lineTo(SW, CHROME + 0.5); ctx.stroke();
+  /* プレイヤー（灰矩形。前に何も置かない） */
+  const p = g.player; ctx.fillStyle = '#5b606b'; ctx.fillRect(p.x, p.y, p.w, p.h); ctx.strokeStyle = '#8a909c'; ctx.lineWidth = 2; ctx.strokeRect(p.x + 1, p.y + 1, p.w - 2, p.h - 2);
+  ctx.fillStyle = '#f4f2ea'; ctx.textAlign = 'center'; ctx.font = JP(700, 15); ctx.fillText('YouTube プレイヤー', p.x + p.w / 2, p.y + p.h / 2 - 30);
+  ctx.font = NUM(700, 26); ctx.fillText(`${p.w} × ${p.h}`, p.x + p.w / 2, p.y + p.h / 2 - 4);
+  ctx.font = JP(500, 12); ctx.fillStyle = '#d8d5cc'; ctx.fillText('実寸の灰矩形。前には何も置かない', p.x + p.w / 2, p.y + p.h / 2 + 22);
+  ctx.fillStyle = '#f2a452'; ctx.fillText('規約: 埋め込みプレイヤーの前にはオーバーレイを置けない', p.x + p.w / 2, p.y + p.h / 2 + 40);
+  /* HUD の置き場 */
+  for (const h of g.hud) { if (h.w < 70 || h.h < 24) continue; ctx.setLineDash([5, 4]); ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 1; roundRect(ctx, h.x + 0.5, h.y + 0.5, h.w - 1, h.h - 1, 6); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = JP(500, 12); ctx.textAlign = 'center'; ctx.fillText(h.label, h.x + h.w / 2, h.y + Math.min(h.h / 2, 24)); }
+  /* 舞台 */
+  const st = g.stage; const sg = ctx.createLinearGradient(0, st.y, 0, st.y + st.h); sg.addColorStop(0, '#0e1118'); sg.addColorStop(1, '#171e2c'); ctx.fillStyle = sg; ctx.fillRect(st.x, st.y, st.w, st.h);
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 1; ctx.strokeRect(st.x + 0.5, st.y + 0.5, st.w - 1, st.h - 1);
+  /* 進行と点灯 */
+  const el = (now - S.t0) / 1000; const period = S.chart ? S.chart.period : 1; const loopNo = Math.floor(el / period); const songT = el - loopNo * period;
+  const lit = {}; const notes = S.chart ? S.chart.notes : [];
+  for (const n of notes) { const dt = n.t - songT; if (Math.abs(dt) < 0.18) lit[n.code] = Math.max(lit[n.code] || 0, 1 - Math.abs(dt) / 0.18);
+    if (dt <= 0 && n.lastLoop !== loopNo) { n.lastLoop = loopNo; if (S.sound && AC && dt > -0.25) playNote(n.midi, 0.55, Math.max(0.8, n.dur + 0.3)); } }
+  const R = g.R, cellR = R * 0.93;
+  /* レーンと判定線 */
+  ctx.save(); ctx.beginPath(); ctx.rect(st.x, st.y, st.w, st.h); ctx.clip();
+  if (S.mode === 'fall') { ctx.lineWidth = 1; for (const c of g.cells) { if (c.midi == null) continue; ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.beginPath(); ctx.moveTo(c.cx, st.y); ctx.lineTo(c.cx, (g.perCell ? c.cy : g.yLine) - R); ctx.stroke(); }
+    if (!g.perCell) { ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(g.kbLeft - 6, g.yLine); ctx.lineTo(g.kbLeft + g.kbW + 6, g.yLine); ctx.stroke(); } }
+  /* 鍵盤図 */
+  for (const c of g.cells) { hexPath(ctx, c.cx, c.cy, cellR); const col = ROW_COLORS[c.row];
+    if (c.midi == null) { ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1; ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.25)'; }
+    else { const on = pressed[c.code] ? 1 : (lit[c.code] || 0); ctx.fillStyle = col; ctx.globalAlpha = 0.16 + on * 0.78; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = on > 0.5 ? '#ffffff' : col; ctx.lineWidth = on > 0.5 ? 2 : 1.3; ctx.stroke(); ctx.fillStyle = on > 0.5 ? '#0b0d12' : '#f4f2ea'; }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = NUM(700, g.fontPx); ctx.fillText(c.label, c.cx, c.cy + R * 0.04); }
+  /* 落下セル */
+  if (S.mode === 'fall') { const sp = g.speed; const nR = R * 0.9;
+    for (const n of notes) { const dt = n.t - songT; if (dt > S.travel + 0.5 || dt < -0.25) continue; const c = g.byCode[n.code]; if (!c) continue;
+      const ty = g.perCell ? c.cy : g.yLine; const y = ty - dt * sp; if (y < st.y - 2 * R) continue; const col = ROW_COLORS[c.row];
+      const alpha = dt < 0 ? Math.max(0, 1 + dt / 0.25) : 1; ctx.globalAlpha = alpha;
+      if (n.hold) { const tailTop = ty - (dt + n.dur) * sp; if (y > tailTop) { ctx.globalAlpha = 0.35 * alpha; ctx.fillStyle = col; roundRect(ctx, c.cx - g.hexW * 0.2, tailTop, g.hexW * 0.4, y - tailTop, 5); ctx.fill(); ctx.globalAlpha = alpha; } }
+      hexPath(ctx, c.cx, y, nR); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = '#0b0d12'; ctx.font = NUM(700, g.fontPx); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(c.label, c.cx, y + R * 0.04); ctx.globalAlpha = 1; } }
+  /* far-16 の輪 */
+  else { const r0 = RING_MAX * R;
+    for (const n of notes) { const dt = n.t - songT; if (dt > S.travel || dt < -0.2) continue; const c = g.byCode[n.code]; if (!c) continue; const col = ROW_COLORS[c.row];
+      if (dt >= 0) { const q = dt / S.travel; const rr = cellR + (r0 - cellR) * q; ctx.globalAlpha = 0.3 + 0.7 * (1 - q); ctx.strokeStyle = col; ctx.lineWidth = 2 + (1 - q) * 1.5; hexPath(ctx, c.cx, c.cy, rr); ctx.stroke();
+        if (q < 0.5) { ctx.globalAlpha = 0.5 * (1 - q * 2); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; hexPath(ctx, c.cx, c.cy, rr); ctx.stroke(); } }
+      else { ctx.globalAlpha = 0.6 * (1 + dt / 0.2); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; hexPath(ctx, c.cx, c.cy, cellR + (-dt / 0.2) * R * 0.6); ctx.stroke(); }
+      ctx.globalAlpha = 1; } }
+  ctx.restore();
+  /* 舞台のラベル（clip の外、落下セルの上に描く） */
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = JP(500, 12); ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(`舞台 ${Math.round(st.w)}×${Math.round(st.h)} px`, st.x + 8, st.y + 6);
+  ctx.textAlign = 'right'; ctx.fillText(S.chart ? `見本: ${S.chart.name}（自動再生・${S.tempo}%）` : '', st.x + st.w - 8, st.y + 6);
+  /* 寸法の注記 */
+  const fallCol = '#f08a4b', kbCol = '#5aa0f0';
+  if (S.mode === 'fall') { const y1 = g.perCell ? g.byCode[g.cells[0].code].cy : g.yLine;
+    const lines = [`${Math.round(g.fallH)} px`, `${g.secBase.toFixed(2)} s @HS1.0（0.5 px/ms）`, `選択 ${S.travel.toFixed(1)} s → ${(g.speed / 1000).toFixed(2)} px/ms（×${(g.speed / BASE).toFixed(2)}）`];
+    if (g.perCell) lines.push(`最下段まで ${Math.round(g.fallHmax)} px・押し上げ ${Math.round(g.push)} px`);
+    placeDim(ctx, g, st, st.y, y1, lines, fallCol); }
+  else { const topY = g.kbTop + R - RING_MAX * R;
+    const lines = [`余り ${Math.round(g.spare)} px`, `落下域なし。輪は ${f1(RING_MAX * R)} px → ${f1(cellR)} px に ${S.travel.toFixed(1)} s で縮む`, `この舞台ならセルを最大 ${g.maxCell} px まで広げられる`];
+    placeDim(ctx, g, st, st.y, topY, lines, fallCol); }
+  { const rx = Math.min(st.x + st.w - 10, g.kbLeft + g.kbW + 26); const lines = [`${Math.round(g.kbW)} × ${Math.round(g.kbH)} px`, `鍵盤図 ${g.rowsUsed.length} 段・セル ${g.hexW} px・文字 ${g.fontPx} px`];
+    if (st.x + st.w - (g.kbLeft + g.kbW) - 34 >= noteWidth(ctx, lines)) dimV(ctx, rx, g.kbTop, g.kbTop + g.kbH, lines, kbCol, 'right'); else { ctx.fillStyle = kbCol; ctx.font = JP(500, 12); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(lines.join('　'), g.kbLeft + g.kbW / 2, g.kbTop - (S.mode === 'fall' && !g.perCell ? LINE_GAP * R + 4 : 4)); } }
+  /* 成否の印 */
+  { const far = S.mode !== 'fall'; const ok = g.ok; const txt = far ? (ok ? '収まる' : '収まらない') : (ok ? '成立' : '不成立');
+    const sub = far ? '輪が舞台に収まるか（1.5 s の成立判定は落下方式のみ）' : `${g.secBase.toFixed(2)} s / 1.5 s・セル ${g.hexW} px`;
+    ctx.font = JP(500, 11); const w = Math.max(180, Math.ceil(ctx.measureText(sub).width) + 20); const bx = st.x + st.w - w - 8, by = st.y + 24;
+    ctx.fillStyle = far ? (ok ? 'rgba(43,127,217,0.92)' : 'rgba(217,165,43,0.94)') : (ok ? 'rgba(47,158,91,0.9)' : 'rgba(217,75,75,0.9)'); roundRect(ctx, bx, by, w, 38, 8); ctx.fill();
+    ctx.fillStyle = far && !ok ? '#1d1b17' : '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = JP(700, 14); ctx.fillText(txt, bx + 10, by + 13); ctx.font = JP(500, 11); ctx.fillText(sub, bx + 10, by + 28); }
+}
+function frame(now) { draw(now); requestAnimationFrame(frame); }
+
+/* ---------- 音（Web Audio で合成。m1-core と同じ） ---------- */
+let AC = null, master = null;
+function ensureAudio() { if (AC) { if (AC.state === 'suspended') AC.resume(); return; } const Ctor = window.AudioContext || window.webkitAudioContext; if (!Ctor) return; AC = new Ctor(); const comp = AC.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4; master = AC.createGain(); master.gain.value = 0.7; master.connect(comp); comp.connect(AC.destination); }
+function playNote(midi, vel = 0.7, dur = 1.2) { if (!AC || midi == null) return; const f = 440 * Math.pow(2, (midi - 69) / 12); const t = AC.currentTime; const out = AC.createGain(); out.gain.value = 1; out.connect(master);
+  const bright = Math.max(0.35, Math.min(1.3, 1.4 - (midi - 48) / 40)); const partials = [[1, 1], [2, 0.5], [3, 0.26], [4, 0.12], [5.01, 0.06], [6.02, 0.03]];
+  for (const [h, a] of partials) { const o = AC.createOscillator(); o.type = 'sine'; o.frequency.value = f * h; const g = AC.createGain(); const decay = dur * bright / (0.35 + h * 0.5);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a * vel * 0.28, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0003, t + decay); o.connect(g); g.connect(out); o.start(t); o.stop(t + decay + 0.05); }
+  const buf = AC.createBuffer(1, 2205, AC.sampleRate); const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / 300); const n = AC.createBufferSource(); n.buffer = buf; const ng = AC.createGain(); ng.gain.value = vel * 0.08; const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = Math.min(12000, f * 2); n.connect(bp); bp.connect(ng); ng.connect(out); n.start(t); }
+
+/* ---------- UI ---------- */
+function syncDesc() { $('#layoutDesc').textContent = LAYOUT_DESC[S.layout] + (S.layout === 'floor' && S.mode === 'far16' ? ' far-16 では落下しないので上下配置と同じ見え方になる。' : ''); $('#modeDesc').textContent = MODE_DESC[S.mode]; }
+document.querySelectorAll('input[name=layout]').forEach(r => r.addEventListener('change', e => { S.layout = e.target.value; syncDesc(); applyGeom(); }));
+document.querySelectorAll('input[name=rows]').forEach(r => r.addEventListener('change', e => { S.rows = +e.target.value; buildChart(); applyGeom(); }));
+document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('change', e => { S.mode = e.target.value; syncDesc(); applyGeom(); }));
+document.querySelectorAll('input[name=cell]').forEach(r => r.addEventListener('change', e => { S.cell = +e.target.value; applyGeom(); }));
+$('#screenSel').addEventListener('change', e => { S.screen = e.target.value; applyGeom(); });
+$('#minPlayer').addEventListener('change', e => { S.minPlayer = e.target.checked; $('#ph').disabled = S.minPlayer; applyGeom(); });
+$('#ph').addEventListener('input', e => { S.ph = +e.target.value; $('#phVal').textContent = `${Math.round(S.ph * 16 / 9)}×${S.ph}`; applyGeom(); });
+$('#travel').addEventListener('input', e => { S.travel = +e.target.value; applyGeom(); });
+$('#song').addEventListener('change', e => { S.song = e.target.value; buildChart(); draw(performance.now()); });
+$('#tempo').addEventListener('change', e => { S.tempo = +e.target.value; buildChart(); });
+$('#sound').addEventListener('change', e => { S.sound = e.target.checked; if (S.sound) ensureAudio(); });
+$('#real').addEventListener('change', e => { S.real = e.target.checked; fit(); });
+const FULLMAP = PRESETS.fl.map();   // 鍵盤図に無い段のキーも音だけは出す
+window.addEventListener('keydown', e => {
+  /* 文字入力を受ける部品だけ無視する。radio／checkbox／range にフォーカスがあっても文字キーは通す（矢印キーは byCodeAll に無いので邪魔しない） */
+  if (e.target && e.target.matches && e.target.matches('select,textarea,button,input:not([type=radio]):not([type=checkbox]):not([type=range])')) return;
+  if (e.repeat) { if (byCodeAll[e.code]) e.preventDefault(); return; }
+  if (!byCodeAll[e.code]) return; e.preventDefault(); if (pressed[e.code]) return; pressed[e.code] = true;
+  const c = G.byCode[e.code]; ensureAudio(); playNote(c ? c.midi : FULLMAP[e.code], 0.6); });
+window.addEventListener('keyup', e => { delete pressed[e.code]; });
+window.addEventListener('blur', () => { for (const k of Object.keys(pressed)) delete pressed[k]; });
+const touches = new Map();
+canvas.addEventListener('pointerdown', e => { e.preventDefault(); const r = canvas.getBoundingClientRect(); const x = (e.clientX - r.left) * (G.SW / r.width), y = (e.clientY - r.top) * (G.SH / r.height); let best = null, bd = Infinity;
+  for (const c of G.cells) { const d = Math.hypot(c.cx - x, c.cy - y); if (d < bd) { bd = d; best = c; } }
+  if (best && bd <= G.R) { touches.set(e.pointerId, best.code); pressed[best.code] = true; ensureAudio(); playNote(best.midi, 0.6); try { canvas.setPointerCapture(e.pointerId); } catch (_) {} } });
+const endTouch = e => { const code = touches.get(e.pointerId); if (code) { delete pressed[code]; touches.delete(e.pointerId); } };
+canvas.addEventListener('pointerup', endTouch); canvas.addEventListener('pointercancel', endTouch);
+
+/* 前回の設定を覚える（無くても動く） */
+try { const saved = JSON.parse(localStorage.getItem('hexnote-m0') || 'null');
+  if (saved && typeof saved === 'object') { for (const k of ['layout', 'screen', 'ph', 'rows', 'mode', 'cell', 'travel', 'song', 'tempo']) if (saved[k] != null && (k in S)) S[k] = saved[k]; S.minPlayer = !!saved.minPlayer;
+    if (!LAYOUT_DESC[S.layout]) S.layout = 'split'; if (!SCREENS[S.screen]) S.screen = '1366x768'; if (!MODE_DESC[S.mode]) S.mode = 'fall'; if (![24, 26, 28].includes(S.cell)) S.cell = 24; if (![2, 4].includes(S.rows)) S.rows = 4; if (!SONGS[S.song]) S.song = 'twinkle';
+    S.ph = Math.min(270, Math.max(200, +S.ph || 270)); S.travel = Math.min(2, Math.max(0.8, +S.travel || 1.5)); if (![100, 150, 200].includes(S.tempo)) S.tempo = 100; }
+} catch (_) {}
+function persist() { try { const { layout, screen, ph, minPlayer, rows, mode, cell, travel, song, tempo } = S; localStorage.setItem('hexnote-m0', JSON.stringify({ layout, screen, ph, minPlayer, rows, mode, cell, travel, song, tempo })); } catch (_) {} }
+document.querySelectorAll('aside input, aside select').forEach(el => el.addEventListener('change', persist));
+/* 部品へ状態を反映 */
+for (const [name, key] of [['layout', 'layout'], ['rows', 'rows'], ['mode', 'mode'], ['cell', 'cell']]) { const el = document.querySelector(`input[name=${name}][value="${S[key]}"]`); if (el) el.checked = true; }
+$('#screenSel').value = S.screen; $('#ph').value = S.ph; $('#phVal').textContent = `${Math.round(S.ph * 16 / 9)}×${S.ph}`; $('#travel').value = S.travel; $('#minPlayer').checked = S.minPlayer; $('#ph').disabled = S.minPlayer; $('#song').value = S.song; $('#tempo').value = String(S.tempo);
+
+syncDesc(); buildChart(); applyGeom(); requestAnimationFrame(frame);
+})();
+</script>

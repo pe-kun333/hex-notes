@@ -1,0 +1,408 @@
+<title>ヘクサノート コア試作</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Rajdhani:wght@500;600;700&display=swap">
+<style>
+/* Layout: full-height dark stage (canvas) with a settings rail on the right; the rail stacks under the stage on phones. */
+:root{
+  --bg:#f3f1ec; --fg:#1d1b17; --muted:#6b6660; --panel:#fbfaf7; --line:#d9d4ca; --field:#ffffff;
+  --accent:#d9672b; --accent-2:#2b7fd9; --good:#2f9e5b; --warn:#d9a52b; --bad:#d94b4b;
+  --font-body:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  --font-num:"Rajdhani","Zen Kaku Gothic New",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#15171c; --fg:#ecebe6; --muted:#9a978f; --panel:#1d2027; --line:#2e323b; --field:#262a33; --accent:#f08a4b; --accent-2:#5aa0f0; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#15171c; --fg:#ecebe6; --muted:#9a978f; --panel:#1d2027; --line:#2e323b; --field:#262a33; --accent:#f08a4b; --accent-2:#5aa0f0; color-scheme:dark }
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.5}
+*{box-sizing:border-box}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 304px;grid-template-rows:auto minmax(0,1fr);height:100%;min-height:100%}
+header.top{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px}
+.brand svg{width:22px;height:22px;fill:var(--accent)}
+.brand .sub{font-weight:400;color:var(--muted);font-size:12px;letter-spacing:.04em}
+.status{color:var(--muted);font-size:12px;flex:1 1 240px;min-width:0}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+button{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--field);color:var(--fg);border-radius:6px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+main{position:relative;min-width:0;min-height:0;background:#0b0d12}
+canvas{display:block;width:100%;height:100%}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(6,8,12,.72);color:#f4f2ea;text-align:center;padding:24px}
+.overlay .card{max-width:420px;display:grid;gap:12px}
+.overlay h2{margin:0;font-size:22px;font-weight:700;text-wrap:balance}
+.overlay p{margin:0;color:#c9c6bd}
+.overlay .big{font-family:var(--font-num);font-size:44px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.overlay table{margin:0 auto;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.overlay td{padding:2px 10px}
+.overlay td:first-child{text-align:left;color:#c9c6bd}
+.overlay td:last-child{text-align:right;font-family:var(--font-num);font-size:18px;font-weight:600}
+.overlay button.primary{font-size:16px;padding:10px 20px}
+aside{overflow:auto;border-left:1px solid var(--line);background:var(--panel);padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px;align-content:start}
+fieldset{border:0;margin:0;padding:0;display:grid;gap:8px;min-width:0}
+legend{font-weight:700;font-size:12px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;padding:0;margin-bottom:4px}
+.row{display:grid;grid-template-columns:88px minmax(0,1fr);align-items:center;gap:8px}
+.row label{color:var(--muted);font-size:12px}
+select,input[type=range]{width:100%;min-width:0;font:inherit}
+select{padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--fg)}
+.val{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:13px;color:var(--fg);min-width:52px;text-align:right}
+.range{display:flex;align-items:center;gap:8px;min-width:0}
+.checks{display:grid;gap:6px}
+.checks label{display:flex;align-items:center;gap:8px;cursor:pointer}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg label{flex:1;text-align:center;padding:5px 4px;cursor:pointer;font-size:12px;color:var(--muted);position:relative}
+.seg input{position:absolute;opacity:0;inset:0;margin:0}
+.seg label:has(input:checked){background:var(--accent-2);color:#fff}
+.note{font-size:12px;color:var(--muted);margin:0}
+.note b{color:var(--fg)}
+.kbd{font-family:var(--font-num);border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:12px}
+@media (max-width:820px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(420px,62vh) auto;height:auto}
+  aside{border-left:0;border-top:1px solid var(--line)}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5 21.5 7v10L12 22.5 2.5 17V7z"/></svg>ヘクサノート<span class="sub">コア試作 v0.1</span></div>
+    <div class="status" id="status">物理キーの位置で判定します（JIS / US 共通）。文字キーの千鳥配列をそのまま六角の鍵盤として使います。</div>
+    <div class="actions">
+      <button id="btnStart" class="primary">開始 <span class="kbd">Space</span></button>
+      <button id="btnPause">一時停止 <span class="kbd">Esc</span></button>
+      <button id="btnRestart">やり直し <span class="kbd">Enter</span></button>
+    </div>
+  </header>
+  <main id="main">
+    <canvas id="stage"></canvas>
+    <div class="overlay" id="startOverlay">
+      <div class="card">
+        <h2>キーボードが六角の鍵盤になります</h2>
+        <p>上から流れてくる六角セルの文字と同じキーを、セルが鍵盤に届く瞬間に押します。押したキーの音はいつでも鳴ります。</p>
+        <p id="startHint">まず曲と配列を右の設定で選び、開始を押してください。</p>
+        <div><button class="primary" id="btnStart2">開始</button></div>
+      </div>
+    </div>
+    <div class="overlay" id="resultOverlay" hidden>
+      <div class="card">
+        <h2 id="resTitle">結果</h2>
+        <div class="big" id="resScore">0</div>
+        <table><tbody>
+          <tr><td>精度</td><td id="resAcc">0%</td></tr>
+          <tr><td>最大コンボ</td><td id="resCombo">0</td></tr>
+          <tr><td>PERFECT / GREAT / GOOD / MISS</td><td id="resCounts">0 / 0 / 0 / 0</td></tr>
+          <tr><td>平均ずれ（＋は遅い）</td><td id="resOffset">0 ms</td></tr>
+        </tbody></table>
+        <p id="resAdvice"></p>
+        <div><button class="primary" id="btnAgain">もう一度</button></div>
+      </div>
+    </div>
+  </main>
+  <aside>
+    <fieldset>
+      <legend>曲と配列</legend>
+      <div class="row"><label for="song">曲</label><select id="song"></select></div>
+      <p class="note" id="songDesc"></p>
+      <div class="row"><label for="preset">配列</label><select id="preset"></select></div>
+      <p class="note" id="presetDesc"></p>
+      <p class="note" id="chartInfo"></p>
+    </fieldset>
+    <fieldset>
+      <legend>方式</legend>
+      <div class="row"><label>着地</label>
+        <div class="seg">
+          <label><input type="radio" name="mode" value="line" checked><span>一本線</span></label>
+          <label><input type="radio" name="mode" value="cell"><span>セルに着地</span></label>
+        </div></div>
+      <p class="note" id="modeDesc"></p>
+      <div class="row"><label for="labels">文字</label><select id="labels">
+        <option value="key">キーの文字</option><option value="both">キー＋音名</option><option value="note">音名だけ</option><option value="none">なし（覚えて弾く）</option></select></div>
+      <div class="row"><label for="colors">色分け</label><select id="colors">
+        <option value="row">段ごと</option><option value="bw">白鍵 / 黒鍵</option><option value="pitch">音名ごと</option></select></div>
+    </fieldset>
+    <fieldset>
+      <legend>速さと判定</legend>
+      <div class="row"><label for="travel">流れる時間</label><div class="range"><input type="range" id="travel" min="0.5" max="2.5" step="0.1" value="1.3"><span class="val" id="travelVal">1.3 s</span></div></div>
+      <div class="row"><label for="tempo">テンポ</label><div class="range"><input type="range" id="tempo" min="50" max="120" step="5" value="100"><span class="val" id="tempoVal">100%</span></div></div>
+      <div class="row"><label for="leniency">判定の甘さ</label><select id="leniency">
+        <option value="1">標準（±40/80/120 ms）</option><option value="1.5">甘め（×1.5）</option><option value="2">とても甘い（×2）</option><option value="0.6">厳しい（×0.6）</option></select></div>
+      <div class="row"><label for="offset">オフセット</label><div class="range"><input type="range" id="offset" min="-120" max="120" step="5" value="0"><span class="val" id="offsetVal">0 ms</span></div></div>
+    </fieldset>
+    <fieldset>
+      <legend>練習と補助</legend>
+      <div class="checks">
+        <label><input type="checkbox" id="wait"> 待ちモード（正しいキーまで止まる）</label>
+        <label><input type="checkbox" id="guide"> ガイド音（本来の音を小さく鳴らす）</label>
+        <label><input type="checkbox" id="metro"> メトロノーム</label>
+        <label><input type="checkbox" id="auto"> オートプレイ（見本）</label>
+        <label><input type="checkbox" id="freeplay" checked> ノートが無いキーも鳴らす</label>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>操作</legend>
+      <p class="note">文字キー・数字キーで演奏。<span class="kbd">Space</span> 開始 / 一時停止、<span class="kbd">Enter</span> やり直し。スマートフォンでは鍵盤のセルをタップ。</p>
+      <p class="note" id="layoutNote"></p>
+    </fieldset>
+  </aside>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const SQ3 = Math.sqrt(3);
+const ROWS = [
+  ['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','Digit0'],
+  ['KeyQ','KeyW','KeyE','KeyR','KeyT','KeyY','KeyU','KeyI','KeyO','KeyP'],
+  ['KeyA','KeyS','KeyD','KeyF','KeyG','KeyH','KeyJ','KeyK','KeyL','Semicolon'],
+  ['KeyZ','KeyX','KeyC','KeyV','KeyB','KeyN','KeyM','Comma','Period','Slash'],
+];
+const ROW_OFF = [0, 0.5, 1.0, 1.5];
+const SPECIAL = { Semicolon:';', Comma:',', Period:'.', Slash:'/' };
+const KEYS = [];
+ROWS.forEach((r, ri) => r.forEach((code, ci) => KEYS.push({ code, row: ri, col: ci, label: SPECIAL[code] || code.replace(/^Key|^Digit/, ''), gx: ROW_OFF[ri] + ci })));
+const byCode = Object.fromEntries(KEYS.map(k => [k.code, k]));
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const noteName = m => NOTE_NAMES[m % 12] + (Math.floor(m / 12) - 1);
+const isBlack = m => [1,3,6,8,10].includes(m % 12);
+const ROW_COLORS = ['#c08cf0', '#62a6f2', '#52d490', '#f2a452'];
+const hexDist = (a, b) => { const dq = a.col - b.col, dr = a.row - b.row; return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2; };
+
+/* ---------- 配列プリセット（KeyboardEvent.code → MIDI） ---------- */
+const PRESETS = {
+  fl: { name: 'ピアノ風・2オクターブ（FL Studio 風）', desc: 'Z 段と Q 段が白鍵（Z = C3、Q = C4）、A 段と数字段が黒鍵。実鍵盤に近い並び。',
+    map() { const m = {}; [48,50,52,53,55,57,59,60,62,64].forEach((p, i) => m[ROWS[3][i]] = p);
+      Object.assign(m, { KeyS:49, KeyD:51, KeyG:54, KeyH:56, KeyJ:58, KeyL:61, Semicolon:63 });
+      [60,62,64,65,67,69,71,72,74,76].forEach((p, i) => m[ROWS[1][i]] = p);
+      Object.assign(m, { Digit2:61, Digit3:63, Digit5:66, Digit6:68, Digit7:70, Digit9:73, Digit0:75 }); return m; } },
+  garage: { name: 'ピアノ風・1オクターブ（GarageBand / Ableton 風）', desc: 'A 段が白鍵（A = C4）、Q 段が黒鍵。片手で収まるぶん音域は狭い。',
+    map() { const m = {}; [60,62,64,65,67,69,71,72,74,76].forEach((p, i) => m[ROWS[2][i]] = p);
+      Object.assign(m, { KeyW:61, KeyE:63, KeyT:66, KeyY:68, KeyU:70, KeyO:73, KeyP:75 }); return m; } },
+  genshin: { name: '3 段×7・白鍵だけ（原神 / Sky 風）', desc: 'Q 段・A 段・Z 段の左 7 キーが高・中・低の 3 オクターブの白鍵（ド〜シ）。黒鍵は無く、曲の半音は隣の白鍵へ寄せる。原神・Sky のキー文字譜と同じ並びなので既存の譜面資産をそのまま使える。',
+    map() { const m = {}; const nat = [0, 2, 4, 5, 7, 9, 11]; [[1, 72], [2, 60], [3, 48]].forEach(([r, base]) => { for (let i = 0; i < 7; i++) m[ROWS[r][i]] = base + nat[i]; }); return m; } },
+  wicki: { name: 'Wicki-Hayden（等方性配列）', desc: '右へ全音、右上へ完全5度、左上へ完全4度。和音や旋律の「形」がどのキーから始めても同じ。',
+    map() { const m = {}; KEYS.forEach(k => m[k.code] = 48 + 2 * k.col + 5 * (3 - k.row)); return m; } },
+  harmonic: { name: 'Harmonic Table（和声テーブル）', desc: '右へ半音、右上へ長3度、左上へ短3度、真上（2段上）が完全5度。三和音が小さな三角形になる。',
+    map() { const m = {}; KEYS.forEach(k => m[k.code] = 48 + k.col + 3 * (3 - k.row)); return m; } },
+  auto: { name: '位置優先（曲ごとに自動割り当て）', desc: '曲に出てくる音を低い順に A 段 → Q 段 → Z 段 → 数字段へ並べる。音程と位置は無関係だが手の移動は小さい。',
+    map(chart) { const ps = [...new Set(chart.notes.map(n => n.midi))].sort((a, b) => a - b); const m = {}; let i = 0;
+      for (const r of [2, 1, 3, 0]) for (const c of ROWS[r]) if (i < ps.length) m[c] = ps[i++]; return m; } },
+};
+
+/* ---------- 内蔵の曲（拍単位） ---------- */
+function mel(name, desc, bpm, seq) { let b = 0; const notes = []; for (const [p, d] of seq) { if (p !== null) (Array.isArray(p) ? p : [p]).forEach(m => notes.push({ midi: m, beat: b, dur: d })); b += d; } return { name, desc, bpm, notes, beats: b }; }
+const C=60, D=62, E=64, F=65, G=67, A=69, B=71;
+const SONGS = {
+  twinkle: mel('きらきら星', 'ゆっくり。白鍵だけで、段をまたがない基本形。', 96, [[C,1],[C,1],[G,1],[G,1],[A,1],[A,1],[G,2],[F,1],[F,1],[E,1],[E,1],[D,1],[D,1],[C,2],[G,1],[G,1],[F,1],[F,1],[E,1],[E,1],[D,2],[G,1],[G,1],[F,1],[F,1],[E,1],[E,1],[D,2],[C,1],[C,1],[G,1],[G,1],[A,1],[A,1],[G,2],[F,1],[F,1],[E,1],[E,1],[D,1],[D,1],[C,2]]),
+  ode: mel('歓喜の歌', '順次進行と付点のリズム。ロングノート（伸ばす音）も出ます。', 112, [[E,1],[E,1],[F,1],[G,1],[G,1],[F,1],[E,1],[D,1],[C,1],[C,1],[D,1],[E,1],[E,1.5],[D,.5],[D,2],[E,1],[E,1],[F,1],[G,1],[G,1],[F,1],[E,1],[D,1],[C,1],[C,1],[D,1],[E,1],[D,1.5],[C,.5],[C,3]]),
+  canon: mel('カノン進行（三和音）', '2拍ごとの三和音。同時押しの読みやすさと、段をまたぐ和音の見え方を試す。', 76,
+    [[[62,66,69],2],[[57,61,64],2],[[59,62,66],2],[[54,57,61],2],[[55,59,62],2],[[50,54,57],2],[[55,59,62],2],[[57,61,64],2],[[62,66,69],2],[[57,61,64],2],[[59,62,66],2],[[54,57,61],2],[[55,59,62],2],[[50,54,57],2],[[55,59,62],2],[[57,61,64],2],[[62,66,69],4]]),
+  scale: mel('スケール走り', 'ハ長調を2オクターブ上下。段をまたぐ移動の読みやすさを試す。', 120,
+    [48,50,52,53,55,57,59,60,62,64,65,67,69,71,72,74,76,74,72,71,69,67,65,64,62,60,59,57,55,53,52,50,48].map((p, i, a) => [p, i === a.length - 1 ? 2 : .5])),
+  chroma: mel('半音階ドリル', '黒鍵（A 段・数字段）との往復。', 100, [60,61,62,63,64,65,66,67,68,69,70,71,72,71,70,69,68,67,66,65,64,63,62,61,60].map((p, i, a) => [p, i === a.length - 1 ? 2 : .5])),
+  random: { name: 'ランダム練習', desc: 'ハ長調の音でランダムウォーク。やり直すたびに変わる。', bpm: 100, gen: true },
+};
+function genRandom() { const pool = [48,50,52,53,55,57,59,60,62,64,65,67,69,71,72,74,76]; let i = 8; const notes = []; let b = 0;
+  for (let n = 0; n < 48; n++) { i = Math.max(0, Math.min(pool.length - 1, i + Math.floor(Math.random() * 5) - 2)); notes.push({ midi: pool[i], beat: b, dur: 1 });
+    if (Math.random() < 0.15) { const j = Math.max(0, Math.min(pool.length - 1, i + 2)); if (j !== i) notes.push({ midi: pool[j], beat: b, dur: 1 }); } b += 1; }
+  return { name: SONGS.random.name, desc: SONGS.random.desc, bpm: 100, notes, beats: b }; }
+
+/* ---------- 状態 ---------- */
+const LEAD = 2.2, APPROACH = 0.7, HOLD_MIN = 0.55;
+const state = { songKey: 'twinkle', chart: null, presetKey: 'fl', mapping: {}, notes: [], mode: 'line', labels: 'key', colors: 'row', travel: 1.3, tempo: 100, leniency: 1, offset: 0,
+  wait: false, guide: false, metro: false, auto: false, freeplay: true,
+  playing: false, paused: false, finished: false, frozen: false, t0: 0, pausedTotal: 0, pauseStart: 0, time: 0, spb: 0.6, endT: 0, nextBeatT: 0, beatNo: 0,
+  score: 0, combo: 0, maxCombo: 0, counts: { perfect: 0, great: 0, good: 0, miss: 0 }, offsets: [], nextIdx: 0, effects: [], pressed: {}, lastJudge: null };
+const windows = () => ({ perfect: 0.040 * state.leniency, great: 0.080 * state.leniency, good: 0.120 * state.leniency });
+
+function buildChart() {
+  const src = SONGS[state.songKey]; const chart = src.gen ? genRandom() : src; state.chart = chart;
+  state.mapping = PRESETS[state.presetKey].map(chart);
+  const byPitch = {}; for (const [code, m] of Object.entries(state.mapping)) (byPitch[m] ||= []).push(byCode[code]);
+  const spb = 60 / chart.bpm * (100 / state.tempo); state.spb = spb;
+  let prev = null, dropped = 0, folded = 0; const out = [];
+  for (const n of chart.notes) {
+    let cands = null; for (const sh of [0, 12, -12, 24, -24]) if (byPitch[n.midi + sh]) { cands = byPitch[n.midi + sh]; break; }
+    if (!cands) { for (const sh of [-1, 1, 11, -13, 13, -11]) if (byPitch[n.midi + sh]) { cands = byPitch[n.midi + sh]; folded++; break; } }
+    if (!cands) { dropped++; continue; }
+    const key = prev ? cands.reduce((a, b) => hexDist(a, prev) <= hexDist(b, prev) ? a : b) : cands[Math.floor(cands.length / 2)];
+    const t = LEAD + n.beat * spb, durS = n.dur * spb;
+    out.push({ midi: state.mapping[key.code], key, t, dur: durS, end: t + durS, hold: durS >= HOLD_MIN, state: 'pending' }); prev = key;
+  }
+  out.sort((a, b) => a.t - b.t || a.key.gx - b.key.gx);
+  for (let i = 0; i < out.length; i++) { out[i].chordNext = (i + 1 < out.length && Math.abs(out[i + 1].t - out[i].t) < 0.002) ? out[i + 1] : null; }
+  state.notes = out; state.endT = out.length ? out[out.length - 1].end : LEAD;
+  let maxChord = 1; for (let i = 0; i < out.length;) { let j = i; while (out[j].chordNext) j++; maxChord = Math.max(maxChord, j - i + 1); i = j + 1; }
+  const used = Object.keys(state.mapping).length; const ps = Object.values(state.mapping);
+  $('#chartInfo').innerHTML = `譜面: <b>${out.length}</b> ノート、同時押し最大 <b>${maxChord}</b>、長さ ${Math.round(state.endT - LEAD)} 秒` + (folded ? `、<b>${folded}</b> 音は半音を隣の白鍵へ寄せました` : '') + (dropped ? `、<b>${dropped}</b> 音はこの配列に無く落としました` : '') +
+    `<br>配列: ${used} キー使用、音域 ${noteName(Math.min(...ps))}〜${noteName(Math.max(...ps))}`;
+  resetPlay();
+}
+function resetPlay() { state.playing = false; state.paused = false; state.finished = false; state.frozen = false; state.time = 0; state.pausedTotal = 0; state.score = 0; state.combo = 0; state.maxCombo = 0;
+  state.counts = { perfect: 0, great: 0, good: 0, miss: 0 }; state.offsets = []; state.nextIdx = 0; state.effects = []; state.lastJudge = null; state.nextBeatT = LEAD - 4 * state.spb; state.beatNo = 0;
+  for (const n of state.notes) { n.state = 'pending'; n.guided = false; n.grade = null; }
+  for (const k of KEYS) k.approach = null;
+  $('#startHint').textContent = 'まず曲と配列を右の設定で選び、開始を押してください。';
+  $('#startOverlay').hidden = false; $('#resultOverlay').hidden = true; }
+function start() { ensureAudio(); if (state.finished) resetPlay();
+  state.playing = true; state.paused = false; state.t0 = performance.now(); state.pausedTotal = 0; $('#startOverlay').hidden = true; $('#resultOverlay').hidden = true; }
+function togglePause() { if (!state.playing || state.finished) return; if (state.paused) { state.pausedTotal += performance.now() - state.pauseStart; state.paused = false; $('#startOverlay').hidden = true; }
+  else { state.paused = true; state.pauseStart = performance.now(); $('#startHint').textContent = '一時停止中。Space で再開。'; $('#startOverlay').hidden = false; } }
+function restart() { buildChart(); start(); }
+
+/* ---------- 判定 ---------- */
+function judge(n, dt) { const w = windows(); const a = Math.abs(dt); const grade = a <= w.perfect ? 'perfect' : a <= w.great ? 'great' : 'good';
+  n.grade = grade; n.state = n.hold ? 'holding' : 'hit'; n.hitAt = state.time; state.counts[grade]++; state.offsets.push(-dt);
+  state.combo++; state.maxCombo = Math.max(state.maxCombo, state.combo);
+  state.score += { perfect: 1000, great: 700, good: 400 }[grade] * (1 + Math.min(state.combo, 50) / 100);
+  state.lastJudge = { grade, t: state.time, dt };
+  state.effects.push({ type: 'hit', key: n.key, t: state.time, grade, fromY: state.mode === 'line' ? GM.yLine : n.key.cy }); }
+function miss(n) { n.state = 'missed'; n.missAt = state.time; state.counts.miss++; state.combo = 0; state.lastJudge = { grade: 'miss', t: state.time, dt: 0 }; }
+function completeHold(n) { n.state = 'hit'; state.score += 300; }
+function releaseHold(n) { const w = windows(); if (n.end - state.time > w.good) { n.state = 'hit'; n.early = true; state.lastJudge = { grade: 'early', t: state.time, dt: 0 }; } else { n.state = 'hit'; state.score += 300; } }
+function isResolved(n) { return n.state === 'hit' || (n.state === 'missed' && n.missAt + 0.4 < state.time); }
+
+function onKey(code, down) { const k = byCode[code]; if (!k) return false; const midi = state.mapping[code];
+  if (down) { if (state.pressed[code]) return true; state.pressed[code] = true;
+    if (state.playing && !state.paused && !state.finished) { const w = windows(); const t = state.time;
+      for (let i = state.nextIdx; i < state.notes.length; i++) { const n = state.notes[i]; const dt = n.t - t; if (dt > w.good) break; if (n.state !== 'pending' || n.key !== k) continue;
+        if (Math.abs(dt) <= w.good) { judge(n, dt); if (midi != null) playNote(midi, 0.8, n.hold ? n.dur + 0.4 : 1.2); return true; } }
+      if (state.wait && state.frozen) { ensureAudio(); if (midi != null) playNote(midi, 0.35); return true; } }
+    if (state.freeplay || !state.playing) { ensureAudio(); if (midi != null) playNote(midi, 0.55); }
+    return true; }
+  delete state.pressed[code]; for (let i = state.nextIdx; i < state.notes.length; i++) { const n = state.notes[i]; if (n.state === 'holding' && n.key === k) releaseHold(n); if (n.t - state.time > 0.01 && n.state === 'pending') break; }
+  return true; }
+
+/* ---------- 更新 ---------- */
+function update() { if (!state.playing || state.paused || state.finished) return; const t = state.time, w = windows();
+  if (state.metro) while (state.nextBeatT <= t && state.nextBeatT < state.endT) { if (state.nextBeatT >= 0 && t - state.nextBeatT < 0.1) click(state.beatNo % 4 === 0); state.nextBeatT += state.spb; state.beatNo++; }
+  for (const k of KEYS) k.approach = null; let due = false;
+  for (let i = state.nextIdx; i < state.notes.length; i++) { const n = state.notes[i]; const dt = n.t - t; if (dt > APPROACH) break;
+    if (n.state === 'pending') { const k = n.key; if (k.approach == null || dt < k.approach) k.approach = dt;
+      if (dt <= 0.001) { if (state.guide && !n.guided) { n.guided = true; playNote(n.midi, 0.22, n.hold ? n.dur + 0.3 : 1); }
+        if (state.auto) { judge(n, 0); playNote(n.midi, 0.8, n.hold ? n.dur + 0.4 : 1.2); continue; }
+        if (state.wait) due = true; else if (-dt > w.good) miss(n); } }
+    if (n.state === 'holding' && t >= n.end) completeHold(n); }
+  if (state.wait) { if (due && !state.frozen) { state.frozen = true; state.pauseStart = performance.now(); } else if (!due && state.frozen) { state.frozen = false; state.pausedTotal += performance.now() - state.pauseStart; } }
+  while (state.nextIdx < state.notes.length && isResolved(state.notes[state.nextIdx])) state.nextIdx++;
+  if (state.nextIdx >= state.notes.length && t > state.endT + 1.2) finish(); }
+function finish() { state.finished = true; state.playing = false; const c = state.counts; const judged = c.perfect + c.great + c.good + c.miss;
+  const acc = judged ? (c.perfect * 1 + c.great * 0.7 + c.good * 0.4) / judged : 0; const avg = state.offsets.length ? state.offsets.reduce((a, b) => a + b, 0) / state.offsets.length * 1000 : 0;
+  $('#resScore').textContent = Math.round(state.score).toLocaleString(); $('#resAcc').textContent = (acc * 100).toFixed(1) + '%'; $('#resCombo').textContent = state.maxCombo;
+  $('#resCounts').textContent = `${c.perfect} / ${c.great} / ${c.good} / ${c.miss}`; $('#resOffset').textContent = (avg >= 0 ? '+' : '') + avg.toFixed(0) + ' ms';
+  $('#resAdvice').textContent = Math.abs(avg) > 25 && state.offsets.length >= 8 ? `平均して ${Math.abs(avg).toFixed(0)} ms ${avg > 0 ? '遅れて' : '早く'} 押しています。オフセットを ${avg > 0 ? '＋' : '−'} 方向へ動かすと判定が合いやすくなります。` : (judged ? 'タイミングは安定しています。' : '');
+  $('#resultOverlay').hidden = false; }
+
+/* ---------- 描画 ---------- */
+const canvas = $('#stage'); const main = $('#main'); let W = 0, H = 0, DPR = 1; let GM = { R: 20, hexW: 34, kbTop: 300, left: 16, yLine: 280, speed: 300 };
+function layout() { const r = main.getBoundingClientRect(); W = Math.max(300, r.width); H = Math.max(340, r.height); DPR = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  const gutter = 16; const hexW = Math.min(68, (W - gutter * 2) / 11.5); const R = hexW / SQ3; const kbTop = H - 6.5 * R - 12; const left = gutter + ((W - gutter * 2) - 11.5 * hexW) / 2;
+  const yLine = kbTop - R * 0.8; GM = { hexW, R, kbTop, left, yLine, speed: (yLine + 2 * R) / state.travel };
+  for (const k of KEYS) { k.cx = left + hexW * (k.gx + 0.5); k.cy = kbTop + R + 1.5 * R * k.row; } }
+const targetY = k => state.mode === 'line' ? GM.yLine : k.cy;
+function hexPath(ctx, cx, cy, r) { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 180 * (60 * i - 30); const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.closePath(); }
+function colorFor(k, midi) { if (state.colors === 'row') return ROW_COLORS[k.row]; if (state.colors === 'bw') return isBlack(midi) ? '#8a94ad' : '#efe9d8'; return `hsl(${(midi % 12) * 30} 72% 64%)`; }
+function textColorOn(col) { return col === '#8a94ad' ? '#f4f2ea' : '#0b0d12'; }
+function drawLabel(ctx, x, y, key, midi, mode, color, R) { ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const keyTxt = key.label, noteTxt = midi != null ? noteName(midi) : '';
+  if (mode === 'key' || mode === 'none') { ctx.font = `700 ${R * 0.95}px Rajdhani, "Zen Kaku Gothic New", sans-serif`; ctx.fillText(keyTxt, x, y + R * 0.04); }
+  else if (mode === 'note') { ctx.font = `700 ${R * 0.62}px Rajdhani, sans-serif`; ctx.fillText(noteTxt, x, y + R * 0.04); }
+  else { ctx.font = `700 ${R * 0.78}px Rajdhani, sans-serif`; ctx.fillText(keyTxt, x, y - R * 0.22); ctx.font = `500 ${R * 0.44}px Rajdhani, sans-serif`; ctx.fillText(noteTxt, x, y + R * 0.42); } }
+function drawCell(ctx, k) { const midi = state.mapping[k.code]; const R = GM.R * 0.93; const pressed = !!state.pressed[k.code];
+  hexPath(ctx, k.cx, k.cy, R);
+  if (midi == null) { ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.09)'; ctx.lineWidth = 1; ctx.stroke(); drawLabel(ctx, k.cx, k.cy, k, null, 'key', 'rgba(255,255,255,0.2)', R); return; }
+  const col = colorFor(k, midi); const glow = k.approach != null ? Math.max(0, 1 - Math.max(0, k.approach) / APPROACH) : 0;
+  ctx.fillStyle = col; ctx.globalAlpha = pressed ? 1 : 0.16 + glow * 0.5; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.strokeStyle = pressed ? '#ffffff' : col; ctx.globalAlpha = pressed ? 1 : 0.55 + glow * 0.45; ctx.lineWidth = pressed ? 2.5 : 1.5; ctx.stroke(); ctx.globalAlpha = 1;
+  if (glow > 0.02 && !pressed) { ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 22 * glow; ctx.strokeStyle = col; ctx.globalAlpha = glow; ctx.lineWidth = 2; hexPath(ctx, k.cx, k.cy, R); ctx.stroke(); ctx.restore(); }
+  const mode = state.labels === 'none' ? 'key' : state.labels === 'note' ? 'both' : state.labels;
+  drawLabel(ctx, k.cx, k.cy, k, midi, mode, pressed ? '#0b0d12' : '#f4f2ea', R); }
+function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function drawNotes(ctx) { const t = state.time, sp = GM.speed, R = GM.R * 0.9;
+  for (let i = state.nextIdx; i < state.notes.length; i++) { const n = state.notes[i]; const dt = n.t - t; if (dt > state.travel + 0.2) break; if (n.state === 'hit') continue;
+    const k = n.key; const ty = targetY(k); const y = n.state === 'holding' ? ty : ty - dt * sp; const col = colorFor(k, n.midi);
+    if (y < -3 * R) continue;
+    if (n.hold) { const tailTop = ty - (n.end - t) * sp; const tailBottom = y; if (tailBottom > tailTop) { ctx.globalAlpha = n.state === 'missed' ? 0.15 : 0.4; ctx.fillStyle = col; roundRect(ctx, k.cx - GM.hexW * 0.2, tailTop, GM.hexW * 0.4, tailBottom - tailTop, 6); ctx.fill(); ctx.globalAlpha = 1; } }
+    if (n.chordNext && n.state === 'pending') { const m = n.chordNext; const my = targetY(m.key) - (m.t - t) * sp; ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(k.cx, y); ctx.lineTo(m.key.cx, my); ctx.stroke(); ctx.setLineDash([]); } }
+  for (let i = state.nextIdx; i < state.notes.length; i++) { const n = state.notes[i]; const dt = n.t - t; if (dt > state.travel + 0.2) break; if (n.state === 'hit') continue;
+    const k = n.key; const ty = targetY(k); const y = n.state === 'holding' ? ty : ty - dt * sp; const col = colorFor(k, n.midi); if (y < -3 * R) continue;
+    ctx.globalAlpha = n.state === 'missed' ? 0.3 : 1;
+    hexPath(ctx, k.cx, y, R); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = n.state === 'holding' ? '#ffffff' : 'rgba(255,255,255,0.85)'; ctx.lineWidth = n.state === 'holding' ? 3 : 1.5; ctx.stroke();
+    if (state.labels !== 'none') drawLabel(ctx, k.cx, y, k, n.midi, state.labels, textColorOn(col), R);
+    ctx.globalAlpha = 1; } }
+const GRADE_TXT = { perfect: ['PERFECT', '#ffd766'], great: ['GREAT', '#62d4a0'], good: ['GOOD', '#62a6f2'], miss: ['MISS', '#f06a6a'], early: ['はやい', '#f2a452'] };
+function drawEffects(ctx) { const t = state.time; state.effects = state.effects.filter(e => t - e.t < 0.45);
+  for (const e of state.effects) { const p = (t - e.t) / 0.45; const k = e.key; const col = GRADE_TXT[e.grade][1];
+    if (state.mode === 'line') { const q = Math.min(1, (t - e.t) / 0.16); const y = e.fromY + (k.cy - e.fromY) * q; if (q < 1) { ctx.globalAlpha = 0.7 * (1 - q); hexPath(ctx, k.cx, y, GM.R * 0.8); ctx.fillStyle = col; ctx.fill(); ctx.globalAlpha = 1; } }
+    ctx.globalAlpha = 1 - p; ctx.strokeStyle = col; ctx.lineWidth = 3 * (1 - p) + 1; hexPath(ctx, k.cx, k.cy, GM.R * (0.95 + p * 0.9)); ctx.stroke(); ctx.globalAlpha = 1; }
+  const j = state.lastJudge; if (j && t - j.t < 0.6) { const p = (t - j.t) / 0.6; const [txt, col] = GRADE_TXT[j.grade]; ctx.globalAlpha = 1 - p * p; ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `700 ${Math.round(GM.R * 1.3)}px Rajdhani, sans-serif`; const yy = (state.mode === 'line' ? GM.yLine : GM.kbTop) - GM.R * 2.2 - p * 10; ctx.fillText(txt, W / 2, yy);
+    if (j.grade !== 'miss' && j.grade !== 'early') { ctx.font = `500 ${Math.round(GM.R * 0.6)}px Rajdhani, sans-serif`; ctx.fillStyle = '#cfccc3'; ctx.fillText((j.dt > 0 ? '−' : '+') + Math.abs(Math.round(j.dt * 1000)) + ' ms', W / 2, yy + GM.R * 0.95); }
+    ctx.globalAlpha = 1; } }
+function drawHUD(ctx) { ctx.textBaseline = 'top'; ctx.fillStyle = '#f4f2ea'; ctx.textAlign = 'left'; ctx.font = '600 26px Rajdhani, sans-serif'; ctx.fillText(Math.round(state.score).toLocaleString(), 18, 12);
+  ctx.font = '500 12px "Zen Kaku Gothic New", sans-serif'; ctx.fillStyle = '#9a978f'; ctx.fillText('SCORE', 18, 40); ctx.fillText(state.chart ? state.chart.name + '  ' + PRESETS[state.presetKey].name.split('（')[0] : '', 18, 56);
+  ctx.textAlign = 'right'; const c = state.counts; const judged = c.perfect + c.great + c.good + c.miss; const acc = judged ? (c.perfect + c.great * 0.7 + c.good * 0.4) / judged * 100 : 100;
+  ctx.fillStyle = '#f4f2ea'; ctx.font = '600 22px Rajdhani, sans-serif'; ctx.fillText(acc.toFixed(1) + '%', W - 18, 12); ctx.fillStyle = '#9a978f'; ctx.font = '500 12px "Zen Kaku Gothic New", sans-serif'; ctx.fillText('精度', W - 18, 38);
+  if (state.combo > 1) { ctx.textAlign = 'center'; ctx.fillStyle = '#f4f2ea'; ctx.font = '700 34px Rajdhani, sans-serif'; ctx.fillText(state.combo, W / 2, 14); ctx.fillStyle = '#9a978f'; ctx.font = '500 11px "Zen Kaku Gothic New", sans-serif'; ctx.fillText('COMBO', W / 2, 50); }
+  if (state.playing && state.time < LEAD) { const beatsLeft = Math.ceil((LEAD - state.time) / state.spb); if (beatsLeft <= 4 && beatsLeft > 0) { ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = '700 48px Rajdhani, sans-serif'; ctx.fillText(String(beatsLeft), W / 2, H * 0.3); } }
+  if (state.frozen) { ctx.textAlign = 'center'; ctx.fillStyle = '#ffd766'; ctx.font = '600 14px "Zen Kaku Gothic New", sans-serif'; ctx.fillText('待ちモード: 光っているキーを押すと進みます', W / 2, (state.mode === 'line' ? GM.yLine : GM.kbTop) - GM.R * 4); } }
+function draw() { const ctx = canvas.getContext('2d'); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const grad = ctx.createLinearGradient(0, 0, 0, H); grad.addColorStop(0, '#0b0d12'); grad.addColorStop(1, '#151b28'); ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+  ctx.lineWidth = 1; for (const k of KEYS) { if (state.mapping[k.code] == null) continue; ctx.strokeStyle = 'rgba(255,255,255,0.045)'; ctx.beginPath(); ctx.moveTo(k.cx, 0); ctx.lineTo(k.cx, targetY(k) - GM.R); ctx.stroke(); }
+  if (state.mode === 'line') { ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(GM.left - 6, GM.yLine); ctx.lineTo(GM.left + 11.5 * GM.hexW + 6, GM.yLine); ctx.stroke(); }
+  for (const k of KEYS) drawCell(ctx, k); drawNotes(ctx); drawEffects(ctx); drawHUD(ctx); }
+function frame() { if (state.playing && !state.paused && !state.frozen && !state.finished) state.time = (performance.now() - state.t0 - state.pausedTotal) / 1000 + state.offset / 1000; update(); draw(); requestAnimationFrame(frame); }
+
+/* ---------- 音（Web Audio で合成） ---------- */
+let AC = null, master = null;
+function ensureAudio() { if (AC) { if (AC.state === 'suspended') AC.resume(); return; } AC = new (window.AudioContext || window.webkitAudioContext)(); const comp = AC.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4; master = AC.createGain(); master.gain.value = 0.7; master.connect(comp); comp.connect(AC.destination); }
+function playNote(midi, vel = 0.7, dur = 1.2) { if (!AC) return; const f = 440 * Math.pow(2, (midi - 69) / 12); const t = AC.currentTime; const out = AC.createGain(); out.gain.value = 1; out.connect(master);
+  const bright = Math.max(0.35, Math.min(1.3, 1.4 - (midi - 48) / 40)); const partials = [[1, 1], [2, 0.5], [3, 0.26], [4, 0.12], [5.01, 0.06], [6.02, 0.03]];
+  for (const [h, a] of partials) { const o = AC.createOscillator(); o.type = 'sine'; o.frequency.value = f * h; const g = AC.createGain(); const decay = dur * bright / (0.35 + h * 0.5);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a * vel * 0.28, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0003, t + decay); o.connect(g); g.connect(out); o.start(t); o.stop(t + decay + 0.05); }
+  const buf = AC.createBuffer(1, 2205, AC.sampleRate); const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / 300); const n = AC.createBufferSource(); n.buffer = buf; const ng = AC.createGain(); ng.gain.value = vel * 0.08; const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = Math.min(12000, f * 2); n.connect(bp); bp.connect(ng); ng.connect(out); n.start(t); }
+function click(accent) { if (!AC) return; const t = AC.currentTime; const o = AC.createOscillator(); o.type = 'square'; o.frequency.value = accent ? 1400 : 1000; const g = AC.createGain(); g.gain.setValueAtTime(0.12, t); g.gain.exponentialRampToValueAtTime(0.0005, t + 0.04); o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.05); }
+
+/* ---------- UI ---------- */
+function fillSelect(sel, obj) { sel.innerHTML = ''; for (const [k, v] of Object.entries(obj)) { const o = document.createElement('option'); o.value = k; o.textContent = v.name; sel.appendChild(o); } }
+fillSelect($('#song'), SONGS); fillSelect($('#preset'), PRESETS);
+function syncDesc() { $('#songDesc').textContent = SONGS[state.songKey].desc; $('#presetDesc').textContent = PRESETS[state.presetKey].desc;
+  $('#modeDesc').textContent = state.mode === 'line' ? '一本線: 全ノートが鍵盤の上の線で判定。線に届く前から目標のキーが光ります。同時押しは横一列に揃います。' : 'セルに着地: ノートが自分のキーのセルまで落ちて重なった瞬間が判定。段によって届く位置が違うので、同時押しは斜めに並びます。'; }
+const blur = e => e.target.blur();
+$('#song').addEventListener('change', e => { state.songKey = e.target.value; syncDesc(); buildChart(); blur(e); });
+$('#preset').addEventListener('change', e => { state.presetKey = e.target.value; syncDesc(); buildChart(); blur(e); });
+document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('change', e => { state.mode = e.target.value; syncDesc(); blur(e); }));
+$('#labels').addEventListener('change', e => { state.labels = e.target.value; blur(e); });
+$('#colors').addEventListener('change', e => { state.colors = e.target.value; blur(e); });
+$('#travel').addEventListener('input', e => { state.travel = +e.target.value; $('#travelVal').textContent = state.travel.toFixed(1) + ' s'; layout(); });
+$('#travel').addEventListener('change', blur);
+$('#tempo').addEventListener('input', e => { $('#tempoVal').textContent = e.target.value + '%'; });
+$('#tempo').addEventListener('change', e => { state.tempo = +e.target.value; buildChart(); blur(e); });
+$('#leniency').addEventListener('change', e => { state.leniency = +e.target.value; blur(e); });
+$('#offset').addEventListener('input', e => { state.offset = +e.target.value; $('#offsetVal').textContent = (state.offset > 0 ? '+' : '') + state.offset + ' ms'; });
+$('#offset').addEventListener('change', blur);
+for (const id of ['wait', 'guide', 'metro', 'auto', 'freeplay']) $('#' + id).addEventListener('change', e => { state[id] = e.target.checked; if (id === 'wait' && !e.target.checked && state.frozen) { state.frozen = false; state.pausedTotal += performance.now() - state.pauseStart; } blur(e); });
+$('#btnStart').addEventListener('click', () => state.playing && !state.finished ? togglePause() : start());
+$('#btnStart2').addEventListener('click', () => state.paused ? togglePause() : start());
+$('#btnPause').addEventListener('click', togglePause);
+$('#btnRestart').addEventListener('click', restart);
+$('#btnAgain').addEventListener('click', restart);
+window.addEventListener('keydown', e => { if (e.target.matches('input,select,textarea,button') && e.code !== 'Space' && e.code !== 'Escape' && e.code !== 'Enter') return;
+  if (e.code === 'Space') { e.preventDefault(); if (e.repeat) return; if (!state.playing || state.finished) start(); else togglePause(); return; }
+  if (e.code === 'Escape') { e.preventDefault(); togglePause(); return; }
+  if (e.code === 'Enter') { e.preventDefault(); if (e.repeat) return; restart(); return; }
+  if (e.repeat) { if (byCode[e.code]) e.preventDefault(); return; }
+  if (onKey(e.code, true)) e.preventDefault(); });
+window.addEventListener('keyup', e => { onKey(e.code, false); });
+window.addEventListener('blur', () => { for (const code of Object.keys(state.pressed)) onKey(code, false); });
+const touches = new Map();
+canvas.addEventListener('pointerdown', e => { const r = canvas.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top; let best = null, bd = Infinity;
+  for (const k of KEYS) { const d = Math.hypot(k.cx - x, k.cy - y); if (d < bd) { bd = d; best = k; } } if (best && bd <= GM.R) { touches.set(e.pointerId, best.code); onKey(best.code, true); canvas.setPointerCapture(e.pointerId); } });
+const endTouch = e => { const code = touches.get(e.pointerId); if (code) { onKey(code, false); touches.delete(e.pointerId); } };
+canvas.addEventListener('pointerup', endTouch); canvas.addEventListener('pointercancel', endTouch);
+if (navigator.keyboard && navigator.keyboard.getLayoutMap) { navigator.keyboard.getLayoutMap().then(m => { let changed = 0; for (const k of KEYS) { const v = m.get(k.code); if (v && v.toUpperCase() !== k.label) { k.label = v.toUpperCase(); changed++; } } $('#layoutNote').textContent = changed ? `お使いの配列に合わせて ${changed} 個のキー表示を変えました。` : '表示はお使いのキーボード配列と一致しています。'; }).catch(() => {}); }
+else $('#layoutNote').textContent = 'このブラウザでは配列を読めないため、US/JIS 共通の文字で表示しています。';
+window.addEventListener('resize', layout);
+syncDesc(); layout(); buildChart(); requestAnimationFrame(frame);
+})();
+</script>

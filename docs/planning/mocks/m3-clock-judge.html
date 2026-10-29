@@ -1,0 +1,670 @@
+<title>ヘクサノート 時計と判定</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Rajdhani:wght@500;600;700&display=swap">
+<style>
+/* m3: clock / judgement / calibration bench. Same product family as m1-core (tokens, rail, dark canvas stage). */
+:root{
+  --bg:#f3f1ec; --fg:#1d1b17; --muted:#6b6660; --panel:#fbfaf7; --line:#d9d4ca; --field:#ffffff;
+  --accent:#d9672b; --accent-2:#2b7fd9; --good:#2f9e5b; --warn:#d9a52b; --bad:#d94b4b;
+  --font-body:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  --font-num:"Rajdhani","Zen Kaku Gothic New",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#15171c; --fg:#ecebe6; --muted:#9a978f; --panel:#1d2027; --line:#2e323b; --field:#262a33; --accent:#f08a4b; --accent-2:#5aa0f0; --good:#4fc47c; --warn:#e6b74a; --bad:#f06a6a; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#15171c; --fg:#ecebe6; --muted:#9a978f; --panel:#1d2027; --line:#2e323b; --field:#262a33; --accent:#f08a4b; --accent-2:#5aa0f0; --good:#4fc47c; --warn:#e6b74a; --bad:#f06a6a; color-scheme:dark }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.5}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 304px;min-height:100vh}
+header.top{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px;white-space:nowrap}
+.brand svg{width:22px;height:22px;fill:var(--accent)}
+.brand .sub{font-weight:400;color:var(--muted);font-size:12px;letter-spacing:.04em}
+.status{color:var(--muted);font-size:12px;flex:1 1 240px;min-width:0}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+button{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--field);color:var(--fg);border-radius:6px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.small{padding:4px 8px;font-size:12px}
+.main{min-width:0;display:grid;gap:12px;align-content:start;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+section.box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0}
+.box h3{margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.box h3 span{text-transform:none;letter-spacing:0;font-weight:400}
+.video{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.video.hasPlayer{grid-template-columns:minmax(0,480px) minmax(0,1fr)}
+@media (max-width:1180px){ .video.hasPlayer{grid-template-columns:minmax(0,1fr)} }
+#ytHost{width:min(480px,100%);aspect-ratio:16/9;background:#0b0d12;border-radius:6px;overflow:hidden}
+#ytHost iframe{width:100%;height:100%;display:block;border:0}
+.vcol{display:grid;gap:8px;min-width:0;align-content:start}
+.bar{height:30px;background:#0b0d12;border-radius:6px;position:relative;overflow:hidden}
+.bar .fill{position:absolute;top:0;bottom:0;left:0;width:0;background:linear-gradient(90deg,#2b7fd9,#62a6f2)}
+.bar .txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 10px;color:#f4f2ea;font-family:var(--font-num);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
+.traceWrap{height:150px;background:#0b0d12;border-radius:6px;overflow:hidden}
+.stageWrap{height:360px;background:#0b0d12;border-radius:8px;overflow:hidden;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px}
+.tile{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.tile .k{font-size:11px;color:var(--muted)}
+.tile .v{font-family:var(--font-num);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15}
+.tile .s{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.meterGrid{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:10px}
+@media (min-width:900px){ .meterGrid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} }
+.histWrap{height:130px;background:#0b0d12;border-radius:6px;overflow:hidden}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cmp .c{background:#0b0d12;border-radius:6px;height:130px;overflow:hidden}
+.cap{font-size:11px;color:var(--muted);margin:4px 0 0;min-width:0}
+.cap b{color:var(--fg);font-family:var(--font-num);font-size:13px}
+aside{overflow:auto;border-left:1px solid var(--line);background:var(--panel);padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px;align-content:start;min-width:0}
+fieldset{border:0;margin:0;padding:0;display:grid;gap:8px;min-width:0}
+legend{font-weight:700;font-size:12px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;padding:0;margin-bottom:4px}
+.row{display:grid;grid-template-columns:88px minmax(0,1fr);align-items:center;gap:8px}
+.row label{color:var(--muted);font-size:12px}
+select,input[type=range],input[type=text]{width:100%;min-width:0;font:inherit}
+select,input[type=text]{padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--fg)}
+.val{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:13px;color:var(--fg);min-width:52px;text-align:right}
+.range{display:flex;align-items:center;gap:8px;min-width:0}
+.checks{display:grid;gap:6px}
+.checks label{display:flex;align-items:center;gap:8px;cursor:pointer}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg label{flex:1;text-align:center;padding:5px 4px;cursor:pointer;font-size:12px;color:var(--muted);position:relative}
+.seg input{position:absolute;opacity:0;inset:0;margin:0}
+.seg label:has(input:checked){background:var(--accent-2);color:#fff}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+.note{font-size:12px;color:var(--muted);margin:0;min-width:0;overflow-wrap:anywhere}
+.note b{color:var(--fg)}
+.note.ok{color:var(--good)} .note.ng{color:var(--bad)}
+.kbd{font-family:var(--font-num);border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:12px}
+.log{font-size:11px;color:var(--muted);margin:0;padding:0;list-style:none;display:grid;gap:2px;font-variant-numeric:tabular-nums}
+.log li{overflow-wrap:anywhere}
+.idrow{display:flex;gap:6px;min-width:0}
+.idrow input{flex:1 1 auto}
+.resWrap{overflow:auto;margin-top:6px}
+table.res{border-collapse:collapse;width:100%;min-width:560px;font-size:12px}
+table.res th,table.res td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+table.res th{color:var(--muted);font-weight:500;font-size:11px}
+table.res th:first-child,table.res td:first-child{text-align:left}
+table.res td{font-family:var(--font-num);font-size:13px;font-variant-numeric:tabular-nums}
+table.res td.jp{font-family:var(--font-body);font-size:12px}
+table.res tr.cur td:first-child{color:var(--accent);font-weight:700}
+table.res td.na{color:var(--muted)}
+@media (max-width:820px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  aside{border-left:0;border-top:1px solid var(--line)}
+  .stageWrap{height:320px}
+}
+/* 作者スタイル fieldset{display:grid} が UA の [hidden]{display:none} に勝つため、hidden を確実に効かせる */
+[hidden]{display:none !important}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5 21.5 7v10L12 22.5 2.5 17V7z"/></svg>ヘクサノート<span class="sub">時計と判定 v0.1</span></div>
+    <div class="status" id="status">ダミー時計で自動プレイ中。右の設定で補間方式や判定窓を切り替えると、残差 SD と UR が変わります。</div>
+    <div class="actions">
+      <button id="btnStart" class="primary">一時停止 <span class="kbd">Space</span></button>
+      <button id="btnRestart">やり直し <span class="kbd">Enter</span></button>
+    </div>
+  </header>
+  <div class="main">
+    <section class="box">
+      <h3>動画の時計 <span id="clockLabel">ダミー（15 ms 刻み・逆行・seek 凍結）</span></h3>
+      <div class="video" id="video">
+        <div id="ytHost" hidden><div id="ytPlayer"></div></div>
+        <div class="vcol">
+          <div class="bar"><div class="fill" id="barFill"></div><div class="txt"><span id="barL">ダミー動画 0.00 / 40.00 s</span><span id="barR">生 0.000　補間 0.000</span></div></div>
+          <div class="traceWrap"><canvas id="trace"></canvas></div>
+          <p class="cap" id="traceInfo">残差（時計 − 実時間）: 生 SD <b id="traceRaw">—</b> ms ／ 補間後 SD <b id="traceInt">—</b> ms（直近 8 秒、seek・停止・同期中の区間を除く）</p>
+        </div>
+      </div>
+    </section>
+    <section class="box">
+      <h3>落下と判定 <span>A 段 10 鍵・判定線 1 本。着地時の表示: 左 5 鍵は「嵌合の隙間」、右 5 鍵は「回転角」（右の設定で変更）</span></h3>
+      <div class="stageWrap"><canvas id="stage"></canvas></div>
+    </section>
+    <section class="box">
+      <h3>計測盤</h3>
+      <div class="tiles">
+        <div class="tile"><div class="k">入力遅延（keydown → 処理）</div><div class="v" id="tInput">—</div><div class="s" id="tInputSub">直前の rAF からの経過 —</div></div>
+        <div class="tile"><div class="k">フレーム間隔 SD</div><div class="v" id="tFrame">—</div><div class="s" id="tFrameSub">平均 —</div></div>
+        <div class="tile"><div class="k">時計残差 SD（生）</div><div class="v" id="tResRaw">—</div><div class="s">getCurrentTime − 実時間（直近 8 秒、seek・停止を除く）</div></div>
+        <div class="tile"><div class="k">時計残差 SD（補間後）</div><div class="v" id="tResInt">—</div><div class="s" id="tResIntSub">—</div></div>
+        <div class="tile"><div class="k">UR（Unstable Rate）</div><div class="v" id="tUR">—</div><div class="s">ヒット誤差の SD × 10</div></div>
+        <div class="tile"><div class="k">平均ずれ（＋は遅い）</div><div class="v" id="tMean">—</div><div class="s" id="tMeanSub">ヒット 0</div></div>
+        <div class="tile"><div class="k">PERFECT / GREAT / GOOD / MISS</div><div class="v" id="tCounts">0 / 0 / 0 / 0</div><div class="s" id="tCountsSub">判定窓 —</div></div>
+        <div class="tile"><div class="k">連続採点（Wife3 風）</div><div class="v" id="tWife">—</div><div class="s">|誤差|≤5 ms 満点、erf 減衰、ミス −275%</div></div>
+      </div>
+      <p class="cap" style="margin:10px 0 0">方式別の結果 ― 譜面の終わり（と、途中でやり直した直前）に、そのとき選んでいた補間方式の行へ書き込みます。残差 SD は譜面全体（seek・停止の区間を除く）。</p>
+      <div class="resWrap"><table class="res"><thead><tr><th>方式</th><th>残差 SD 生 ／ 補間後</th><th>UR</th><th>平均ずれ</th><th>P / G / G / M</th><th>Wife3</th><th>条件</th></tr></thead><tbody id="resBody"></tbody></table></div>
+      <div class="btns" style="margin-top:6px"><button id="btnSweep" class="small">3 方式を順に自動で流す</button><button id="btnResClear" class="small">表を消す</button></div>
+      <p class="note" id="sweepNote">自動プレイ＋同じ人工入力で 直読み → 最小二乗 → 指数平滑 の順に譜面を 3 回まわして表を埋めます（約 2 分）。</p>
+      <div class="meterGrid">
+        <div>
+          <p class="cap" style="margin:0 0 4px">早遅ヒストグラム（±200 ms、10 ms 刻み。右が遅い）</p>
+          <div class="histWrap"><canvas id="hist"></canvas></div>
+        </div>
+        <div>
+          <p class="cap" style="margin:0 0 4px">着地時の表示を見比べる（最後のヒットを両方で描く）</p>
+          <div class="cmp">
+            <div class="c"><canvas id="cGap"></canvas></div>
+            <div class="c"><canvas id="cAngle"></canvas></div>
+          </div>
+          <div class="cmp">
+            <p class="cap">嵌合の隙間: 1 ms ＝ 0.5 px　<b id="gapVal">—</b></p>
+            <p class="cap">回転角: 1 ms ＝ 0.2°　<b id="angleVal">—</b></p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <aside>
+    <fieldset>
+      <legend>経路</legend>
+      <div class="seg">
+        <label><input type="radio" name="route" value="dummy" checked><span>ダミー時計</span></label>
+        <label><input type="radio" name="route" value="yt"><span>実 IFrame</span></label>
+      </div>
+      <div class="idrow"><input type="text" id="videoId" placeholder="YouTube の動画 ID" autocomplete="off" spellcheck="false"><button id="btnLoad" class="small">読み込む</button></div>
+      <p class="note" id="routeNote">動画 ID を入れて読み込んだときだけ IFrame API を取りに行きます。失敗したらダミーに退避して理由を出します。公開版（アーティファクト）では youtube.com を読めず必ず退避するので、実 IFrame の確認はローカルの mocks/preview 写しで行ってください。</p>
+    </fieldset>
+    <fieldset id="dummyParams">
+      <legend>ダミーの模倣</legend>
+      <div class="row"><label for="step">刻み</label><div class="range"><input type="range" id="step" min="1" max="50" step="1" value="15"><span class="val" id="stepVal">15 ms</span></div></div>
+      <div class="row"><label for="backFreq">逆行の頻度</label><div class="range"><input type="range" id="backFreq" min="0" max="5" step="0.1" value="0.6"><span class="val" id="backFreqVal">0.6 /s</span></div></div>
+      <div class="row"><label for="backMs">逆行の大きさ</label><div class="range"><input type="range" id="backMs" min="0" max="20" step="1" value="10"><span class="val" id="backMsVal">10 ms</span></div></div>
+      <div class="row"><label for="freeze">seek 凍結</label><div class="range"><input type="range" id="freeze" min="0" max="500" step="10" value="250"><span class="val" id="freezeVal">250 ms</span></div></div>
+      <div class="row"><label for="freezeMode">凍結中の再生</label><select id="freezeMode"><option value="run" selected>進む（凍結明けに +凍結分 を読む）</option><option value="hold">止まる（凍結明けは seek 先から進む）</option></select></div>
+      <p class="note">「進む」は補間器の外挿が正解になる仮説、「止まる」は保持が正解になる仮説。どちらが実機に近いかは実 IFrame で確かめます。</p>
+    </fieldset>
+    <fieldset>
+      <legend>再生</legend>
+      <div class="row"><label for="rate">レート</label><select id="rate"><option>0.25</option><option>0.5</option><option>0.75</option><option selected>1</option><option>1.25</option><option>1.5</option><option>1.75</option><option>2</option></select></div>
+      <p class="note">両経路で使えます（実 IFrame は setPlaybackRate）。</p>
+    </fieldset>
+    <fieldset>
+      <legend>補間と判定</legend>
+      <div class="row"><label for="interp">補間方式</label><select id="interp">
+        <option value="direct">直読み（getCurrentTime そのまま）</option><option value="lsq" selected>最小二乗 2 秒窓</option><option value="ema">指数平滑（単調＋周期補正）</option></select></div>
+      <p class="note" id="interpNote"></p>
+      <div class="checks"><label><input type="checkbox" id="holdFresh"> seek 直後は生の読みが変わるまで曲時刻を保持（外挿しない）</label></div>
+      <div class="row"><label for="win">判定窓</label><select id="win">
+        <option value="m1" selected>m1 既定 40/80/120</option><option value="beatoraja">beatoraja KEYBOARD 30/90/200</option><option value="bemuse">Bemuse Lv1–2 24/100/180</option><option value="etterna">Etterna J4×0.66 30/59/119</option></select></div>
+      <div class="row"><label for="landing">着地表示</label><select id="landing">
+        <option value="both" selected>両方（左 5 鍵 隙間／右 5 鍵 回転）</option><option value="gap">嵌合の隙間だけ</option><option value="angle">回転角だけ</option></select></div>
+      <div class="row"><label for="travel">流れる時間</label><div class="range"><input type="range" id="travel" min="0.6" max="2.5" step="0.1" value="1.3"><span class="val" id="travelVal">1.3 s</span></div></div>
+      <div class="row"><label for="offset">オフセット</label><div class="range"><input type="range" id="offset" min="-120" max="120" step="1" value="0"><span class="val" id="offsetVal">0 ms</span></div></div>
+      <p class="note">オフセットは判定に使う曲時刻へ足します（＋で早く押しても合う）。</p>
+    </fieldset>
+    <fieldset>
+      <legend>校正</legend>
+      <div class="btns"><button id="btnCal" class="small">メトロノーム校正（24 打）</button><button id="btnCalStop" class="small" disabled>中止</button></div>
+      <p class="note" id="calStatus">100 BPM のクリックに合わせて A 段のキーか Space を 24 回。SD &lt; 30 ms のときだけ平均を適用します（StepMania AutoSync 型）。</p>
+      <div id="proposal" hidden>
+        <p class="note" id="proposalTxt"></p>
+        <div class="btns"><button id="btnApply" class="small primary">提案を適用</button></div>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>自動プレイと乱し</legend>
+      <div class="checks"><label><input type="checkbox" id="auto" checked> 自動プレイ（人工入力）</label></div>
+      <div class="row"><label for="jitter">人工ジッタ</label><select id="jitter"><option value="0">SD 0 ms</option><option value="5" selected>SD 5 ms</option><option value="10">SD 10 ms</option></select></div>
+      <div class="btns"><button id="btnSeekB" class="small">seek −5 s</button><button id="btnSeekF" class="small">seek +5 s</button><button id="btnJump" class="small">時刻を +400 ms 飛ばす</button><button id="btnStuck" class="small">時計を 3 秒止める</button><button id="btnBack" class="small" disabled>動画の時計へ戻す</button></div>
+      <p class="note">seek・一時停止・飛びの直後は「同期中」帯を出し、再開後 300 ms は判定を猶予します。時計が 2 秒止まると動画なしモード（performance.now 単独）へ自動で切り替わります。seek で戻ってもヒット済み・ミス済みのセルは再判定しません（UR と判定内訳を二重に積まないため）。ログの時刻は「実」＝ページ経過、「曲」＝曲時刻。</p>
+      <ul class="log" id="eventLog"></ul>
+    </fieldset>
+    <fieldset>
+      <legend>操作</legend>
+      <p class="note">A 段のキー（<span class="kbd">A</span>〜<span class="kbd">;</span>）で演奏。<span class="kbd">Space</span> 一時停止 / 再開、<span class="kbd">Enter</span> やり直し。自動プレイを切ると手入力の UR を測れます。音は最初のクリックかキー入力の後に鳴ります。</p>
+    </fieldset>
+  </aside>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const SQ3 = Math.sqrt(3);
+/* ---- m1-core から流用: キー表・六角描画・合成音 ---- */
+const ROWS = [
+  ['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','Digit0'],
+  ['KeyQ','KeyW','KeyE','KeyR','KeyT','KeyY','KeyU','KeyI','KeyO','KeyP'],
+  ['KeyA','KeyS','KeyD','KeyF','KeyG','KeyH','KeyJ','KeyK','KeyL','Semicolon'],
+  ['KeyZ','KeyX','KeyC','KeyV','KeyB','KeyN','KeyM','Comma','Period','Slash'],
+];
+const ROW_OFF = [0, 0.5, 1.0, 1.5];
+const SPECIAL = { Semicolon:';', Comma:',', Period:'.', Slash:'/' };
+const ROW_COLORS = ['#c08cf0', '#62a6f2', '#52d490', '#f2a452'];
+const ROW_IDX = 2, CELL_COL = ROW_COLORS[ROW_IDX];
+const PITCH = [60,62,64,65,67,69,71,72,74,76];
+const KEYS = ROWS[ROW_IDX].map((code, i) => ({ code, col: i, row: ROW_IDX, label: SPECIAL[code] || code.replace(/^Key/, ''), midi: PITCH[i], gx: ROW_OFF[ROW_IDX] + i, cx: 0, cy: 0 }));
+const byCode = Object.fromEntries(KEYS.map(k => [k.code, k]));
+function hexPath(ctx, cx, cy, r) { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 180 * (60 * i - 30); const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.closePath(); }
+
+/* ---- 乱数（同じ人工入力を再現するため種付き） ---- */
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gauss(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function erf(x) { const s = x < 0 ? -1 : 1; x = Math.abs(x); const t = 1 / (1 + 0.3275911 * x); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return s * y; }
+const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+const sd = a => { if (a.length < 2) return 0; const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) * (x - m), 0) / (a.length - 1)); };
+const sign = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(0);
+
+/* ---- 判定窓と連続採点 ---- */
+const WINDOWS = {
+  m1: { name: 'm1 既定 40/80/120', p: 40, g: 80, o: 120 },
+  beatoraja: { name: 'beatoraja KEYBOARD 30/90/200', p: 30, g: 90, o: 200 },
+  bemuse: { name: 'Bemuse Lv1–2 24/100/180', p: 24, g: 100, o: 180 },
+  etterna: { name: 'Etterna J4×0.66 30/59/119', p: 29.7, g: 59.4, o: 118.8 },
+};
+/* Wife3（ts=1）を最大 2 点→100% に正規化。ミスは −5.5/2 = −275%。 */
+function wife3(ms) { const a = Math.abs(ms); if (a <= 5) return 1; const zero = 65, dev = 22.7, boo = 180; if (a <= zero) return erf((zero - a) / dev); if (a <= boo) return (a - zero) * (-2.75) / (boo - zero); return -2.75; }
+const WIFE_MISS = -2.75;
+
+/* ---- 状態 ---- */
+const LEAD = 2.0, SPB = 0.5;
+const S = {
+  route: 'dummy', interp: 'lsq', win: 'm1', landing: 'both', travel: 1.3, offset: 0, auto: true, jitter: 5,
+  running: false, paused: false, ended: false, time: 0,
+  noVideo: false, nvT0: 0, nvNow: 0,
+  syncUntil: 0, syncReason: '',
+  notes: [], nextIdx: 0,
+  hits: [], counts: { perfect: 0, great: 0, good: 0, miss: 0 }, wifeSum: 0, wifeN: 0,
+  effects: [], lastHit: null, lastJudge: null, pressed: {},
+  inputLat: [], frameGap: [], lastRafTs: 0,
+  traces: [], events: [], proposal: null,
+  results: {}, recorded: false, mixed: false, acc: null, backEnabled: false, holdFresh: false,
+};
+
+/* ---- ダミー時計（YouTube getCurrentTime の癖を模倣） ---- */
+const dummy = {
+  playing: false, rate: 1, step: 15, backFreq: 0.6, backMs: 10, freezeMs: 250, freezeHold: false, duration: 40,
+  anchorT: 0, anchorNow: 0, frozenUntil: 0, frozenVal: 0, stuckUntil: 0, lastRaw: 0, nextBack: Infinity, rng: mulberry32(7), ended: false,
+  /* 凍結中「止まる」では anchorNow を未来に置くので、真の時刻は anchorT で止まる */
+  trueTime(now) { const t = this.playing ? Math.max(this.anchorT, this.anchorT + (now - this.anchorNow) / 1000 * this.rate) : this.anchorT; return Math.min(t, this.duration); },
+  /* 逆行の発生時刻は曲時刻で事前生成（指数間隔）するので、同じ種なら毎回同じ曲時刻で起きる */
+  nextBackFrom(t) { return this.backFreq > 0 ? t - Math.log(1 - this.rng()) / this.backFreq : Infinity; },
+  read(now) {
+    if (now < this.stuckUntil) return this.lastRaw;
+    if (now < this.frozenUntil) return this.frozenVal;
+    const tt = this.trueTime(now);
+    if (this.playing && tt >= this.duration) { this.anchorT = this.duration; this.playing = false; this.ended = true; this.lastRaw = this.duration; return this.lastRaw; }
+    if (!this.playing) return this.lastRaw;
+    const q = this.step / 1000; let v = Math.floor(tt / q) * q;
+    /* 逆行: 直前の読みより 0〜backMs ms 小さい値を 1 フレームだけ返す（刻み 15 ms より小さい逆行でも本当に戻るように、直前の読み基準にする） */
+    if (this.backFreq > 0 && tt >= this.nextBack) { v = Math.max(0, Math.min(v, this.lastRaw) - this.rng() * this.backMs / 1000); this.nextBack = this.nextBackFrom(tt); }
+    this.lastRaw = v; return v; },
+  play(now) { if (this.playing) return; if (this.anchorT >= this.duration) this.anchorT = 0; this.anchorNow = now; this.playing = true; this.ended = false; },
+  pause(now) { if (!this.playing) return; this.anchorT = this.trueTime(now); this.playing = false; const q = this.step / 1000; this.lastRaw = Math.floor(this.anchorT / q) * q; },
+  seek(t, now) { this.anchorT = Math.max(0, Math.min(this.duration, t)); this.anchorNow = this.freezeHold ? now + this.freezeMs : now; this.frozenUntil = now + this.freezeMs; this.frozenVal = this.lastRaw = this.anchorT; this.ended = false; this.nextBack = this.nextBackFrom(this.anchorT); },
+  jump(ms, now) { this.anchorT = this.trueTime(now) + ms / 1000; this.anchorNow = now; },
+  stuck(sec, now) { this.stuckUntil = now + sec * 1000; },
+  setRate(r, now) { this.anchorT = this.trueTime(now); this.anchorNow = now; this.rate = r; },
+  reset(now) { this.playing = false; this.anchorT = 0; this.anchorNow = now; this.frozenUntil = 0; this.stuckUntil = 0; this.lastRaw = 0; this.ended = false; this.rng = mulberry32(7); this.nextBack = this.nextBackFrom(0); },
+};
+/* ---- 実 IFrame（任意経路） ---- */
+const yt = {
+  player: null, ready: false, state: -1, lastRaw: 0,
+  get playing() { return this.state === 1; },
+  get rate() { try { return this.player.getPlaybackRate() || 1; } catch (e) { return 1; } },
+  get duration() { try { return this.player.getDuration() || 0; } catch (e) { return 0; } },
+  read() { try { const v = this.player.getCurrentTime(); if (typeof v === 'number' && isFinite(v)) this.lastRaw = v; } catch (e) {} return this.lastRaw; },
+  trueTime() { return null; },
+  play() { try { this.player.playVideo(); } catch (e) {} },
+  pause() { try { this.player.pauseVideo(); } catch (e) {} },
+  seek(t) { try { this.player.seekTo(Math.max(0, t), true); } catch (e) {} },
+  setRate(r) { try { this.player.setPlaybackRate(r); } catch (e) {} },
+  jump() {}, stuck() {},
+  reset() { this.seek(0); },
+};
+const src = () => (S.route === 'yt' && yt.ready) ? yt : dummy;
+
+/* ---- 補間（performance.now で進め、時計の読みで補正） ---- */
+function lsq(pts) { const n = pts.length; if (n < 2) return null; const x0 = pts[0].now; let sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (const p of pts) { const x = (p.now - x0) / 1000, y = p.raw; sx += x; sy += y; sxx += x * x; sxy += x * y; }
+  const den = n * sxx - sx * sx; if (den < 1e-9) return null; const b = (n * sxy - sx * sy) / den, a = (sy - b * sx) / n; return { a, b, x0, span: pts[n - 1].now - x0 }; }
+const clk = {
+  samples: [], ref: [], lastRaw: null, lastChange: 0, fit: null, reffit: null, emaOff: null, out: 0, outNow: 0, fresh: true, q: 0,
+  reset(t, now, rate) { this.samples = []; this.ref = []; this.lastRaw = t; this.lastChange = now; this.fit = null; this.reffit = null; this.emaOff = t - now / 1000 * rate; this.out = t; this.outNow = now; this.fresh = true; },
+  feed(raw, now, rate, playing) { let isNew = false, jumpMs = 0;
+    if (this.lastRaw == null || raw !== this.lastRaw) {
+      if (!this.fresh && playing) { const exp = this.out + (now - this.outNow) / 1000 * rate; const d = (raw - exp) * 1000; if (Math.abs(d) > 250) jumpMs = d; }
+      this.fresh = false; isNew = true; this.lastRaw = raw; this.lastChange = now;
+      this.samples.push({ now, raw }); while (this.samples.length > 2 && now - this.samples[0].now > 2000) this.samples.shift();
+      this.ref.push({ now, raw }); while (this.ref.length > 2 && now - this.ref[0].now > 10000) this.ref.shift();
+      this.fit = lsq(this.samples); this.reffit = lsq(this.ref);
+      /* 量子化の刻み q̂: floor 量子化された読みの直線残差は幅 q の一様分布（SD = q/√12）なので q̂ = √12·SD。lsq/ema の出力に +q̂/2 を足して −刻み/2 の系統誤差を打ち消す */
+      const f = this.fit; if (f && f.span >= 1000) { const res = this.samples.map(p => p.raw - (f.a + f.b * (p.now - f.x0) / 1000)); this.q = Math.min(0.05, sd(res) * Math.sqrt(12)); }
+      const off = raw - now / 1000 * rate; this.emaOff = this.emaOff == null ? off : this.emaOff + (off - this.emaOff) * 0.2;
+    }
+    return { isNew, jumpMs }; },
+  timeAt(ts, rate, playing, commit) { let v; const direct = S.interp === 'direct';
+    if (!playing) v = direct ? (this.lastRaw == null ? this.out : this.lastRaw) : this.out;
+    else if (direct) v = this.lastRaw == null ? 0 : this.lastRaw;
+    else if (this.fresh && S.holdFresh) v = this.lastRaw == null ? this.out : this.lastRaw; /* seek 直後: 生の読みが変わるまで保持（外挿しない） */
+    else { if (S.interp === 'lsq') { const f = this.fit; v = (f && f.span >= 300) ? f.a + f.b * (ts - f.x0) / 1000 : (this.lastRaw == null ? 0 : this.lastRaw) + (ts - this.lastChange) / 1000 * rate; }
+      else v = (this.emaOff == null ? 0 : this.emaOff) + ts / 1000 * rate;
+      v += this.q / 2; }
+    if (!direct && playing && ts >= this.outNow && v < this.out) v = this.out;
+    if (commit) { this.out = v; this.outNow = ts; }
+    return v; },
+  refAt(now) { const f = this.reffit; return (f && f.span >= 1000) ? f.a + f.b * (now - f.x0) / 1000 : null; },
+};
+const nvTime = (now, rate) => S.nvT0 + (now - S.nvNow) / 1000 * rate;
+function refTime(now, raw) { const tt = src().trueTime(now); if (tt != null) return tt; const r = clk.refAt(now); return r == null ? raw : r; }
+const hasRef = now => src().trueTime(now) != null || clk.refAt(now) != null;
+function clockAt(ts) { const s = src(); const rate = s.rate || 1; const playing = !!s.playing && !S.paused;
+  const base = S.noVideo ? nvTime(ts, rate) : clk.timeAt(ts, rate, playing, false); return base + S.offset / 1000; }
+
+/* ---- 譜面（A 段 10 鍵のランダムウォーク、種固定） ---- */
+function buildNotes() { const rng = mulberry32(20261024), rz = mulberry32(99); const out = []; let col = 4, beat = 0;
+  while (beat < 64) { const dur = rng() < 0.3 ? 0.5 : 1; col = Math.max(0, Math.min(9, col + Math.floor(rng() * 5) - 2)); out.push({ key: KEYS[col], t: LEAD + beat * SPB, z: gauss(rz), state: 'pending', autoAt: null, missAt: 0 }); beat += dur; }
+  S.notes = out; }
+const isResolved = (n, t) => n.state === 'hit' || n.state === 'skipped' || (n.state === 'missed' && n.missAt + 0.4 < t);
+function advanceIdx() { while (S.nextIdx < S.notes.length && isResolved(S.notes[S.nextIdx], S.time)) S.nextIdx++; }
+
+/* ---- 判定 ---- */
+function judge(n, dS) { const err = dS * 1000, w = WINDOWS[S.win], a = Math.abs(err); const grade = a <= w.p ? 'perfect' : a <= w.g ? 'great' : 'good';
+  n.state = 'hit'; S.counts[grade]++; S.hits.push(err); S.wifeSum += wife3(err); S.wifeN++;
+  const at = performance.now(); S.effects.push({ key: n.key, at, err, grade }); S.lastHit = { err, grade, key: n.key }; S.lastJudge = { grade, err, at }; }
+function miss(n, dS) { n.state = 'missed'; n.missAt = S.time; S.counts.miss++; S.wifeSum += WIFE_MISS; S.wifeN++; S.lastJudge = { grade: 'miss', err: dS * 1000, at: performance.now() }; }
+function press(code, ts) { const k = byCode[code]; if (!k) return false; if (S.pressed[code]) return true; S.pressed[code] = true; ensureAudio();
+  if (S.running && !S.paused && !cal.active) { const good = WINDOWS[S.win].o / 1000; const tHit = clockAt(ts);
+    for (let i = S.nextIdx; i < S.notes.length; i++) { const n = S.notes[i]; const d = n.t - tHit; if (d > good) break; if (n.state !== 'pending' || n.key !== k) continue;
+      if (Math.abs(d) <= good) { judge(n, d); playNote(k.midi, 0.8, 1.2); return true; } } }
+  playNote(k.midi, 0.55, 1); return true; }
+function release(code) { delete S.pressed[code]; }
+
+function resync(reason, now) { const s = src(); const rate = s.rate || 1; const raw = s.read(now);
+  if (!S.noVideo) clk.reset(raw, now, rate);
+  S.time = (S.noVideo ? nvTime(now, rate) : raw) + S.offset / 1000; const T = S.time;
+  /* ヒット済みは戻さない（seek −5 s で同じセルを二度判定して UR・内訳・Wife3 を二重に積まないため）。ミス済みも skipped にして再落下させない */
+  for (const n of S.notes) { if (n.state === 'hit') continue; if (n.state === 'missed') { n.state = 'skipped'; continue; } n.state = n.t < T + 0.3 ? 'skipped' : 'pending'; n.autoAt = null; }
+  S.nextIdx = 0; advanceIdx(); S.ended = S.nextIdx >= S.notes.length; S.effects = [];
+  S.syncUntil = now + 300; S.syncReason = reason; logEvent(reason, now); }
+function enterNoVideo(now) { const rate = src().rate || 1; S.noVideo = true; S.nvT0 = S.time - S.offset / 1000; S.nvNow = now; S.syncUntil = 0; S.backEnabled = false; $('#btnBack').disabled = true; logEvent('時計が 2 秒止まったため動画なしモードへ（performance.now 単独、レート ' + rate.toFixed(2) + '）。時計が動き出すと「動画の時計へ戻す」が押せます', now); }
+function leaveNoVideo(now) { if (!S.noVideo) return; if (now - clk.lastChange > 2000) { logEvent('時計がまだ止まっているため戻せません', now); return; } S.noVideo = false; S.backEnabled = false; $('#btnBack').disabled = true; resync('動画の時計へ戻した', now); }
+function logEvent(label, now) { S.events.push({ now, t: S.time, label }); if (S.events.length > 40) S.events.shift();
+  const ul = $('#eventLog'); ul.innerHTML = ''; for (const e of S.events.slice(-6).reverse()) { const li = document.createElement('li'); li.textContent = `実 ${(e.now / 1000).toFixed(1)} s ／ 曲 ${e.t.toFixed(2)} s  ${e.label}`; ul.appendChild(li); } }
+
+function update(now) { if (!S.running) return; const s = src(); const playing = !!s.playing && !S.paused; const rate = s.rate || 1; const t = S.time; const good = WINDOWS[S.win].o / 1000; const inSync = now < S.syncUntil;
+  for (let i = S.nextIdx; i < S.notes.length; i++) { const n = S.notes[i]; const dt = n.t - t; if (dt > 1.2) break; if (n.state !== 'pending') continue;
+    if (S.auto && playing && !inSync && !cal.active) {
+      if (n.autoAt == null) { const refNow = refTime(now, clk.lastRaw == null ? 0 : clk.lastRaw); n.autoAt = now + (n.t + n.z * S.jitter / 1000 - refNow) / rate * 1000; }
+      if (now >= n.autoAt) { const d = n.t - clockAt(n.autoAt); playNote(n.key.midi, 0.6, 0.9); if (Math.abs(d) <= good) judge(n, d); else miss(n, d); continue; } }
+    if (!inSync && playing && !cal.active && -dt > good) miss(n, dt); }
+  advanceIdx();
+  if (S.nextIdx >= S.notes.length && !S.ended) { S.ended = true; onEnd(); } }
+function onEnd() { const n = S.hits.length; if (n >= 8) { const m = mean(S.hits); const next = Math.max(-120, Math.min(120, Math.round(S.offset + m)));
+    S.proposal = next; $('#proposal').hidden = false; $('#proposalTxt').innerHTML = `プレイ後の提案: 平均ずれ <b>${sign(-m)} ms</b>（${m > 0 ? '早い' : '遅い'}、${n} ヒット、UR ${(sd(S.hits) * 10).toFixed(0)}）→ オフセットを <b>${next} ms</b> にする。`; }
+  recordResult(true); logEvent('譜面の終わり（やり直しで同じ人工入力を再実行）', performance.now());
+  if (sweep.active) { sweep.idx++; if (sweep.idx < sweep.order.length) { const m = sweep.order[sweep.idx]; setNote('sweepNote', `自動で流しています… 次は ${INTERP_NAME[m]}（${sweep.idx + 1}/3）`); clearTimeout(sweep.timer); sweep.timer = setTimeout(() => { if (!sweep.active) return; restart({ sweep: true, interp: m }); }, 900); }
+    else { sweep.active = false; $('#btnSweep').disabled = false; setNote('sweepNote', '3 方式を流し終えました。表の 3 行を見比べてください（同じ人工入力・同じ時計の癖）。', 'ok'); } } }
+
+/* ---- 方式別の結果表（3 方式を数値で並べる） ---- */
+const INTERP_NAME = { direct: '直読み', lsq: '最小二乗', ema: '指数平滑' };
+const welford = () => ({ n: 0, m: 0, s: 0, add(x) { this.n++; const d = x - this.m; this.m += d / this.n; this.s += d * (x - this.m); }, sd() { return this.n > 1 ? Math.sqrt(this.s / (this.n - 1)) : NaN; } });
+const sweep = { active: false, order: ['direct', 'lsq', 'ema'], idx: 0, timer: 0 };
+function cancelSweep(msg) { if (!sweep.active) return; sweep.active = false; clearTimeout(sweep.timer); $('#btnSweep').disabled = false; setNote('sweepNote', msg); }
+function recordResult(complete) { if (S.mixed || (!S.hits.length && !S.counts.miss)) return; const c = S.counts, h = S.hits, a = S.acc;
+  S.results[S.interp] = { complete, rawSd: a && a.raw.n > 10 ? a.raw.sd() : NaN, intSd: a && a.est.n > 10 ? a.est.sd() : NaN, ur: h.length >= 2 ? sd(h) * 10 : NaN, mean: h.length ? -mean(h) : NaN, counts: `${c.perfect} / ${c.great} / ${c.good} / ${c.miss}`, wife: S.wifeN ? S.wifeSum / S.wifeN * 100 : NaN,
+    cond: `${src() === dummy ? 'ダミー' : '実 IFrame'}・${S.auto ? 'ジッタ ' + S.jitter : '手入力'}・${WINDOWS[S.win].name.split(' ')[0]}・オフセット ${sign(S.offset)}${S.holdFresh ? '・seek 保持' : ''}` };
+  S.recorded = true; renderResults(); }
+function renderResults() { const tb = $('#resBody'); tb.innerHTML = ''; const f = (v, d, u) => isFinite(v) ? v.toFixed(d) + (u || '') : null;
+  for (const k of ['direct', 'lsq', 'ema']) { const r = S.results[k]; const tr = document.createElement('tr'); if (k === S.interp) tr.className = 'cur';
+    const cells = r ? [INTERP_NAME[k] + (r.complete ? '' : '（途中）'), `${f(r.rawSd, 1) || '—'} ／ ${f(r.intSd, 1) || '—'}`, f(r.ur, 0), isFinite(r.mean) ? sign(r.mean) + ' ms' : null, r.counts, f(r.wife, 2, '%'), r.cond] : [INTERP_NAME[k], null, null, null, null, null, null];
+    cells.forEach((v, i) => { const td = document.createElement('td'); if (i === 0 || i === 6) td.className = 'jp'; if (v == null) { td.textContent = '—'; td.className = 'na'; } else td.textContent = v; tr.appendChild(td); }); tb.appendChild(tr); } }
+function setInterp(m) { S.interp = m; $('#interp').value = m; syncInterpNote(); renderResults(); }
+
+/* ---- 制御 ---- */
+function restart(opts) { const now = performance.now(); const s = src(); if (!(opts && opts.sweep)) cancelSweep('やり直しで自動の流しを中止しました。');
+  if (!S.recorded && !S.ended) recordResult(false); /* 途中でやり直した分は「途中」として今の方式の行へ */
+  if (opts && opts.interp) setInterp(opts.interp);
+  buildNotes(); S.nextIdx = 0; S.hits = []; S.counts = { perfect: 0, great: 0, good: 0, miss: 0 }; S.wifeSum = 0; S.wifeN = 0; S.effects = []; S.lastHit = null; S.lastJudge = null; S.traces = []; S.ended = false; S.paused = false; S.noVideo = false; S.backEnabled = false; $('#btnBack').disabled = true; $('#proposal').hidden = true; S.proposal = null;
+  S.recorded = false; S.mixed = false; S.acc = { raw: welford(), est: welford() };
+  if (s === dummy) { dummy.reset(now); dummy.play(now); } else { yt.seek(0); yt.play(); }
+  S.running = true; clk.reset(0, now, s.rate || 1); S.time = S.offset / 1000; S.syncUntil = now + 300; S.syncReason = '開始'; logEvent('開始', now); syncStartBtn(); }
+function setPaused(p, label) { const now = performance.now(); const s = src(); if (!S.running) { restart(); return; }
+  if (p) { if (S.paused) return; S.paused = true; s.pause(now); logEvent(label || '一時停止（時計は凍結）', now); }
+  else { if (!S.paused) return; S.paused = false; s.play(now); if (s === dummy) resync(label || '一時停止から再開', now); }
+  syncStartBtn(); }
+function syncStartBtn() { $('#btnStart').innerHTML = (S.running && !S.paused ? '一時停止' : '再開') + ' <span class="kbd">Space</span>'; }
+function doSeek(d) { const now = performance.now(); const s = src(); const cur = S.noVideo ? nvTime(now, s.rate || 1) : (clk.lastRaw == null ? 0 : clk.lastRaw); const target = Math.max(0, cur + d);
+  s.seek(target, now); if (S.paused) { S.paused = false; s.play(now); } S.noVideo = false; S.backEnabled = false; $('#btnBack').disabled = true; resync(`seek ${d > 0 ? '+' : ''}${d} s → ${target.toFixed(1)} s（ダミーは ${dummy.freezeMs} ms 凍結）`, now); syncStartBtn(); }
+
+/* ---- 校正（メトロノーム 24 打、SD ゲート） ---- */
+const cal = { active: false, starting: false, resume: false, clicks: [], taps: [], timer: 0 };
+async function startCal() { if (cal.active || cal.starting) return; ensureAudio(); if (!AC) { setNote('calStatus', '音声を開始できませんでした。', 'ng'); return; }
+  /* suspended のままだと AC.currentTime が止まっていて予定が狂うので、resume を待ってから予定を組む（Safari の keydown 由来 AC、タブ復帰後） */
+  cal.starting = true; $('#btnCal').disabled = true; try { if (AC.state !== 'running') await AC.resume(); } catch (e) {} cal.starting = false;
+  if (AC.state !== 'running') { $('#btnCal').disabled = false; setNote('calStatus', `音声を開始できませんでした（AudioContext が ${AC.state}）。画面を一度クリックしてからもう一度試してください。`, 'ng'); return; }
+  /* 校正中は譜面を止める: 自動プレイの音がクリックに重ならず、落下セルが MISS として統計に積まれない */
+  cal.resume = false; if (S.running && !S.paused) { cal.resume = true; setPaused(true, '校正のため一時停止'); }
+  cal.active = true; cal.taps = []; cal.clicks = []; const N = 28, acT0 = AC.currentTime + 0.6;
+  /* AudioContext 時刻 → performance.now の換算。getOutputTimestamp の対応点は出力遅延込み（contextTime は「いま出力中のフレーム」）なので outputLatency は足さない。無い環境だけ現在時刻＋outputLatency で退避 */
+  const lat = AC.outputLatency || AC.baseLatency || 0; let perfOf = null, convNote = '';
+  if (typeof AC.getOutputTimestamp === 'function') { try { const o = AC.getOutputTimestamp(); if (o && isFinite(o.performanceTime) && isFinite(o.contextTime) && o.performanceTime > 0) { perfOf = i => o.performanceTime + (acT0 + i * 0.6 - o.contextTime) * 1000; convNote = 'getOutputTimestamp で換算'; } } catch (e) {} }
+  if (!perfOf) { const p0 = performance.now(), c0 = AC.currentTime; perfOf = i => p0 + (acT0 + i * 0.6 - c0 + lat) * 1000; convNote = `performance.now ＋ outputLatency ${(lat * 1000).toFixed(0)} ms で換算`; }
+  for (let i = 0; i < N; i++) { clickAt(acT0 + i * 0.6, i % 4 === 0); cal.clicks.push({ perf: perfOf(i), measured: i >= 4, hit: false }); }
+  clearTimeout(cal.timer); cal.timer = setTimeout(finishCal, N * 600 + 900); $('#btnCalStop').disabled = false;
+  setNote('calStatus', `予備 4 拍のあと 24 打。クリックに合わせて A 段のキーか Space を押してください… 0/24（${convNote}）`); }
+function calTap(ts) { if (!cal.active) return; let best = null, bd = Infinity; for (const c of cal.clicks) { const d = ts - c.perf; if (Math.abs(d) < Math.abs(bd)) { bd = d; best = c; } }
+  if (!best || !best.measured || best.hit || Math.abs(bd) > 300) return; best.hit = true; cal.taps.push(bd);
+  setNote('calStatus', `計測中… ${cal.taps.length}/24（直前 ${sign(bd)} ms）`); if (cal.taps.length >= 24) finishCal(); }
+function stopCal(msg) { clearTimeout(cal.timer); cal.active = false; $('#btnCal').disabled = false; $('#btnCalStop').disabled = true; if (msg) setNote('calStatus', msg, 'ng');
+  if (cal.resume) { cal.resume = false; if (S.running && S.paused) setPaused(false, '校正を終えて再開'); } }
+function finishCal() { if (!cal.active) return; const n = cal.taps.length; if (n < 24) { stopCal(`打数不足（${n}/24）のため適用しません。`); return; }
+  const m = mean(cal.taps), s = sd(cal.taps);
+  if (s < 30) { S.offset = Math.max(-120, Math.min(120, Math.round(S.offset - m))); $('#offset').value = S.offset; $('#offsetVal').textContent = sign(S.offset) + ' ms'; saveOffset(); stopCal(); setNote('calStatus', `平均 ${sign(m)} ms（${m > 0 ? '遅い' : '早い'}）、SD ${s.toFixed(1)} ms < 30 → オフセット ${sign(S.offset)} ms を適用しました。`, 'ok'); }
+  else stopCal(`ばらつき大（SD ${s.toFixed(1)} ms ≥ 30 ms）のため適用を拒否。平均 ${sign(m)} ms は参考値です。もう一度試してください。`); }
+function setNote(id, txt, cls) { const el = $('#' + id); el.textContent = txt; el.className = 'note' + (cls ? ' ' + cls : ''); }
+
+/* ---- 実 IFrame の読み込み ---- */
+let ytTimer = 0, ytGen = 0, ytScript = false;
+function loadYT(id) { if (!id) { setNote('routeNote', '動画 ID を入れてください（例: 11 文字の ID）。', 'ng'); return; }
+  const gen = ++ytGen; /* 世代番号: タイムアウト後に遅れて届く onReady や、古いプレイヤーの onStateChange を捨てる */
+  const fail = why => { if (gen !== ytGen) return; clearTimeout(ytTimer); yt.ready = false; yt.player = null; S.route = 'dummy'; $('input[name=route][value=dummy]').checked = true; $('#ytHost').hidden = true; $('#video').classList.remove('hasPlayer'); $('#dummyParams').hidden = false;
+    setNote('routeNote', '実 IFrame に失敗: ' + why + ' → ダミー時計に退避しました。', 'ng'); $('#clockLabel').textContent = 'ダミー（15 ms 刻み・逆行・seek 凍結）'; };
+  setNote('routeNote', 'IFrame API を読み込み中…'); $('#ytHost').hidden = false; $('#video').classList.add('hasPlayer');
+  clearTimeout(ytTimer); ytTimer = setTimeout(() => fail('10 秒以内に応答なし（埋め込み不可・ブロック・オフライン）'), 10000);
+  const create = () => { if (gen !== ytGen) return; try { if (yt.player && yt.player.destroy) yt.player.destroy(); const host = $('#ytHost'); host.innerHTML = '<div id="ytPlayer"></div>';
+      yt.player = new window.YT.Player('ytPlayer', { width: 480, height: 270, videoId: id, playerVars: { playsinline: 1, controls: 1, rel: 0 }, events: {
+        onReady: () => { if (gen !== ytGen) return; clearTimeout(ytTimer); yt.ready = true; S.route = 'yt'; $('input[name=route][value=yt]').checked = true; $('#dummyParams').hidden = true; dummy.pause(performance.now());
+          setNote('routeNote', '実 IFrame で動作中。残差の基準は 10 秒窓の最小二乗直線（実時間は取れないため）。', 'ok'); $('#clockLabel').textContent = '実 IFrame（getCurrentTime）'; yt.setRate(+$('#rate').value); restart(); },
+        onError: e => fail('プレイヤーのエラー（code ' + (e && e.data) + '：ID 違い・埋め込み禁止・地域制限）'),
+        onStateChange: e => { if (gen !== ytGen) return; onYTState(e); } } }); } catch (e) { fail(String(e && e.message || e)); } };
+  if (window.YT && window.YT.Player) create();
+  else { window.onYouTubeIframeAPIReady = create; if (!ytScript) { ytScript = true; const sc = document.createElement('script'); sc.src = 'https://www.youtube.com/iframe_api'; sc.onerror = () => { ytScript = false; fail('iframe_api の読み込みに失敗（オフラインかブロック。公開版では常にここへ来る）'); }; document.head.appendChild(sc); } } }
+function onYTState(e) { const prev = yt.state; yt.state = e.data; const now = performance.now(); if (src() !== yt || !S.running) return; /* ダミーへ戻した後に遅れて届く PAUSED を無視 */
+  /* 再生に入る遷移はすべて合わせ直す（CUED・UNSTARTED からの初回再生や、自動再生ブロック後にシークしてからの再生も含む） */
+  if (e.data === 1 && prev !== 1) { S.paused = false; resync(prev === 3 ? 'BUFFERING から再開（広告・読み込みの模擬）' : prev === 2 ? 'PAUSED から再開' : '再生開始（CUED/UNSTARTED から）', now); syncStartBtn(); }
+  else if (e.data === 3) logEvent('BUFFERING（時計を保持）', now);
+  else if (e.data === 2 && !S.paused) { S.paused = true; logEvent('プレイヤー側で一時停止', now); syncStartBtn(); }
+  else if (e.data === 0) logEvent('動画の終わり', now); }
+
+/* ---- 音（m1 流用） ---- */
+let AC = null, master = null;
+function ensureAudio() { if (AC) { if (AC.state === 'suspended') AC.resume(); return; } try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; } const comp = AC.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4; master = AC.createGain(); master.gain.value = 0.7; master.connect(comp); comp.connect(AC.destination); }
+function playNote(midi, vel = 0.7, dur = 1.2) { if (!AC) return; const f = 440 * Math.pow(2, (midi - 69) / 12); const t = AC.currentTime; const out = AC.createGain(); out.gain.value = 1; out.connect(master);
+  const bright = Math.max(0.35, Math.min(1.3, 1.4 - (midi - 48) / 40)); const partials = [[1, 1], [2, 0.5], [3, 0.26], [4, 0.12], [5.01, 0.06], [6.02, 0.03]];
+  for (const [h, a] of partials) { const o = AC.createOscillator(); o.type = 'sine'; o.frequency.value = f * h; const g = AC.createGain(); const decay = dur * bright / (0.35 + h * 0.5);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a * vel * 0.28, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0003, t + decay); o.connect(g); g.connect(out); o.start(t); o.stop(t + decay + 0.05); }
+  const buf = AC.createBuffer(1, 2205, AC.sampleRate); const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / 300); const n = AC.createBufferSource(); n.buffer = buf; const ng = AC.createGain(); ng.gain.value = vel * 0.08; const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = Math.min(12000, f * 2); n.connect(bp); bp.connect(ng); ng.connect(out); n.start(t); }
+function clickAt(t, accent) { if (!AC) return; const o = AC.createOscillator(); o.type = 'square'; o.frequency.value = accent ? 1400 : 1000; const g = AC.createGain(); g.gain.setValueAtTime(0.12, t); g.gain.exponentialRampToValueAtTime(0.0005, t + 0.04); o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.05); }
+
+/* ---- Canvas 準備（DPR と ResizeObserver） ---- */
+const sizes = new Map();
+const RO = window.ResizeObserver ? new ResizeObserver(es => { for (const e of es) sizes.set(e.target, { w: e.contentRect.width, h: e.contentRect.height }); }) : null;
+function prep(c) { const wrap = c.parentElement; if (!sizes.has(wrap) || !RO) { const r = wrap.getBoundingClientRect(); sizes.set(wrap, { w: r.width, h: r.height }); if (RO) RO.observe(wrap); }
+  const sz = sizes.get(wrap); const W = Math.max(40, sz.w), H = Math.max(40, sz.h); const DPR = Math.min(2, window.devicePixelRatio || 1); const pw = Math.round(W * DPR), ph = Math.round(H * DPR);
+  if (c.width !== pw || c.height !== ph) { c.width = pw; c.height = ph; } const ctx = c.getContext('2d'); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); return { ctx, W, H }; }
+const stageC = $('#stage'), traceC = $('#trace'), histC = $('#hist'), gapC = $('#cGap'), angleC = $('#cAngle');
+const GRADE_TXT = { perfect: ['PERFECT', '#ffd766'], great: ['GREAT', '#62d4a0'], good: ['GOOD', '#62a6f2'], miss: ['MISS', '#f06a6a'] };
+const FONT_NUM = 'Rajdhani, "Zen Kaku Gothic New", sans-serif', FONT_JP = '"Zen Kaku Gothic New", sans-serif';
+
+/* ---- 舞台 ---- */
+let GM = { W: 0, H: 0, travel: 0, R: 20, hexW: 34, kbCy: 300, left: 16, yLine: 260, speed: 300 };
+function layoutStage(W, H) { const gutter = 16; const hexW = Math.min(72, (W - gutter * 2) / 10.2); const R = hexW / SQ3; const kbCy = H - R - 18; const left = gutter + ((W - gutter * 2) - 10 * hexW) / 2; const yLine = kbCy - R * 2.1;
+  GM = { W, H, travel: S.travel, hexW, R, kbCy, left, yLine, speed: (yLine + 2 * R) / S.travel }; for (const k of KEYS) { k.cx = left + hexW * (k.col + 0.5); k.cy = kbCy; } }
+function drawLabel(ctx, x, y, txt, col, R) { ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `700 ${R * 0.95}px ${FONT_NUM}`; ctx.fillText(txt, x, y + R * 0.04); }
+function drawCellAt(ctx, cx, cy, R, err, mode, alpha, label) { ctx.save(); ctx.translate(cx, cy);
+  if (mode === 'gap') ctx.translate(0, Math.max(-R * 1.4, Math.min(R * 1.4, -err * 0.5))); else ctx.rotate(Math.max(-90, Math.min(90, err * 0.2)) * Math.PI / 180);
+  ctx.globalAlpha = alpha; hexPath(ctx, 0, 0, R); ctx.fillStyle = CELL_COL; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5; ctx.stroke(); if (label) drawLabel(ctx, 0, 0, label, '#0b0d12', R); ctx.restore(); }
+function drawSocket(ctx, cx, cy, R, strong) { hexPath(ctx, cx, cy, R); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill(); ctx.setLineDash(strong ? [] : [4, 3]); ctx.strokeStyle = strong ? '#ffffff' : 'rgba(255,255,255,0.55)'; ctx.lineWidth = strong ? 2 : 1.2; ctx.stroke(); ctx.setLineDash([]); }
+function landingMode(k) { return S.landing === 'both' ? (k.col < 5 ? 'gap' : 'angle') : S.landing; }
+/* 幅に収まる最大のフォントサイズに落とす（400 px 幅で端が切れないように） */
+function fitFont(ctx, txt, maxW, px, min, weight, fam) { for (let p = px; p > min; p--) { ctx.font = `${weight} ${p}px ${fam}`; if (ctx.measureText(txt).width <= maxW) return p; } ctx.font = `${weight} ${min}px ${fam}`; return min; }
+function drawStage(now) { const { ctx, W, H } = prep(stageC); if (W !== GM.W || H !== GM.H || GM.travel !== S.travel) layoutStage(W, H);
+  const grad = ctx.createLinearGradient(0, 0, 0, H); grad.addColorStop(0, '#0b0d12'); grad.addColorStop(1, '#151b28'); ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+  const R = GM.R, t = S.time;
+  ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,0.045)'; for (const k of KEYS) { ctx.beginPath(); ctx.moveTo(k.cx, 0); ctx.lineTo(k.cx, GM.yLine - R); ctx.stroke(); }
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(GM.left - 6, GM.yLine); ctx.lineTo(GM.left + 10 * GM.hexW + 6, GM.yLine); ctx.stroke();
+  /* 鍵盤（穴） */
+  for (const k of KEYS) { const pressed = !!S.pressed[k.code]; hexPath(ctx, k.cx, k.cy, R * 0.93); ctx.fillStyle = CELL_COL; ctx.globalAlpha = pressed ? 1 : 0.14; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = pressed ? '#ffffff' : CELL_COL; ctx.globalAlpha = pressed ? 1 : 0.55; ctx.lineWidth = pressed ? 2.5 : 1.5; ctx.stroke(); ctx.globalAlpha = 1; drawLabel(ctx, k.cx, k.cy, k.label, pressed ? '#0b0d12' : '#f4f2ea', R * 0.93); }
+  /* 落下セル */
+  const Rn = R * 0.9;
+  for (let i = S.nextIdx; i < S.notes.length; i++) { const n = S.notes[i]; const dt = n.t - t; if (dt > S.travel + 0.2) break; if (n.state === 'hit' || n.state === 'skipped') continue;
+    const y = GM.yLine - dt * GM.speed; if (y < -3 * Rn || y > H + Rn) continue; ctx.globalAlpha = n.state === 'missed' ? 0.3 : 1;
+    hexPath(ctx, n.key.cx, y, Rn); ctx.fillStyle = CELL_COL; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.5; ctx.stroke(); drawLabel(ctx, n.key.cx, y, n.key.label, '#0b0d12', Rn); ctx.globalAlpha = 1; }
+  /* 着地表示（嵌合の隙間／回転角） */
+  S.effects = S.effects.filter(e => now - e.at < 800);
+  for (const e of S.effects) { const p = (now - e.at) / 800; const k = e.key; const mode = landingMode(k); drawSocket(ctx, k.cx, k.cy, R * 0.93, true); drawCellAt(ctx, k.cx, k.cy, Rn, e.err, mode, 1 - p * p, k.label);
+    ctx.globalAlpha = 1 - p; ctx.fillStyle = '#cfccc3'; ctx.font = `500 ${Math.round(R * 0.5)}px ${FONT_NUM}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText((e.err > 0 ? '−' : '+') + Math.abs(Math.round(e.err)) + ' ms', k.cx, GM.yLine - R * 1.15 - p * 8); ctx.globalAlpha = 1; }
+  const j = S.lastJudge; if (j && now - j.at < 600) { const p = (now - j.at) / 600; const [txt, col] = GRADE_TXT[j.grade]; ctx.globalAlpha = 1 - p * p; ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `700 ${Math.round(R * 1.3)}px ${FONT_NUM}`; ctx.fillText(txt, W / 2, GM.yLine - R * 3.2 - p * 10); ctx.globalAlpha = 1; }
+  /* 同期中の帯 */
+  const since = now - S.syncUntil; if (since < 400) { const a = since < 0 ? 1 : 1 - since / 400; const y0 = GM.yLine - R * 2.6, h = R * 3.0; ctx.globalAlpha = a; ctx.fillStyle = 'rgba(242,164,82,0.22)'; ctx.fillRect(0, y0, W, h); ctx.fillStyle = '#f2a452'; ctx.fillRect(0, y0, W, 2); ctx.fillRect(0, y0 + h - 2, W, 2);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ffe3c2'; ctx.font = `700 15px ${FONT_JP}`; ctx.fillText('同期中 … 再開後 300 ms は判定を猶予', W / 2, y0 + h / 2 - 9); fitFont(ctx, S.syncReason, W - 24, 11, 9, 500, FONT_JP); ctx.fillStyle = '#f4f2ea'; ctx.fillText(S.syncReason, W / 2, y0 + h / 2 + 10); ctx.globalAlpha = 1; }
+  /* HUD */
+  const s = src(); const rate = s.rate || 1; const stateTxt = !S.running ? '停止' : S.paused ? '一時停止' : !s.playing ? (s === dummy && dummy.ended ? '動画の終わり' : '保持中') : '再生中';
+  const interpTxt = { direct: '直読み', lsq: '最小二乗 2 秒', ema: '指数平滑' }[S.interp];
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillStyle = '#f4f2ea'; ctx.font = `600 24px ${FONT_NUM}`; ctx.fillText(t.toFixed(3) + ' s', 18, 10);
+  ctx.fillStyle = '#9a978f'; ctx.font = `500 12px ${FONT_JP}`; ctx.fillText(`${s === dummy ? 'ダミー' : '実 IFrame'} ・ ${S.noVideo ? '動画なしモード' : interpTxt} ・ ${stateTxt} ${rate.toFixed(2)}×`, 18, 40);
+  ctx.fillText(S.landing === 'both' ? '左 5 鍵: 嵌合の隙間 ／ 右 5 鍵: 回転角' : S.landing === 'gap' ? '着地: 嵌合の隙間' : '着地: 回転角', 18, 56);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#f4f2ea'; ctx.font = `600 22px ${FONT_NUM}`; ctx.fillText('UR ' + (S.hits.length >= 2 ? (sd(S.hits) * 10).toFixed(0) : '—'), W - 18, 10); ctx.fillStyle = '#9a978f'; ctx.font = `500 12px ${FONT_JP}`; ctx.fillText(`ヒット ${S.hits.length} ／ ミス ${S.counts.miss}`, W - 18, 38);
+  if (S.noVideo) { ctx.textAlign = 'center'; ctx.textBaseline = 'top'; const l1 = '動画なしモード: performance.now 単独で進行', l2 = '（時計が 2 秒止まったため）'; ctx.font = `700 13px ${FONT_JP}`; const w1 = ctx.measureText(l1 + l2).width; ctx.fillStyle = 'rgba(217,103,43,0.85)';
+    if (w1 + 24 <= W - 32) { ctx.fillRect(W / 2 - (w1 + 24) / 2, 78, w1 + 24, 24); ctx.fillStyle = '#fff'; ctx.fillText(l1 + l2, W / 2, 83); }
+    else { ctx.font = `700 12px ${FONT_JP}`; const tw = Math.min(W - 32, Math.max(ctx.measureText(l1).width, ctx.measureText(l2).width) + 24); ctx.fillRect(W / 2 - tw / 2, 78, tw, 40); ctx.fillStyle = '#fff'; ctx.fillText(l1, W / 2, 82); ctx.fillText(l2, W / 2, 100); } }
+  if (S.ended && S.running) { ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = 'rgba(255,255,255,0.75)'; const et = '譜面の終わり ― Enter でやり直し（同じ人工入力）'; fitFont(ctx, et, W - 32, 20, 13, 700, FONT_JP); ctx.fillText(et, W / 2, H * 0.38); }
+  if (cal.active) { ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ffd766'; ctx.font = `700 16px ${FONT_JP}`; ctx.fillText('校正中: クリックに合わせてキーを押す', W / 2, H * 0.3); } }
+
+/* ---- トレース ---- */
+function drawTrace(now) { const { ctx, W, H } = prep(traceC); ctx.fillStyle = '#0b0d12'; ctx.fillRect(0, 0, W, H); const span = 8000, x0 = now - span;
+  let maxA = 30; for (const p of S.traces) { if (isFinite(p.raw)) maxA = Math.max(maxA, Math.abs(p.raw)); if (isFinite(p.est)) maxA = Math.max(maxA, Math.abs(p.est)); } const yr = Math.min(500, Math.ceil(maxA / 10) * 10);
+  const padL = 40, padR = 8, padT = 10, padB = 16; const px = t => padL + (t - x0) / span * (W - padL - padR); const py = v => padT + (1 - (Math.max(-yr, Math.min(yr, v)) + yr) / (2 * yr)) * (H - padT - padB);
+  ctx.font = `500 10px ${FONT_NUM}`; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (const v of [-yr, -yr / 2, 0, yr / 2, yr]) { ctx.strokeStyle = v === 0 ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(padL, py(v)); ctx.lineTo(W - padR, py(v)); ctx.stroke(); ctx.fillStyle = '#9a978f'; ctx.fillText((v > 0 ? '+' : '') + v, padL - 4, py(v)); }
+  for (const e of S.events) { if (e.now < x0) continue; ctx.strokeStyle = 'rgba(242,164,82,0.6)'; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(px(e.now), padT); ctx.lineTo(px(e.now), H - padB); ctx.stroke(); ctx.setLineDash([]); }
+  const line = (key, col) => { ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.beginPath(); let first = true; for (const p of S.traces) { const v = p[key]; if (!isFinite(v)) { first = true; continue; } const x = px(p.now), y = py(v); first ? ctx.moveTo(x, y) : ctx.lineTo(x, y); first = false; } ctx.stroke(); };
+  line('raw', '#62a6f2'); line('est', '#f2a452');
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.font = `600 11px ${FONT_JP}`; ctx.fillStyle = '#62a6f2'; ctx.fillText('— 生の getCurrentTime', padL + 6, 2); ctx.fillStyle = '#f2a452'; ctx.fillText('— 補間後の曲時刻', padL + 140, 2);
+  ctx.fillStyle = '#9a978f'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.font = `500 10px ${FONT_JP}`; ctx.fillText(src() === dummy ? '縦軸: 時計 − 実時間 (ms)　横軸: 直近 8 秒' : '縦軸: 時計 − 基準線（10 秒の最小二乗）(ms)', W - padR, H - 1); }
+
+/* ---- ヒストグラムと見比べ ---- */
+function drawHist() { const { ctx, W, H } = prep(histC); ctx.fillStyle = '#0b0d12'; ctx.fillRect(0, 0, W, H); const bins = new Array(40).fill(0); let over = 0;
+  for (const e of S.hits) { const late = -e; const b = Math.floor((late + 200) / 10); if (b >= 0 && b < 40) bins[b]++; else over++; }
+  const mx = Math.max(1, ...bins); const padL = 8, padR = 8, padT = 8, padB = 18; const bw = (W - padL - padR) / 40; const w = WINDOWS[S.win];
+  const xOf = ms => padL + (ms + 200) / 400 * (W - padL - padR);
+  for (const [lim, col] of [[w.o, 'rgba(98,166,242,0.10)'], [w.g, 'rgba(98,212,160,0.12)'], [w.p, 'rgba(255,215,102,0.16)']]) { ctx.fillStyle = col; ctx.fillRect(xOf(-lim), padT, xOf(lim) - xOf(-lim), H - padT - padB); }
+  for (let i = 0; i < 40; i++) { const h = bins[i] / mx * (H - padT - padB); const late = i * 10 - 195; ctx.fillStyle = late < 0 ? '#62a6f2' : '#f2a452'; ctx.fillRect(padL + i * bw + 1, H - padB - h, bw - 2, h); }
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.moveTo(xOf(0), padT); ctx.lineTo(xOf(0), H - padB); ctx.stroke();
+  if (S.hits.length) { const m = -mean(S.hits); ctx.strokeStyle = '#ffd766'; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(xOf(m), padT); ctx.lineTo(xOf(m), H - padB); ctx.stroke(); ctx.setLineDash([]); }
+  ctx.fillStyle = '#9a978f'; ctx.font = `500 10px ${FONT_NUM}`; ctx.textBaseline = 'bottom'; ctx.textAlign = 'left'; ctx.fillText('−200 早い', padL, H - 3); ctx.textAlign = 'center'; ctx.fillText('0', xOf(0), H - 3); ctx.textAlign = 'right'; ctx.fillText('遅い +200' + (over ? `（範囲外 ${over}）` : ''), W - padR, H - 3); }
+function drawCompare() { const e = S.lastHit; const err = e ? e.err : 0;
+  for (const [c, mode] of [[gapC, 'gap'], [angleC, 'angle']]) { const { ctx, W, H } = prep(c); ctx.fillStyle = '#0b0d12'; ctx.fillRect(0, 0, W, H); const R = Math.min(W, H) * 0.3; const cx = W / 2, cy = H / 2 + 4;
+    drawSocket(ctx, cx, cy, R * 0.98, true); drawCellAt(ctx, cx, cy, R * 0.9, err, mode, e ? 0.95 : 0.35, e ? e.key.label : '');
+    ctx.fillStyle = '#9a978f'; ctx.font = `600 11px ${FONT_JP}`; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(mode === 'gap' ? '嵌合の隙間' : '回転角', 8, 6);
+    if (!e) { ctx.textAlign = 'center'; ctx.fillText('まだヒットなし', cx, H - 18); } }
+  setText('gapVal', e ? `${sign(-err)} ms → ${(Math.abs(err) * 0.5).toFixed(1)} px ${err > 0 ? '上' : '下'}` : '—');
+  setText('angleVal', e ? `${sign(-err)} ms → ${(Math.abs(err) * 0.2).toFixed(1)}° ${err > 0 ? '右回り' : '左回り'}` : '—'); }
+
+/* ---- 計測盤の文字 ---- */
+const textCache = {};
+function setText(id, s) { if (textCache[id] === s) return; textCache[id] = s; $('#' + id).textContent = s; }
+function drawMeter() { const il = S.inputLat; setText('tInput', il.length ? mean(il.map(x => x.h)).toFixed(1) + ' ms' : '—'); setText('tInputSub', il.length ? `直前の rAF からの経過 ${mean(il.map(x => x.f)).toFixed(1)} ms（${il.length} 打）` : '直前の rAF からの経過 —（キーを押すと測ります）');
+  const fg = S.frameGap; setText('tFrame', fg.length > 5 ? sd(fg).toFixed(2) + ' ms' : '—'); setText('tFrameSub', fg.length > 5 ? `平均 ${mean(fg).toFixed(1)} ms（${(1000 / mean(fg)).toFixed(0)} fps）` : '平均 —');
+  const okp = S.traces.filter(p => !p.inEvent); const rr = okp.map(p => p.raw).filter(isFinite), ee = okp.map(p => p.est).filter(isFinite);
+  const rawSd = rr.length > 10 ? sd(rr).toFixed(2) : '—', intSd = ee.length > 10 ? sd(ee).toFixed(2) : '—';
+  setText('tResRaw', rawSd === '—' ? '—' : rawSd + ' ms'); setText('tResInt', intSd === '—' ? '—' : intSd + ' ms'); setText('traceRaw', rawSd); setText('traceInt', intSd);
+  setText('tResIntSub', ({ direct: '直読み（補間なし）', lsq: '最小二乗 2 秒窓', ema: '指数平滑' })[S.interp] + (S.interp !== 'direct' ? `・量子化補正 +${(clk.q * 500).toFixed(1)} ms` : '') + (S.holdFresh ? '・seek 直後は保持' : '') + (S.noVideo ? '・動画なしモード' : ''));
+  setText('tUR', S.hits.length >= 2 ? (sd(S.hits) * 10).toFixed(0) : '—'); setText('tMean', S.hits.length ? sign(-mean(S.hits)) + ' ms' : '—'); setText('tMeanSub', `ヒット ${S.hits.length}` + (S.hits.length >= 2 ? `　誤差 SD ${sd(S.hits).toFixed(1)} ms` : ''));
+  const c = S.counts; setText('tCounts', `${c.perfect} / ${c.great} / ${c.good} / ${c.miss}`); setText('tCountsSub', '判定窓 ' + WINDOWS[S.win].name);
+  setText('tWife', S.wifeN ? (S.wifeSum / S.wifeN * 100).toFixed(2) + '%' : '—');
+  const parts = [`経路 ${src() === dummy ? 'ダミー' : '実 IFrame'}`, `補間 ${({ direct: '直読み', lsq: '最小二乗', ema: '指数平滑' })[S.interp]}`, `窓 ${WINDOWS[S.win].name.split(' ')[0]}`, S.auto ? `自動プレイ（ジッタ SD ${S.jitter} ms）` : '手入力', S.hits.length >= 2 ? `UR ${(sd(S.hits) * 10).toFixed(0)}` : ''];
+  setText('status', parts.filter(Boolean).join(' ｜ ') + '。同じ人工入力で補間方式を替え、残差 SD と UR を比べてください。'); }
+function updateBar(now) { const s = src(); const raw = clk.lastRaw == null ? 0 : clk.lastRaw; const est = S.time - S.offset / 1000;
+  if (s === dummy) { const tt = dummy.trueTime(now); $('#barFill').style.width = (tt / dummy.duration * 100).toFixed(2) + '%'; setText('barL', `ダミー動画 ${tt.toFixed(2)} / ${dummy.duration.toFixed(2)} s　${dummy.rate.toFixed(2)}×${dummy.playing ? '' : '（停止）'}`); }
+  else { const d = yt.duration || 0; $('#barFill').style.width = (d ? raw / d * 100 : 0).toFixed(2) + '%'; setText('barL', `実 IFrame ${raw.toFixed(2)} / ${d.toFixed(2)} s　${(yt.rate).toFixed(2)}×`); }
+  setText('barR', `生 ${raw.toFixed(3)}　補間 ${est.toFixed(3)}`); }
+
+/* ---- フレーム ---- */
+let lastFrameTs = 0;
+function frame(ts) { const now = performance.now(); if (lastFrameTs) { S.frameGap.push(ts - lastFrameTs); if (S.frameGap.length > 120) S.frameGap.shift(); } lastFrameTs = ts; S.lastRafTs = ts;
+  const s = src(); const playing = !!s.playing && !S.paused; const rate = s.rate || 1; const raw = s.read(now);
+  if (S.running) { const r = clk.feed(raw, now, rate, playing);
+    if (r.jumpMs && !S.noVideo && playing && now >= S.syncUntil) resync(`時刻の飛びを検出（${r.jumpMs > 0 ? '+' : '−'}${Math.abs(Math.round(r.jumpMs))} ms > 250 ms）→ 譜面を止めて合わせ直し`, now);
+    else if (!S.noVideo && playing && now >= S.syncUntil && now - clk.lastChange > 2000) enterNoVideo(now);
+    const base = S.noVideo ? nvTime(now, rate) : clk.timeAt(now, rate, playing, true); S.time = base + S.offset / 1000;
+    const ref = refTime(now, raw), refOk = hasRef(now); const inEvent = !playing || S.noVideo || now < S.syncUntil || now < dummy.frozenUntil || now < dummy.stuckUntil;
+    const pt = { now, raw: refOk ? (raw - ref) * 1000 : NaN, est: refOk ? (base - ref) * 1000 : NaN, inEvent }; S.traces.push(pt); while (S.traces.length && now - S.traces[0].now > 8000) S.traces.shift();
+    if (!inEvent && S.acc) { if (isFinite(pt.raw)) S.acc.raw.add(pt.raw); if (isFinite(pt.est)) S.acc.est.add(pt.est); }
+    if (S.noVideo) { const can = now - clk.lastChange <= 2000; if (can !== S.backEnabled) { S.backEnabled = can; $('#btnBack').disabled = !can; } }
+    update(now); }
+  drawStage(now); drawTrace(now); drawHist(); drawCompare(); drawMeter(); updateBar(now); requestAnimationFrame(frame); }
+
+/* ---- UI ---- */
+const blur = e => e.target.blur();
+const INTERP_NOTE = { direct: '毎フレーム getCurrentTime をそのまま使う。15 ms 刻みと逆行が判定にそのまま出る。', lsq: '直近 2 秒の読みを直線に当てはめ、performance.now で評価。単調に進め、逆行は無視される。', ema: 'performance.now で単調に進め、読みとの差（オフセット）を α=0.2 で平滑して周期補正する。' };
+function syncInterpNote() { $('#interpNote').textContent = INTERP_NOTE[S.interp]; }
+document.querySelectorAll('input[name=route]').forEach(r => r.addEventListener('change', e => { const v = e.target.value; if (v === 'yt') { if (yt.ready) { S.route = 'yt'; $('#dummyParams').hidden = true; $('#clockLabel').textContent = '実 IFrame（getCurrentTime）'; dummy.pause(performance.now()); restart(); } else { $('input[name=route][value=dummy]').checked = true; setNote('routeNote', '動画 ID を入れて「読み込む」を押すと IFrame を使います。読み込めるまではダミーで動きます。'); } }
+  else { S.route = 'dummy'; $('#dummyParams').hidden = false; $('#clockLabel').textContent = 'ダミー（15 ms 刻み・逆行・seek 凍結）'; if (yt.ready) yt.pause(); restart(); } blur(e); }));
+$('#btnLoad').addEventListener('click', () => loadYT($('#videoId').value.trim()));
+const rangeBind = (id, fmt, apply) => { const el = $('#' + id); el.addEventListener('input', e => { const v = +e.target.value; $('#' + id + 'Val').textContent = fmt(v); apply(v); }); el.addEventListener('change', blur); };
+rangeBind('step', v => v + ' ms', v => dummy.step = v);
+rangeBind('backFreq', v => v.toFixed(1) + ' /s', v => { dummy.backFreq = v; dummy.nextBack = dummy.nextBackFrom(dummy.trueTime(performance.now())); });
+rangeBind('backMs', v => v + ' ms', v => dummy.backMs = v);
+rangeBind('freeze', v => v + ' ms', v => dummy.freezeMs = v);
+$('#freezeMode').addEventListener('change', e => { dummy.freezeHold = e.target.value === 'hold'; blur(e); });
+$('#holdFresh').addEventListener('change', e => { S.holdFresh = e.target.checked; blur(e); });
+rangeBind('travel', v => v.toFixed(1) + ' s', v => S.travel = v);
+rangeBind('offset', v => sign(v) + ' ms', v => { S.offset = v; saveOffset(); });
+$('#rate').addEventListener('change', e => { const r = +e.target.value; const now = performance.now(); src().setRate(r, now); if (S.running && !S.paused) resync(`レート ${r}× に変更`, now); blur(e); });
+$('#interp').addEventListener('change', e => { if (S.running && !S.ended && (S.hits.length || S.counts.miss)) S.mixed = true; /* 途中で方式を替えた回は表に書かない */ setInterp(e.target.value); blur(e); });
+$('#win').addEventListener('change', e => { S.win = e.target.value; blur(e); });
+$('#landing').addEventListener('change', e => { S.landing = e.target.value; blur(e); });
+$('#auto').addEventListener('change', e => { S.auto = e.target.checked; for (const n of S.notes) n.autoAt = null; blur(e); });
+$('#jitter').addEventListener('change', e => { S.jitter = +e.target.value; for (const n of S.notes) if (n.state === 'pending') n.autoAt = null; blur(e); });
+$('#btnStart').addEventListener('click', () => S.running ? setPaused(!S.paused) : restart());
+$('#btnRestart').addEventListener('click', () => restart());
+$('#btnSweep').addEventListener('click', () => { if (sweep.active) return; if (!S.auto) { S.auto = true; $('#auto').checked = true; logEvent('自動の流しのため自動プレイを有効にした', performance.now()); }
+  sweep.active = true; sweep.idx = 0; $('#btnSweep').disabled = true; setNote('sweepNote', `自動で流しています… ${INTERP_NAME.direct}（1/3）`); restart({ sweep: true, interp: 'direct' }); });
+$('#btnResClear').addEventListener('click', () => { S.results = {}; renderResults(); });
+$('#btnSeekB').addEventListener('click', () => doSeek(-5));
+$('#btnSeekF').addEventListener('click', () => doSeek(5));
+$('#btnJump').addEventListener('click', () => { const now = performance.now(); const s = src(); if (s !== dummy) { logEvent('実 IFrame では飛びを人工的に起こせません（seek で代用）', now); return; } if (!S.running || S.paused) return; if (S.noVideo) { logEvent('動画なしモード中は飛びを検出しません（戻してから試す）', now); return; } dummy.jump(400, now); logEvent('時刻を +400 ms 飛ばした（次の読みで検出されるはず）', now); });
+$('#btnStuck').addEventListener('click', () => { const now = performance.now(); const s = src(); if (s !== dummy) { logEvent('実 IFrame では時計を止められません', now); return; } dummy.stuck(3, now); logEvent('時計を 3 秒止めた（2 秒で動画なしモードへ切替、戻すボタンで復帰）', now); });
+$('#btnBack').addEventListener('click', () => leaveNoVideo(performance.now()));
+$('#btnCal').addEventListener('click', startCal);
+$('#btnCalStop').addEventListener('click', () => stopCal('校正を中止しました。'));
+$('#btnApply').addEventListener('click', () => { if (S.proposal == null) return; S.offset = S.proposal; $('#offset').value = S.offset; $('#offsetVal').textContent = sign(S.offset) + ' ms'; saveOffset(); $('#proposal').hidden = true; logEvent(`提案を適用: オフセット ${sign(S.offset)} ms`, performance.now()); });
+window.addEventListener('keydown', e => { const tg = e.target; const isText = tg && tg.matches && tg.matches('input[type=text],textarea');
+  if (isText) { if (e.code === 'Enter' && tg.id === 'videoId') { e.preventDefault(); loadYT(tg.value.trim()); } return; }
+  if (tg && tg.matches && tg.matches('select,input,button') && e.code !== 'Space' && e.code !== 'Escape' && e.code !== 'Enter') { if (byCode[e.code]) tg.blur(); else return; } /* 演奏キーは blur して通常処理へ流す（ボタンを押した次の 1 打を捨てない） */
+  if (e.repeat) { if (byCode[e.code] || e.code === 'Space') e.preventDefault(); return; }
+  if (cal.active) { if (byCode[e.code] || e.code === 'Space') { e.preventDefault(); ensureAudio(); calTap(e.timeStamp); } return; }
+  if (e.code === 'Space') { e.preventDefault(); if (!S.running) restart(); else setPaused(!S.paused); return; }
+  if (e.code === 'Escape') { e.preventDefault(); if (S.running) setPaused(true); return; }
+  if (e.code === 'Enter') { e.preventDefault(); restart(); return; }
+  if (byCode[e.code]) { e.preventDefault(); const now = performance.now(); S.inputLat.push({ h: now - e.timeStamp, f: e.timeStamp - S.lastRafTs }); if (S.inputLat.length > 60) S.inputLat.shift(); press(e.code, e.timeStamp); } });
+window.addEventListener('keyup', e => release(e.code));
+window.addEventListener('blur', () => { for (const code of Object.keys(S.pressed)) release(code); });
+const touches = new Map();
+stageC.addEventListener('pointerdown', e => { const r = stageC.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top; let best = null, bd = Infinity;
+  for (const k of KEYS) { const d = Math.hypot(k.cx - x, k.cy - y); if (d < bd) { bd = d; best = k; } }
+  if (best && bd <= GM.R) { touches.set(e.pointerId, best.code); if (cal.active) calTap(e.timeStamp); else press(best.code, e.timeStamp); try { stageC.setPointerCapture(e.pointerId); } catch (err) {} } });
+const endTouch = e => { const code = touches.get(e.pointerId); if (code) { release(code); touches.delete(e.pointerId); } };
+stageC.addEventListener('pointerup', endTouch); stageC.addEventListener('pointercancel', endTouch);
+document.addEventListener('pointerdown', ensureAudio, { once: true });
+try { const saved = localStorage.getItem('hexnote-m3-offset'); if (saved != null && isFinite(+saved)) { S.offset = Math.max(-120, Math.min(120, +saved)); $('#offset').value = S.offset; $('#offsetVal').textContent = sign(S.offset) + ' ms'; } } catch (e) {}
+function saveOffset() { try { localStorage.setItem('hexnote-m3-offset', String(S.offset)); } catch (e) {} }
+window.addEventListener('beforeunload', saveOffset); window.addEventListener('pagehide', saveOffset); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveOffset(); });
+syncInterpNote(); renderResults(); buildNotes(); restart(); requestAnimationFrame(frame);
+})();
+</script>

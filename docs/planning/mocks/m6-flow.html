@@ -1,0 +1,1050 @@
+<title>ヘクサノート 画面遷移</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Rajdhani:wght@500;600;700&display=swap">
+<style>
+/* m6 画面遷移: 上段に状態トグルと遷移図、下に 1 画面ずつ切り替わる実文言入りの画面群。配色は m1 の製品ファミリー。 */
+:root{
+  --bg:#f3f1ec; --fg:#1d1b17; --muted:#6b6660; --panel:#fbfaf7; --line:#d9d4ca; --field:#ffffff; --soft:#ece8df;
+  --accent:#d9672b; --accent-2:#2b7fd9; --good:#2f9e5b; --warn:#d9a52b; --bad:#d94b4b;
+  --stage:#0b0d12; --stage-2:#151b28; --stage-fg:#f4f2ea; --stage-muted:#9a978f;
+  --row0:#c08cf0; --row1:#62a6f2; --row2:#52d490; --row3:#f2a452;
+  --ink:#1d1b17; --on-accent:#ffffff; --rank:var(--warn); --player-bg:#8b8f98; --player-fg:#1d1b17; --heat-early:#62a6f2; --heat-late:#f2a452; --heat-miss:#f06a6a; --overlay:rgba(6,8,12,.72); --overlay-line:rgba(255,255,255,.45); --overlay-fg:#c9c6bd; --shadow:rgba(0,0,0,.25);
+  --font-body:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  --font-num:"Rajdhani","Zen Kaku Gothic New",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#15171c; --fg:#ecebe6; --muted:#9a978f; --panel:#1d2027; --line:#2e323b; --field:#262a33; --soft:#232732; --accent:#f08a4b; --accent-2:#5aa0f0; --good:#4cc07a; --warn:#e6b84a; --bad:#f06a6a; --ink:#1d1b17; --on-accent:#ffffff; --rank:var(--warn); --player-bg:#8b8f98; --player-fg:#1d1b17; --heat-early:#62a6f2; --heat-late:#f2a452; --heat-miss:#f06a6a; --overlay:rgba(6,8,12,.72); --overlay-line:rgba(255,255,255,.45); --overlay-fg:#c9c6bd; --shadow:rgba(0,0,0,.25); color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#15171c; --fg:#ecebe6; --muted:#9a978f; --panel:#1d2027; --line:#2e323b; --field:#262a33; --soft:#232732; --accent:#f08a4b; --accent-2:#5aa0f0; --good:#4cc07a; --warn:#e6b84a; --bad:#f06a6a; --ink:#1d1b17; --on-accent:#ffffff; --rank:var(--warn); --player-bg:#8b8f98; --player-fg:#1d1b17; --heat-early:#62a6f2; --heat-late:#f2a452; --heat-miss:#f06a6a; --overlay:rgba(6,8,12,.72); --overlay-line:rgba(255,255,255,.45); --overlay-fg:#c9c6bd; --shadow:rgba(0,0,0,.25); color-scheme:dark }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.55;overflow-x:hidden}
+.wrap{max-width:1180px;margin:0 auto;padding-top:10px;padding-bottom:40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:12px}
+h1,h2,h3,h4,p{margin:0}
+h2{font-size:18px;font-weight:700}
+h3{font-size:14px;font-weight:700}
+h4{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+button{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--field);color:var(--fg);border-radius:6px;padding:6px 12px;cursor:pointer;min-width:0}
+button:hover{border-color:var(--accent)}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+button.ghost{background:transparent}
+button.small{padding:3px 8px;font-size:12px}
+button[disabled]{opacity:.45;cursor:not-allowed}
+select,input[type=text],input[type=number]{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--fg);min-width:0;max-width:100%}
+.kbd{font-family:var(--font-num);border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:12px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-weight:600}
+.muted{color:var(--muted)}
+.note{font-size:12px;color:var(--muted)}
+.note b{color:var(--fg)}
+.pill{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;background:var(--accent-2);color:var(--on-accent);vertical-align:middle;white-space:nowrap}
+.pill.gray{background:var(--soft);color:var(--muted)}
+.pill.warn{background:var(--warn);color:var(--ink)}
+.pill.good{background:var(--good)}
+.pill.accent{background:var(--accent)}
+
+/* 上帯 */
+header.top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px;white-space:nowrap}
+.brand svg{width:22px;height:22px;fill:var(--accent)}
+.brand .sub{font-weight:400;color:var(--muted);font-size:12px}
+.toggles{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;flex:1 1 320px;min-width:0}
+.tg{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);min-width:0}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--field)}
+.seg button{border:0;border-radius:0;padding:4px 10px;font-size:12px;color:var(--muted);background:transparent}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent-2);color:var(--on-accent)}
+.seg.warm button[aria-pressed="true"]{background:var(--accent)}
+
+/* 遷移図 */
+.flow{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:8px 10px 4px;overflow-x:auto}
+.flow svg{display:block;width:100%;min-width:700px;height:auto;font-family:var(--font-body)}
+.flow .node rect{fill:var(--field);stroke:var(--line);stroke-width:1.2;cursor:pointer}
+.flow .node text{fill:var(--fg);font-size:11px;font-weight:700;text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+.flow .node.on rect{fill:var(--accent);stroke:var(--accent)}
+.flow .node.on text{fill:var(--on-accent)}
+.flow .edge{fill:none;stroke:var(--muted);stroke-width:1.2;marker-end:url(#arw)}
+.flow .edge.dash{stroke-dasharray:4 3}
+.flow .lbl{fill:var(--muted);font-size:9.5px;text-anchor:middle}
+.flow marker path{fill:var(--muted)}
+.card.sel{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent)}
+.flow .foot{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:11px;color:var(--muted);padding:4px 2px 2px}
+
+/* 画面 */
+.screen{display:none;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:14px 16px;gap:12px}
+.screen.on{display:grid}
+.screen .head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;min-width:0}
+.screen .head .id{font-family:var(--font-num);font-size:13px;color:var(--accent);font-weight:700}
+.screen .head .role{color:var(--muted);font-size:12px;flex:1 1 200px;min-width:0}
+.gear{margin-left:auto}
+.meas{font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px;display:flex;gap:8px;align-items:flex-start;min-width:0}
+.meas .tag{flex:none;font-weight:700;color:var(--accent-2);font-size:11px;letter-spacing:.06em;white-space:nowrap}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.card{border:1px solid var(--line);border-radius:10px;background:var(--field);padding:12px;display:grid;gap:8px;min-width:0}
+.card.soft{background:var(--soft);border-color:transparent}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;min-width:0}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;min-width:0}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13px;min-width:0}
+.kv dt{color:var(--muted);white-space:nowrap}
+.kv dd{margin:0;min-width:0}
+.band{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;border-radius:8px;padding:8px 12px;font-size:13px;border:1px solid var(--line);background:var(--soft);min-width:0}
+.band.sync{border-color:var(--accent-2);background:color-mix(in srgb,var(--accent-2) 14%,var(--soft))}
+.band.novideo{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--soft))}
+.band.wait{border-color:var(--good);background:color-mix(in srgb,var(--good) 14%,var(--soft))}
+.band.err{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,var(--soft))}
+.band.ime{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 18%,var(--soft))}
+.band b{white-space:nowrap}
+.band .sp{flex:1 1 auto}
+.bar{height:6px;border-radius:3px;background:var(--soft);overflow:hidden;min-width:40px}
+.bar i{display:block;height:100%;background:var(--accent-2)}
+.stack{display:flex;height:14px;border-radius:7px;overflow:hidden;font-size:0}
+.stack i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:4px}
+.steps{display:flex;gap:4px;flex-wrap:wrap}
+.steps span{flex:1 1 60px;text-align:center;font-size:11px;padding:4px 6px;border-radius:6px;background:var(--soft);color:var(--muted);white-space:nowrap}
+.steps span.on{background:var(--accent);color:var(--on-accent);font-weight:700}
+.steps span.done{background:var(--accent-2);color:var(--on-accent)}
+.keys{display:flex;gap:6px;flex-wrap:wrap}
+.keys span{font-family:var(--font-num);font-size:20px;font-weight:700;border:2px solid var(--line);border-radius:8px;padding:2px 10px;min-width:40px;text-align:center;color:var(--muted)}
+.keys span.on{background:var(--row3);color:var(--stage);border-color:var(--row3)}
+.hold{height:10px;border-radius:5px;background:var(--soft);overflow:hidden}
+.hold i{display:block;height:100%;background:var(--good)}
+
+/* 選曲 */
+.topband{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:12px;color:var(--muted);min-width:0}
+.topband b{color:var(--fg)}
+.songs{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;min-width:0}
+.song{border:1px solid var(--line);border-radius:10px;background:var(--field);padding:10px;display:grid;gap:6px;cursor:pointer;min-width:0;text-align:left;font:inherit;color:inherit}
+.song:hover{border-color:var(--accent)}
+.song.sel{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent)}
+.song .t{display:flex;gap:6px;align-items:flex-start;min-width:0}
+.song .name{font-weight:700;font-size:14px;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.song .m{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:2px 10px}
+.axes{display:grid;grid-template-columns:auto 1fr;gap:2px 6px;font-size:10px;color:var(--muted);align-items:center}
+.axes .bar{height:5px}
+.song .best{font-size:12px}
+.variant{display:grid;gap:8px}
+.variant .row{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12px;color:var(--muted)}
+
+/* プレイ */
+.play{display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:12px;min-width:0}
+.player{position:relative;aspect-ratio:16/9;width:100%;background:var(--player-bg);border-radius:6px;display:grid;place-items:center;color:var(--player-fg);font-size:12px;text-align:center;padding:8px}
+.player.audio{background:var(--soft);color:var(--muted);border:1px dashed var(--line)}
+.player .cp{font-family:var(--font-num);font-size:13px;font-weight:700}
+.hud{display:grid;gap:4px;font-size:13px}
+.hud .big{font-family:var(--font-num);font-size:30px;font-weight:700;line-height:1}
+.hud .gauge{display:flex;align-items:center;gap:8px}
+.stagewrap{position:relative;min-width:0;border-radius:8px;overflow:hidden;background:var(--stage)}
+.stagewrap canvas{display:block;width:100%;height:380px}
+.pause{position:absolute;inset:0;display:grid;place-items:center;background:var(--overlay);color:var(--stage-fg);text-align:center;padding:16px}
+.pause .card{background:transparent;border-color:var(--overlay-line);color:inherit}
+.pause .note{color:var(--overlay-fg)}
+.pause h3{color:inherit;font-size:18px}
+.pause button{background:transparent;color:inherit;border-color:var(--overlay-line)}
+.pause button.primary{background:var(--accent);border-color:var(--accent)}
+.bandbtns{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+@media (max-width:760px){ .play{grid-template-columns:minmax(0,1fr)} .stagewrap canvas{height:320px} }
+
+/* 結果・練習室 */
+.big{font-family:var(--font-num);font-size:40px;font-weight:700;line-height:1}
+.rank{font-family:var(--font-num);font-size:30px;font-weight:700;color:var(--rank)}
+table.t{border-collapse:collapse;font-size:13px;width:100%}
+table.t td{padding:3px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+table.t td:last-child{text-align:right;font-family:var(--font-num);font-weight:600;white-space:nowrap}
+.hist{display:flex;align-items:flex-end;gap:2px;height:54px}
+.hist i{flex:1 1 0;background:var(--accent-2);border-radius:2px 2px 0 0;min-width:3px}
+.hist i.late{background:var(--row3)}
+.hist i.zero{background:var(--good)}
+.nine{display:grid;grid-template-columns:auto repeat(3,1fr);gap:4px;font-size:11px;align-items:center}
+.nine .h{color:var(--muted);text-align:center;white-space:nowrap}
+.nine .c{border:1px solid var(--line);border-radius:6px;padding:6px 4px;text-align:center;cursor:pointer;background:var(--field)}
+.nine .c.on{background:var(--accent-2);border-color:var(--accent-2);color:var(--on-accent);font-weight:700}
+.loopbar{position:relative;height:18px;border-radius:4px;background:var(--soft);overflow:hidden}
+.loopbar i{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--accent) 50%,transparent);border-left:2px solid var(--accent);border-right:2px solid var(--accent)}
+.loopbar b{position:absolute;top:0;bottom:0;width:2px;background:var(--bad)}
+.tempo{display:flex;flex-wrap:wrap;gap:4px}
+.tempo span{font-family:var(--font-num);font-size:13px;font-weight:600;padding:2px 8px;border:1px solid var(--line);border-radius:6px;color:var(--muted)}
+.tempo span.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+
+/* 持ち込み・設定 */
+.stage5{display:grid;gap:10px}
+.step{border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--field);display:grid;gap:6px;min-width:0}
+.step.on{border-left-color:var(--accent)}
+.step.done{border-left-color:var(--accent-2)}
+.step.off{opacity:.5}
+.step .st{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.step .st .n{font-family:var(--font-num);font-weight:700;color:var(--accent);font-size:13px}
+.step .body{display:none;gap:6px}
+.step.on .body{display:grid}
+.set{display:grid;gap:10px}
+.set .g{border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:var(--field);display:grid;gap:6px;min-width:0}
+.set .r{display:grid;grid-template-columns:minmax(90px,150px) minmax(0,1fr);gap:4px 10px;align-items:center;font-size:13px}
+.set .r .l{color:var(--muted);font-size:12px}
+.set .r .v{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;min-width:0}
+.opt{display:inline-block;padding:1px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px;color:var(--muted)}
+.opt.on{background:var(--accent-2);border-color:var(--accent-2);color:var(--on-accent);font-weight:700}
+.tabs{display:flex;flex-wrap:wrap;gap:4px}
+.tabs button{font-size:12px}
+.tabs button[aria-pressed="true"]{background:var(--accent-2);border-color:var(--accent-2);color:var(--on-accent)}
+.evac{display:grid;gap:10px}
+.evac .rect{height:120px;border-radius:6px;background:var(--player-bg);display:grid;place-items:center;color:var(--player-fg);font-size:12px;text-align:center;padding:8px}
+.toast{position:fixed;left:50%;top:max(12px,env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:5;max-width:calc(100% - 32px);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;box-shadow:0 6px 20px var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+svg.mini{width:100%;max-width:360px;height:auto;display:block}
+@media (max-width:480px){ .screen{padding:12px} .big{font-size:32px} }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5 21.5 7v10L12 22.5 2.5 17V7z"/></svg>ヘクサノート<span class="sub">画面遷移モック m6</span></div>
+    <div class="toggles">
+      <div class="tg">プロファイル <div class="seg" data-key="profile"><button data-val="beginner">入門者</button><button data-val="gamer">音ゲー向け</button></div></div>
+      <div class="tg">起動 <div class="seg" data-key="first"><button data-val="first">初回</button><button data-val="again">2 回目以降</button></div></div>
+      <div class="tg">曲の音源 <div class="seg warm" data-key="source"><button data-val="youtube">YouTube</button><button data-val="audio">自前</button></div></div>
+      <div class="tg">表示 <div class="seg" data-key="theme"><button data-val="auto">自動</button><button data-val="light">明</button><button data-val="dark">暗</button></div></div>
+    </div>
+  </header>
+
+  <nav class="flow" aria-label="遷移図">
+    <svg viewBox="0 0 760 180" role="img" aria-label="画面の遷移図。現在の画面を強調しています">
+      <defs><marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z"/></marker></defs>
+      <!-- 上の道: S0d → S3 -->
+      <path class="edge" d="M160 30 C160 2 560 2 560 30"/><text class="lbl" x="360" y="14">チュートリアル曲のあと（初回の S3 は練習室を隠す）</text>
+      <!-- 下の道: 起動 → S1 -->
+      <path class="edge" d="M50 60 C50 88 290 88 290 60"/><text class="lbl" x="110" y="92">2 回目以降</text>
+      <path class="edge" d="M92 45 L116 45"/><text class="lbl" x="104" y="38">初回</text>
+      <path class="edge" d="M344 45 L386 45"/><text class="lbl" x="365" y="38">曲と譜面版</text>
+      <path class="edge" d="M474 45 L516 45"/><text class="lbl" x="495" y="38">終了</text>
+      <path class="edge" d="M604 45 L646 45"/><text class="lbl" x="625" y="38">苦手区間</text>
+      <path class="edge" d="M690 60 C690 104 430 104 430 60"/><text class="lbl" x="575" y="98">通しで弾く</text>
+      <path class="edge" d="M280 60 L280 125"/><path class="edge" d="M300 125 L300 60"/><text class="lbl" x="215" y="96">持ち込む（2 回目以降）</text><text class="lbl" x="330" y="96">保存</text>
+      <path class="edge dash" d="M412 60 L392 125"/><text class="lbl" x="372" y="96">Esc／blur</text>
+      <path class="edge dash" d="M448 60 L478 125"/><text class="lbl" x="470" y="96">帯（矩形の外）</text>
+      <g class="node" data-node="Boot"><rect x="8" y="30" width="84" height="30" rx="6"/><text x="50" y="45">起動</text></g>
+      <g class="node" data-node="S0"><rect x="118" y="30" width="84" height="30" rx="6"/><text x="160" y="45">S0 初回導線</text></g>
+      <g class="node" data-node="S1"><rect x="238" y="30" width="104" height="30" rx="6"/><text x="290" y="45">S1 ホーム／選曲</text></g>
+      <g class="node" data-node="S2"><rect x="388" y="30" width="84" height="30" rx="6"/><text x="430" y="45">S2 プレイ</text></g>
+      <g class="node" data-node="S3"><rect x="518" y="30" width="84" height="30" rx="6"/><text x="560" y="45">S3 結果</text></g>
+      <g class="node" data-node="S4"><rect x="648" y="30" width="84" height="30" rx="6"/><text x="690" y="45">S4 練習室</text></g>
+      <g class="node" data-node="S5"><rect x="238" y="125" width="104" height="30" rx="6"/><text x="290" y="140">S5 曲の持ち込み</text></g>
+      <g class="node" data-node="Pause"><rect x="352" y="125" width="70" height="30" rx="6"/><text x="387" y="140">一時停止</text></g>
+      <g class="node" data-node="S7"><rect x="440" y="125" width="96" height="30" rx="6"/><text x="488" y="140">S7 退避状態</text></g>
+      <g class="node" data-node="S6"><rect x="595" y="125" width="140" height="30" rx="6"/><text x="665" y="140">S6 設定（全画面の歯車）</text></g>
+      <text class="lbl" x="488" y="170">S7a 埋め込み不可／S7b 同期中／S7c 動画なしへ／S7d 保存できません</text>
+    </svg>
+    <div class="foot"><span>S3・S4・S5・S6 からは「ホームへ」で S1 に戻れる。</span><span>図に線の無い辺: S1→S4（練習室で弾く）、S3→S2（もう一度）、Pause→S7b（再開は同期中を通る）、S0d「あとで」→S1。</span><span>図の箱を押しても移動できる（モックの操作）。</span><span id="flowState"></span></div>
+  </nav>
+
+  <!-- ===== S0 初回導線 ===== -->
+  <section class="screen" data-screen="S0">
+    <div class="head"><span class="id">S0</span><h2>初回導線</h2><span class="role">配列の確認 → 同時押しテスト → 校正 → チュートリアル曲。目標 5 分（仮）。4 段とも「あとで」で既定値のまま先へ進める。</span><button class="small gear" data-go="S6">⚙ 設定</button></div>
+    <div class="steps" id="s0steps"><span>a 配列の確認</span><span>b 同時押しテスト</span><span>c 校正</span><span>d チュートリアル曲</span></div>
+    <div class="band ime" id="s0ime" hidden><b>半角/全角キーで英数に戻してください</b><span>日本語入力が ON の間の打鍵は無視します（曲は止めません）。</span><button class="small" data-act="ime-off">戻した</button></div>
+
+    <div class="card" data-s0="0">
+      <h3>S0a 刻印は合っていますか</h3>
+      <p>キーボードの文字の並びを確かめて、おすすめの配列（Ableton 型: A 段が白鍵、Q 段が黒鍵）で始めます。</p>
+      <div class="stagewrap"><canvas id="cvS0a" style="height:150px" aria-label="Ableton 型の六角鍵盤図"></canvas></div>
+      <div class="btnrow">
+        <span class="note">刻印</span>
+        <div class="seg" data-key="legend"><button data-val="jis">JIS</button><button data-val="us">US</button></div>
+        <span class="note" id="legendNote">getLayoutMap が使えないので選んでください（ja なら JIS が既定）。</span>
+      </div>
+      <div class="btnrow"><span class="note">試打欄</span><input type="text" placeholder="ここで何か打つと、上の鍵盤図の同じ文字が光ります（模擬）" style="flex:1 1 220px" aria-label="試打欄"></div>
+      <details><summary class="note">別の配列（VMPK 型: Z 段と Q 段が白鍵、2 段×2 で音域が広い）</summary><p class="note">ここで選んでも初回導線は Ableton 型のまま進み、ホームの既定配列にだけ効きます。</p><div class="seg" data-key="layout"><button data-val="ableton">Ableton 型（おすすめ）</button><button data-val="vmpk">VMPK 型</button></div></details>
+      <div class="btnrow"><button class="primary" data-act="s0next">これで始める</button><button class="ghost" data-act="s0later">あとで</button><button class="small ghost" data-act="ime-on">IME 帯を見る</button></div>
+    </div>
+
+    <div class="card" data-s0="1">
+      <h3>S0b 同時押しテスト</h3>
+      <p>10 組のキーを順に、押したまま 1 秒そのままにします。端末が何キーまで同時に読めるかを測り、譜面の同時押し上限（既定 2）を決めます。</p>
+      <div class="kv"><dt>進捗</dt><dd><span class="num" id="diagN">3</span> / 10</dd><dt>いまの組</dt><dd id="diagText">S・D・F を同時に押して、1 秒そのまま</dd></div>
+      <div class="keys" id="diagKeys"><span class="on">S</span><span class="on">D</span><span>F</span></div>
+      <div class="hold"><i id="diagHold" style="width:60%"></i></div>
+      <p class="note">組の内訳: 同段 3 キー（Z X C／A S D／Q W E）、3u 離れた和音（A D G／S F J／D G K）、矩形 4 キー（Q W A S／E R D F）、両手 2＋2（A S K L／Z X , .）。同段 3 組と和音 3 組を全部通せば 3、矩形と両手も通せば 4。最初の keydown が 229 なら帯を出して組をやり直し。</p>
+      <p class="note" id="diagResult"></p>
+      <div class="btnrow"><button data-act="diagsim">模擬: この組を押す</button><button class="primary" data-act="s0next">次へ</button><button class="ghost" data-act="s0later">スキップ（2 つのまま）</button></div>
+    </div>
+
+    <div class="card" data-s0="2">
+      <h3>S0c 校正</h3>
+      <p>まず音のテスト。聞こえるなら、メトロノームに合わせて Space を 24 回打ち、入力の遅れを測ります。</p>
+      <div class="btnrow"><span class="note">音のテスト</span><div class="seg" data-key="sound"><button data-val="yes">聞こえる</button><button data-val="no">聞こえない</button></div></div>
+      <div class="card soft" id="calibBox">
+        <div class="kv"><dt>テンポ</dt><dd>100 BPM・予備 4 拍・24 打</dd><dt>進捗</dt><dd><span class="num" id="calibN">0</span> / 24</dd></div>
+        <div class="hold"><i id="calibHold" style="width:0%"></i></div>
+        <p id="calibResult" class="note">Space で打ちます（ボタンは Enter だけで押せます）。</p>
+        <div class="btnrow"><button data-act="calibsim">模擬: 24 打を終える</button><button class="small ghost" data-act="calibbad">模擬: ばらつきが大きい</button></div>
+      </div>
+      <p class="note" id="calibSkip" hidden>音が聞こえないので校正は行いません（未校正の印をつけます。あとで設定からやり直せます）。</p>
+      <div class="btnrow"><button class="primary" data-act="s0next">次へ</button><button class="ghost" data-act="s0later">あとで</button></div>
+    </div>
+
+    <div class="card" data-s0="3">
+      <h3>S0d チュートリアル曲「はじめの六角」</h3>
+      <p>プレイ画面の入門者形態。配列は Ableton 型固定、音待ち（正しいキーを押すまで止まる）で、鍵数を 3 段階に増やします。</p>
+      <div class="steps" id="tutSteps"><span class="on">1 音（D だけ）</span><span>ホームポジション（D F J K）</span><span>全鍵</span></div>
+      <div class="stagewrap"><canvas id="cvS0d" style="height:300px" aria-label="チュートリアルの模式画面"></canvas></div>
+      <div class="grid3">
+        <div class="card soft"><h4>吹き出し 1</h4><p>鍵盤の明るい辺が、次に押すキーの方向を指します。</p></div>
+        <div class="card soft"><h4>吹き出し 2</h4><p>セルが自分のキーの六角にはまった瞬間が押し時です。</p></div>
+        <div class="card soft"><h4>吹き出し 3</h4><p>くっついた 2 つのセルは同時に押します（上限 2）。</p></div>
+      </div>
+      <div class="btnrow"><button data-act="tutnext">模擬: 次の段階へ</button><button class="primary" data-act="tutdone">曲を終える → 結果</button><button class="ghost" data-act="s0later">あとで</button></div>
+    </div>
+    <div class="meas"><span class="tag">測ること</span><span>段ごとの到達・所要秒・離脱（「あとで」を含む）。IME 帯の回数。同時押し上限の分布（M-3: 3 以上が 70% 超なら既定の見直し）。校正の SD と採否。到達 70% 未満なら順序を見直す（M-4、仮）。</span></div>
+  </section>
+
+  <!-- ===== S1 ホーム／選曲 ===== -->
+  <section class="screen" data-screen="S1">
+    <div class="head"><span class="id">S1</span><h2>ホーム／選曲</h2><span class="role">曲一覧と譜面版。自己ベストは「プロファイル×譜面版」の単位。</span><button class="small gear" data-go="S6">⚙ 設定</button></div>
+    <div class="topband">
+      <span>プロファイル <b id="s1prof">入門者</b> <button class="small" data-act="swapprof">切替</button></span>
+      <span>端末の上限 <b class="num">3</b>（同時押しテスト済み）</span>
+      <span id="s1calib"></span>
+      <span id="s1streak"></span>
+    </div>
+    <div class="band err" id="s1store" hidden><b>保存できません</b><span>この端末では記録を保存できないため、今回の記録はメモリ内だけに残ります。</span><button class="small" data-act="s1store-off">閉じる</button></div>
+    <div class="btnrow">
+      <span class="note">並び</span><select id="sortSel" aria-label="並び"><option value="rec">おすすめ（密度の低い順）</option><option value="name">曲名</option><option value="len">長さ</option></select>
+      <span class="note">絞り込み</span>
+      <div class="seg" data-key="filter"><button data-val="all">すべて</button><button data-val="bundled">同梱</button><button data-val="midi">持ち込み</button><button data-val="video">動画あり</button></div>
+      <button id="btnImport" data-go="S5" style="margin-left:auto">＋ 曲を持ち込む</button>
+    </div>
+    <div class="songs" id="songs"></div>
+    <div class="card variant" id="variantBox">
+      <div class="row"><h3 id="vTitle">譜面版を選ぶ</h3><span class="pill gray" id="vSrc"></span></div>
+      <div class="row">配列 <div class="seg" data-key="layout"><button data-val="ableton">Ableton 型（推奨）</button><button data-val="vmpk">VMPK 型</button></div></div>
+      <div class="row">同時押し上限 <div class="seg" data-key="limit"><button data-val="2">2</button><button data-val="3">3</button><button data-val="4" disabled title="端末の上限 3 を超える">4</button></div><span class="note" id="limitNote"></span></div>
+      <div class="row">動画を使う <div class="seg warm" data-key="source"><button data-val="youtube">はい（YouTube）</button><button data-val="audio">いいえ（自前音源）</button></div><span class="note" id="videoNote"></span></div>
+      <p class="note" id="vMissing" hidden>この配列／上限の版はまだありません。<button class="small" data-act="makevariant">この配列／上限の版を作る</button></p>
+      <div class="btnrow"><button class="primary" data-act="play" id="btnPlay">この譜面版で遊ぶ → プレイ</button><button data-act="s4fromS1" id="btnS4">練習室で弾く</button><span class="note">成績の比較は同じ譜面版の中だけ。</span></div>
+    </div>
+    <div class="meas"><span class="tag">測ること</span><span>選ばれた譜面版（配列×上限）の分布、動画あり／なしの選択率、「保証なし」版を選んだ端末の和音 MISS、持ち込みへの到達、埋め込み不可を記録した曲の数。</span></div>
+  </section>
+
+  <!-- ===== S2 プレイ ===== -->
+  <section class="screen" data-screen="S2">
+    <div class="head"><span class="id">S2</span><h2>プレイ</h2><span class="role">固定テンポ。左列にプレイヤー矩形と HUD、右列の全高を落下域＋鍵盤図。帯はすべて矩形の外。</span><button class="small gear" data-go="S6">⚙ 設定</button></div>
+    <div class="bandbtns">帯を出す:
+      <button class="small" data-band="sync" id="bbSync">同期中</button>
+      <button class="small" data-act="fallback-sim" id="bbNovideo">動画なしへ（S7c の模擬）</button>
+      <button class="small" data-band="wait">待ちモード（練習室）</button>
+      <button class="small" data-band="ime">IME</button>
+      <button class="small" data-band="autoplay" id="bbAuto">自動再生ブロック</button>
+      <button class="small" data-band="store">保存できません</button>
+      <span id="bandHint"></span>
+    </div>
+    <div id="bands"></div>
+    <div class="play">
+      <div style="display:grid;gap:10px;min-width:0">
+        <div class="player" id="player"></div>
+        <div class="hud" id="hud"></div>
+        <p class="note" id="playNote"></p>
+      </div>
+      <div class="stagewrap" id="stage2">
+        <canvas id="cvS2" aria-label="落下するセルと段別着地の六角鍵盤の模式"></canvas>
+        <div class="pause" id="pauseOv" hidden>
+          <div class="card">
+            <h3>一時停止</h3>
+            <p class="note">Esc・ウィンドウ切替・タブ非表示で止まります。再開は「同期中」を通り、300 ms は判定を猶予します。</p>
+            <div class="btnrow" style="justify-content:center"><button class="primary" data-act="resume">再開 <span class="kbd">Space</span></button><button data-act="restart">最初から</button><button data-go="S1">やめる</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="btnrow"><button data-act="pause">一時停止 <span class="kbd">Esc</span></button><button class="primary" data-act="finish">曲を終える → 結果</button><button class="ghost" data-act="evac-a" id="btnEvacA">模擬: 埋め込み不可（S7a）</button><button class="ghost" data-act="gameover" id="btnGameover">模擬: ゲージ 0 で途中終了</button></div>
+    <div class="meas"><span class="tag">測ること</span><span>UR・早遅ヒストグラム・精度・NEAR 率、再同期回数、動画なし切替、入力遅延の中央値、フレーム間隔の SD（M-7: 95 パーセンタイル 20 ms 超が 20% 超で低負荷を既定に）、時計残差の SD（M-2: &lt;5 ms）。帯の回数。</span></div>
+  </section>
+
+  <!-- ===== S3 結果 ===== -->
+  <section class="screen" data-screen="S3">
+    <div class="head"><span class="id">S3</span><h2 id="s3title">結果</h2><span class="role" id="s3role">精度・ランク・内訳・提案・称号。比較は同じ譜面版の中だけ。</span><button class="small gear" data-go="S6">⚙ 設定</button></div>
+    <div class="band novideo" id="s3fallback" hidden><b>途中で動画なしに切り替わりました</b><span>切替の後はピアノ音の時計で判定しています。</span></div>
+    <div class="grid2">
+      <div class="card">
+        <div class="btnrow"><div><div class="note">精度</div><div class="big" id="s3acc">94.2%</div></div><div style="margin-left:16px" id="s3rankBox"><div class="note">ランク</div><div class="rank" id="s3rank">A</div></div><div id="s3fc" style="margin-left:16px" hidden><div class="note">コンボ</div><div class="rank" style="color:var(--good)">FULL COMBO</div></div></div>
+        <p class="note" id="s3song">きらきら星 ・ Ableton 型／上限 2 ・ 入門者</p>
+        <table class="t" id="s3table"></table>
+      </div>
+      <div class="card">
+        <h3>自力率</h3>
+        <div id="s3self"></div>
+        <div id="s3chordBox"><h3>和音</h3>
+        <p id="s3chord">同時押しが合った割合 <b class="num">78%</b>（14 ／ 18 拍）</p></div>
+        <div id="s3gamer" hidden>
+          <div class="kv"><dt>塊／殻／段またぎ</dt><dd class="num">61% ／ 28% ／ 11%</dd><dt>FAST／SLOW</dt><dd class="num">37 ／ 22</dd></div>
+          <h4 style="margin-top:6px">早遅ヒストグラム（−180 … +180 ms）</h4>
+          <div class="hist" aria-label="早遅ヒストグラム"><i style="height:6%"></i><i style="height:10%"></i><i style="height:22%"></i><i style="height:48%"></i><i style="height:70%"></i><i class="zero" style="height:100%"></i><i class="late" style="height:64%"></i><i class="late" style="height:36%"></i><i class="late" style="height:16%"></i><i class="late" style="height:8%"></i><i class="late" style="height:4%"></i></div>
+        </div>
+      </div>
+      <div class="card" id="s3offsetCard">
+        <h3>ずれとオフセット</h3>
+        <p>平均 <b class="num">−12 ms</b>（少し早め）、ばらつき 21 ms、ヒット 118。</p>
+        <div class="band" id="s3offer"><b>オフセット −12 ms を適用しますか</b><span class="note">提案の条件: ヒット 8 以上、|平均| 10 ms 以上、ばらつき 30 ms 未満、通常プレイ（練習記録は母集団に入れない）。音源の種別ごとに別に保存します（この回: <b id="s3offerKind">自前音源</b>）。</span><span class="sp"></span><button class="small primary" data-act="offset-yes">適用</button><button class="small" data-act="offset-no">今回は見送る</button></div>
+        <h3>苦手区間</h3>
+        <p>ミスが集まった 2 小節: <b class="num">17〜18</b> 小節 <span class="note">（段またぎの和音）</span></p>
+        <div class="btnrow"><button id="btnPractice" data-act="topractice">練習室で弾く（この 2 小節をループ）</button></div>
+      </div>
+      <div class="card" id="s3reward"></div>
+    </div>
+    <div class="btnrow"><button class="primary" data-act="again">もう一度</button><button data-go="S1">ホームへ</button></div>
+    <div class="meas"><span class="tag">測ること</span><span>オフセット提案の採択率と提案値（校正 段 2）、「練習室で弾く」への到達、精度%の帯（GOOD 0.4 の重み）、UR の校正前後（M-8）。</span></div>
+  </section>
+
+  <!-- ===== S4 練習室 ===== -->
+  <section class="screen" data-screen="S4">
+    <div class="head"><span class="id">S4</span><h2>練習室</h2><span class="role">プレイ画面の入門者形態＋右パネル。ここでの回は「練習記録」になり、自己ベストには入らない。</span><button class="small gear" data-go="S6">⚙ 設定</button></div>
+    <div class="band wait" id="s4loopband" hidden><b>17〜18 小節をループ中</b><span>結果画面の苦手区間を引き継ぎました。ノーミス 2 周で解除します。</span></div>
+    <div class="play">
+      <div class="stagewrap"><canvas id="cvS4" aria-label="練習室の模式画面"></canvas></div>
+      <div style="display:grid;gap:10px;min-width:0">
+        <div class="card">
+          <h3>待ち方</h3>
+          <div class="seg" data-key="wait" id="waitSeg"><button data-val="note">音待ち</button><button data-val="phrase">フレーズ待ち</button><button data-val="fixed">固定テンポ</button></div>
+          <p class="note" id="waitNote"></p>
+        </div>
+        <div class="card">
+          <h3>ループ</h3>
+          <div class="loopbar" aria-label="曲の帯。始点と終点をクリックで指定"><i style="left:52%;width:9%"></i><b style="left:55%"></b><b style="left:58%"></b><b style="left:60%"></b></div>
+          <p class="note">帯をクリックして始点→終点。<b>ミス 3 回で自動ループ</b>（1 小節前からカウントイン）、<b>ノーミス 2 周で解除</b>。</p>
+        </div>
+        <div class="card">
+          <h3>テンポ段</h3>
+          <div class="tempo" id="tempoSteps"></div>
+          <p class="note" id="tempoNote">正答率 90% 超で 1 段上げ、70% 未満で 1 段下げを提案。1.0 以外の回は練習記録。</p>
+        </div>
+        <div class="card">
+          <h3>足場外し（ラベルの透明度）</h3>
+          <div class="btnrow"><div class="seg" data-key="fade"><button data-val="manual">手動</button><button data-val="auto">成績連動</button></div><span class="note">当てた −0.12、外した +0.30、NEAR は不変。0.2 未満でラベル無し。</span></div>
+          <div class="nine" id="nine9"></div>
+        </div>
+        <div class="card">
+          <h3>自力率</h3>
+          <p><b class="num">62%</b>（ラベル無しで当てた 31 ／ 50）</p>
+          <div id="s4self"></div>
+        </div>
+        <div class="card" id="keysetBox">
+          <h3>鍵数制限（入門者だけ）</h3>
+          <div class="seg" data-key="keyset"><button data-val="dfjk">D F J K</button><button data-val="8">8 鍵</button><button data-val="all">全部</button></div>
+          <p class="note">譜面版は増やさず、実行時に絞ります。制限中の回は練習記録。</p>
+        </div>
+        <div class="card">
+          <h3>ヒートマップ（M4 で追加。模式）</h3>
+          <svg class="mini" viewBox="0 0 240 90" role="img" aria-label="音高ごとの早遅と誤打方向の模式">
+            <g font-family="Rajdhani" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="middle">
+              <polygon points="30,20 47,30 47,50 30,60 13,50 13,30" style="fill:var(--heat-early)" opacity=".35"/><text x="30" y="40" fill="currentColor">A</text>
+              <polygon points="64,20 81,30 81,50 64,60 47,50 47,30" style="fill:var(--heat-late)" opacity=".8"/><text x="64" y="40" fill="currentColor">S</text>
+              <polygon points="98,20 115,30 115,50 98,60 81,50 81,30" style="fill:var(--heat-late)" opacity=".5"/><text x="98" y="40" fill="currentColor">D</text>
+              <polygon points="132,20 149,30 149,50 132,60 115,50 115,30" style="fill:var(--heat-early)" opacity=".2"/><text x="132" y="40" fill="currentColor">F</text>
+              <polygon points="166,20 183,30 183,50 166,60 149,50 149,30" style="fill:var(--heat-early)" opacity=".6"/><text x="166" y="40" fill="currentColor">G</text>
+              <polygon points="200,20 217,30 217,50 200,60 183,50 183,30" style="fill:var(--heat-late)" opacity=".25"/><text x="200" y="40" fill="currentColor">H</text>
+              <circle cx="64" cy="40" r="16" fill="none" style="stroke:var(--heat-miss)" stroke-width="2" opacity=".8"/>
+              <path d="M98 40 L112 28" style="stroke:var(--heat-miss)" stroke-width="3" stroke-linecap="round"/>
+            </g>
+            <text x="120" y="80" font-size="9" text-anchor="middle" fill="currentColor" opacity=".7">青＝早い・橙＝遅い、輪＝ばらつき、扇＝誤打の方向</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <div class="btnrow"><button class="primary" data-act="playfromS4">通しで弾く → プレイ</button><button data-go="S1">ホームへ</button></div>
+    <div class="meas"><span class="tag">測ること</span><span>自力率の推移（M-6: 5 回目までの傾き ≤0 が過半なら足場外しの値を見直す）、ループの回数と解除までの周回、テンポ段の推移、待ち方の選択率、動画ありで待ちを求めた回数。</span></div>
+  </section>
+
+  <!-- ===== S5 曲の持ち込み ===== -->
+  <section class="screen" data-screen="S5">
+    <div class="head"><span class="id">S5</span><h2>曲の持ち込み</h2><span class="role">MIDI → トラック → 折り畳み → 同期（動画を使うときだけ）→ 保存。段ごとに戻れる縦積み。2 回目以降だけ。</span><button class="small gear" data-go="S6">⚙ 設定</button></div>
+    <div class="band err" id="s5fail" hidden><b>保存できません</b><span>この端末では保存に失敗しました。譜面をファイルに書き出して残せます。</span><span class="sp"></span><button class="small primary" data-act="export">*.hexnote.json を書き出す</button><button class="small" data-act="s5fail-off">閉じる</button></div>
+    <div class="stage5" id="stage5">
+      <div class="step" data-step="0">
+        <div class="st"><span class="n">段 1</span><h3>MIDI ファイル</h3><span class="note">SMF 形式 0／1</span><span class="pill good" data-stepdone hidden>済</span></div>
+        <div class="body">
+          <div class="card soft"><p><b>nekofunjatta.mid</b> ・ 形式 1 ・ 4 トラック ・ 120 BPM ・ 1:12</p><p class="note">ドロップするか選びます。テンポ変化はパルス表（pulse.tempo）に写します。</p></div>
+          <div class="btnrow"><button class="primary" data-act="s5next">次へ</button><button data-go="S1">やめる</button></div>
+        </div>
+      </div>
+      <div class="step" data-step="1">
+        <div class="st"><span class="n">段 2</span><h3>トラック</h3><span class="note">弾くトラック 1 つと、伴奏にするトラック</span><span class="pill good" data-stepdone hidden>済</span></div>
+        <div class="body">
+          <table class="t">
+            <tr><td><b>1</b> Melody（312 音）</td><td><span class="pill accent">弾く</span></td></tr>
+            <tr><td><b>2</b> Chords（188 音）</td><td><span class="pill">伴奏</span></td></tr>
+            <tr><td><b>3</b> Bass（96 音）</td><td><span class="pill">伴奏</span></td></tr>
+            <tr><td><b>10</b> Drums（ch 10）</td><td><span class="pill gray">除外</span></td></tr>
+          </table>
+          <p class="note">既定: 弾く以外の全トラックを伴奏（ドラムは除く）。伴奏は Salamander のピアノ音で鳴らします。</p>
+          <div class="btnrow"><button class="primary" data-act="s5next">次へ</button><button data-act="s5back">戻る</button></div>
+        </div>
+      </div>
+      <div class="step" data-step="2">
+        <div class="st"><span class="n">段 3</span><h3>折り畳み</h3><span class="note">配列に収まらない音の扱い</span><span class="pill good" data-stepdone hidden>済</span></div>
+        <div class="body">
+          <div class="grid3">
+            <button class="card" data-fold="octave" style="text-align:left"><b>オクターブ寄せ</b><span class="note">音域の外の音を 1 オクターブ寄せる。失われる音 0、位置が変わる音 24。</span></button>
+            <button class="card" data-fold="cut" style="text-align:left"><b>切り捨て</b><span class="note">音域の外の音を落とす。失われる音 24。</span></button>
+            <button class="card" data-fold="nearest" style="text-align:left"><b>最寄りの鍵</b><span class="note">音域の端の鍵に寄せる。失われる音 0、音高が変わる音 24。</span></button>
+          </div>
+          <p class="note" id="foldNote">選択: オクターブ寄せ。<button class="small">試聴（8 小節）</button></p>
+          <div class="btnrow"><button class="primary" data-act="s5next">次へ</button><button data-act="s5back">戻る</button></div>
+        </div>
+      </div>
+      <div class="step" data-step="3" id="s5sync">
+        <div class="st"><span class="n">段 4</span><h3>同期</h3><span class="note">動画を使うときだけ</span><span class="pill good" data-stepdone hidden>済</span></div>
+        <div class="body">
+          <div class="btnrow"><span class="note">動画 ID</span><input type="text" value="dQw4w9WgXcQ" aria-label="動画 ID" style="font-family:var(--font-num)"></div>
+          <div class="player" style="max-width:320px"><div><div class="cp">▶ クリックで再生</div><div>プレイヤー矩形（前には何も置かない）</div></div></div>
+          <p>再生したら、拍に合わせて Space を <b class="num">8</b> 回タップします。</p>
+          <div class="kv"><dt>タップ</dt><dd><span class="num">8</span> / 8</dd><dt>offset（拍 0 の動画時刻）</dt><dd class="num">12.418 s</dd><dt>rate（動画 BPM ÷ 譜面 BPM）</dt><dd class="num">1.004</dd><dt>残差</dt><dd class="num">SD 14 ms</dd></div>
+          <div class="btnrow"><button class="primary" data-act="s5next">次へ</button><button data-act="s5back">戻る</button><button class="ghost" data-act="s5skipvideo">動画を使わない</button></div>
+        </div>
+      </div>
+      <div class="step" data-step="4">
+        <div class="st"><span class="n">段 5</span><h3>保存</h3><span class="note">配列×上限の譜面版を自動生成</span><span class="pill good" data-stepdone hidden>済</span></div>
+        <div class="body">
+          <div class="kv">
+            <dt>曲名</dt><dd><input type="text" value="ねこふんじゃった" aria-label="曲名"></dd>
+            <dt>作者</dt><dd><input type="text" value="（伝承）" aria-label="作者"></dd>
+            <dt>難度 4 軸</dt><dd>密度 2.6 音/秒 ・ 跳躍 最大 5 ・ 同時押し率 18% ・ 段またぎ率 9%</dd>
+            <dt>運指の警告</dt><dd><span class="pill warn">注意</span> 同じ指の連打が 14 か所（密度 3.5 超なし）</dd>
+            <dt>権利印</dt><dd><span class="pill gray">private</span> 端末の外には出しません。</dd>
+            <dt>生成する版</dt><dd>Ableton×{2,3}・VMPK×{2,3}（折り畳み: 段 3 の選択）</dd>
+          </div>
+          <p class="note" id="s5videoNote" hidden>この曲は動画を使いません（sync.sources は空。上帯の「曲の音源」は変えません）。<button class="small" data-act="s5usevideo">やはり動画をつける（段 4 へ）</button></p>
+          <div class="btnrow"><button class="primary" data-act="s5save">保存 → ホーム</button><button data-act="s5back">戻る</button><button class="ghost" data-act="s5failsim">模擬: 保存に失敗</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="meas"><span class="tag">測ること</span><span>段ごとの到達・離脱、折り畳みの選択率、同期タップの残差 SD、保存失敗率（M-11: 5% 超なら書き出しの導線を S3 にも）、1 本の MIDI から通る版の数。</span></div>
+  </section>
+
+  <!-- ===== S6 設定 ===== -->
+  <section class="screen" data-screen="S6">
+    <div class="head"><span class="id">S6</span><h2>設定</h2><span class="role">既定値は design.md §2。プロファイルの切替で既定値を一括で入れ替える。</span><button class="small" data-act="back" style="margin-left:auto">← 戻る</button></div>
+    <div class="set" id="settings"></div>
+    <div class="meas"><span class="tag">測ること</span><span>設定を変えた項目の頻度（判定窓・配列・演出予算）、計測盤の書き出し回数、「テストをやり直す」の結果の分布、データ削除・初期化の回数。</span></div>
+  </section>
+
+  <!-- ===== S7 退避状態 ===== -->
+  <section class="screen" data-screen="S7">
+    <div class="head"><span class="id">S7</span><h2>退避状態</h2><span class="role">すべてプレイヤー矩形の外に出す帯。矩形は一時停止のまま残す。</span><button class="small gear" data-go="S6">⚙ 設定</button></div>
+    <div class="tabs"><button data-evac="a">S7a 埋め込み不可</button><button data-evac="b">S7b 同期中</button><button data-evac="c">S7c 動画なしへ</button><button data-evac="d">S7d 保存できません</button></div>
+    <div class="evac" id="evac"></div>
+    <div class="meas"><span class="tag">測ること</span><span>embedError のコード別回数、再同期回数（飛び・広告・seek）、動画なし切替の回数と「戻す」の回数、storageFail の回数（M-11）。</span></div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+
+/* ---------- 状態 ---------- */
+/* syncUsed: その回に動画を使ったか（play／again／playfromS4／tutdone で確定。design §4.4 の syncUsed.kind）。
+   fallback: 途中で動画なしへ切り替わった（S7c、fallbackAt あり）。embedFail: 読込時に埋め込み不可で最初から自前音源（S7a。開始から動画を使っていない回）。
+   calib: 'none'（未校正）／'applied'（適用）／'rejected'（ばらつき大で不適用）。tempo は倍率の値で持ち、描画時に段へ丸める。 */
+const state = {
+  profile: 'beginner', first: 'again', source: 'youtube', theme: 'auto',
+  screen: 'S1', prev: 'S1', evacFrom: 'S2', s0step: 0, tut: 0, legend: 'jis', sound: 'yes', calibN: 0, calibResult: '', calib: 'applied',
+  diagN: 3, diagDone: false,
+  song: 'neko', layout: 'ableton', limit: '2', filter: 'all', sort: 'rec',
+  bands: { sync: false, wait: false, ime: false, autoplay: false, store: false },
+  syncUsed: 'audio', fallback: false, embedFail: false, novideoDismissed: false, noEmbed: {},
+  paused: false, practice: false, fromS3: false, gameover: false, offer: '', offsetSaved: { video: 0, audio: 0 },
+  wait: 'note', fade: 'auto', keyset: 'all', tempo: 1.0, nine: 'kk',
+  s5step: 0, fold: 'octave', s5fail: false, s5video: true, evac: 'a', s0ime: false, s1store: false,
+};
+try { const raw = localStorage.getItem('hexnote.m6'); if (raw) { const o = JSON.parse(raw); for (const k of ['profile', 'first', 'source', 'theme']) if (o[k]) state[k] = o[k]; } } catch (e) { /* 保存は任意 */ }
+function persist() { try { localStorage.setItem('hexnote.m6', JSON.stringify({ profile: state.profile, first: state.first, source: state.source, theme: state.theme })); } catch (e) { /* 失敗しても続行 */ } }
+
+const V4 = ['ableton/2', 'ableton/3', 'vmpk/2', 'vmpk/3'];
+/* best は「プロファイル×譜面版」の単位（design §1.3 S1、decisions #8） */
+const SONGS = [
+  { id: 'tut', name: 'はじめの六角', rights: '自作', bpm: 90, len: '0:48', sec: 48, kind: 'bundled', video: false, axes: [1, 1, 0, 0], best: { beginner: null, gamer: null }, done: true, tutorial: true, variants: ['ableton/2'] },
+  { id: 'twinkle', name: 'きらきら星', rights: 'PD', bpm: 100, len: '1:10', sec: 70, kind: 'bundled', video: false, axes: [1, 1, 1, 0], best: { beginner: { acc: 94.2, rank: 'A', v: 'ableton/2' }, gamer: null }, done: true },
+  { id: 'ode', name: '歓喜の歌', rights: 'PD', bpm: 112, len: '1:05', sec: 65, kind: 'bundled', video: false, axes: [2, 1, 1, 1], best: { beginner: { acc: 88.0, rank: 'B', v: 'ableton/2' }, gamer: { acc: 91.3, rank: 'A', v: 'ableton/3' } }, done: true },
+  { id: 'minuet', name: 'メヌエット ト長調', rights: 'PD', bpm: 108, len: '1:30', sec: 90, kind: 'bundled', video: false, axes: [2, 2, 1, 1], best: { beginner: null, gamer: null }, done: false },
+  { id: 'green', name: 'グリーンスリーブス', rights: 'PD', bpm: 96, len: '1:40', sec: 100, kind: 'bundled', video: false, axes: [2, 2, 2, 1], best: { beginner: null, gamer: null }, done: false },
+  { id: 'spring', name: '春の歌', rights: 'PD', bpm: 104, len: '1:50', sec: 110, kind: 'bundled', video: false, axes: [3, 2, 2, 2], best: { beginner: null, gamer: null }, done: false },
+  { id: 'gym', name: 'ジムノペディ 第 1 番', rights: 'PD', bpm: 72, len: '2:50', sec: 170, kind: 'bundled', video: false, axes: [1, 3, 3, 2], best: { beginner: null, gamer: null }, done: false },
+  { id: 'elise', name: 'エリーゼのために（冒頭）', rights: 'PD', bpm: 120, len: '1:20', sec: 80, kind: 'bundled', video: false, axes: [3, 2, 1, 3], best: { beginner: null, gamer: null }, done: false },
+  { id: 'canon', name: 'カノン', rights: 'PD', bpm: 68, len: '2:30', sec: 150, kind: 'bundled', video: false, axes: [2, 3, 4, 3], best: { beginner: null, gamer: null }, done: false },
+  { id: 'hexwaltz', name: 'ヘクサ・ワルツ', rights: 'CC0', bpm: 132, len: '1:36', sec: 96, kind: 'bundled', video: false, axes: [3, 3, 2, 2], best: { beginner: null, gamer: null }, done: false },
+  { id: 'neko', name: 'ねこふんじゃった（持ち込み）', rights: 'private', bpm: 120, len: '1:12', sec: 72, kind: 'midi', video: true, axes: [3, 3, 2, 1], best: { beginner: { acc: 91.5, rank: 'A', v: 'ableton/2' }, gamer: null }, done: true, variants: V4.slice() },
+  { id: 'demo', name: 'demo_take2.mid（持ち込み）', rights: 'private', bpm: 140, len: '2:04', sec: 124, kind: 'midi', video: true, axes: [4, 4, 3, 3], best: { beginner: null, gamer: null }, done: false, variants: ['ableton/2'] },
+];
+for (const s of SONGS) if (!s.variants) s.variants = V4.slice();
+const AXES = ['密度', '跳躍', '同時押し', '段またぎ'];
+/* 舞台（Canvas）の色だけは直書き（契約の例外）。UI の色はすべて :root のトークン。 */
+const ROW_COLORS = ['#c08cf0', '#62a6f2', '#52d490', '#f2a452'];
+const A_ROW = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';'];
+const Q_ROW = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'];
+const COLS = 10;
+const Q_BLACK = new Set(['W', 'E', 'T', 'Y', 'U', 'O', 'P']);
+const TEMPO_NOVIDEO = [0.5, 0.6, 0.75, 0.9, 1.0, 1.1, 1.25];
+const TEMPO_VIDEO = [0.5, 0.75, 1.0, 1.25];
+
+/* ---------- 共通 ---------- */
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600); }
+function song() { return SONGS.find(s => s.id === state.song) || SONGS[1]; }
+/* この曲をいま始めたら動画を使うか: 上帯が YouTube、曲に動画 ID があり、埋め込み不可を記録していない */
+function playVideo() { const s = song(); return state.source === 'youtube' && !!s.video && !state.noEmbed[s.id]; }
+/* いまの回で動画が動いているか（S2 の形態） */
+function isVideo() { return state.syncUsed === 'video' && !state.fallback; }
+function profName() { return state.profile === 'beginner' ? '入門者' : '音ゲー向け'; }
+function layoutName() { return state.layout === 'vmpk' ? 'VMPK 型' : 'Ableton 型'; }
+function waitName() { return { note: '音待ち', phrase: 'フレーズ待ち', fixed: '固定テンポ' }[state.wait]; }
+function tempoText() { return state.tempo.toFixed(2).replace(/0$/, ''); }
+function keysetName() { return { dfjk: 'D F J K', 8: '8 鍵', all: '全鍵' }[state.keyset]; }
+function calibText() {
+  if (state.sound === 'no') return '<b>未校正</b>（音が聞こえないので省略。設定からやり直せます）';
+  if (state.calib === 'applied') return '<b>−18 ms 適用</b>（ばらつき 12 ms）';
+  if (state.calib === 'rejected') return '<b>校正なし</b>（ばらつき 41 ms で不適用。プレイ後に提案します）';
+  return '<b>未校正</b>（「あとで」。設定からやり直せます）';
+}
+function variantsText(s) {
+  const g = {}; for (const v of s.variants) { const [l, n] = v.split('/'); (g[l] = g[l] || []).push(n); }
+  return ['ableton', 'vmpk'].filter(l => g[l]).map(l => `${l === 'vmpk' ? 'VMPK' : 'Ableton'}×{${g[l].sort().join(',')}}`).join('・') || 'なし';
+}
+/* 自力率の帯と凡例。音ゲー向けは NEAR なし（decisions #6）なので区分を出さない */
+function selfRateHtml(beg, long) {
+  const parts = beg
+    ? [[62, 'var(--good)', long ? 'ラベル無しで当てた 62%' : '自力'], [18, 'var(--accent-2)', long ? 'ヒント付き 18%' : 'ヒント付き'], [8, 'var(--row0)', long ? 'となり（NEAR）8%' : 'NEAR'], [12, 'var(--bad)', long ? '外した 12%' : '外した']]
+    : [[68, 'var(--good)', long ? 'ラベル無しで当てた 68%' : '自力'], [16, 'var(--accent-2)', long ? 'ヒント付き 16%' : 'ヒント付き'], [16, 'var(--bad)', long ? '外した 16%' : '外した']];
+  return `<div class="stack">${parts.map(p => `<i style="width:${p[0]}%;background:${p[1]}"></i>`).join('')}</div><div class="legend">${parts.map(p => `<span><i style="background:${p[1]}"></i>${p[2]}</span>`).join('')}</div>`;
+}
+/* プレイの開始: この回の音源をここで確定する */
+function startPlay(practice) {
+  state.syncUsed = playVideo() ? 'video' : 'audio';
+  state.fallback = false; state.embedFail = false; state.novideoDismissed = false;
+  state.practice = !!practice; state.gameover = false; state.offer = ''; state.fromS3 = false;
+  state.bands.sync = state.syncUsed === 'video'; state.bands.autoplay = false;
+  if (!practice) state.bands.wait = false;
+  go('S2');
+}
+function go(screen) {
+  if (screen === 'Boot') { screen = state.first === 'first' ? 'S0' : 'S1'; }
+  if (screen === 'Pause') { screen = 'S2'; state.paused = true; }
+  if (screen === 'S5' && state.first === 'first') { toast('曲の持ち込みは 2 回目以降に出ます'); return; }
+  if (screen === 'S5' && state.screen !== 'S5' && state.screen !== 'S6') { state.s5step = 0; state.s5video = true; state.s5fail = false; }
+  if (screen === 'S6' && state.screen !== 'S6') state.prev = state.screen;
+  if (screen === 'S7' && state.screen !== 'S7' && state.screen !== 'S6') state.evacFrom = state.screen;
+  if (screen === 'S1' && state.first === 'first' && (state.screen === 'S3' || state.screen === 'S0')) { state.first = 'again'; toast('初回導線を終えました。次回からは 2 回目以降の起動です'); }
+  /* S3 以外から練習室に入るときは、結果画面から引き継いだループを落とす（設定からの戻りは除く） */
+  if (screen === 'S4' && !['S3', 'S4', 'S6'].includes(state.screen)) state.fromS3 = false;
+  if (screen !== 'S2') state.paused = false;
+  if (screen !== 'S0') state.s0ime = false;
+  state.screen = screen;
+  render();
+  window.scrollTo({ top: Math.min(window.scrollY, $('.flow').offsetTop), behavior: 'auto' });
+}
+
+/* ---------- 六角描画 ---------- */
+function hexPath(ctx, cx, cy, r, rot = 0) { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 180 * (60 * i - 30 + rot); const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.closePath(); }
+function fitCanvas(cv) { const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth || 320, H = cv.clientHeight || 300; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, W, H }; }
+/* opts: {profile, keyboardOnly, keyset:Set|null, wait, cells:[{row,idx,t,hold?,chord?}], hint:[fromKey,toKey]} */
+function drawStage(cv, o) {
+  if (!cv || !cv.clientWidth) return;
+  const { ctx, W, H } = fitCanvas(cv);
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0b0d12'); g.addColorStop(1, '#151b28'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const R = Math.max(14, Math.min(28, (W - 32) / ((COLS + 0.5) * Math.sqrt(3))));
+  const w = Math.sqrt(3) * R;
+  const x0 = (W - COLS * w) / 2 + w / 2 + w / 4;
+  const yA = H - 14 - R, yQ = yA - 1.5 * R;
+  const pos = (row, idx) => ({ x: x0 + idx * w - (row === 1 ? w / 2 : 0), y: row === 1 ? yQ : yA });
+  const keyOf = (row, idx) => row === 1 ? Q_ROW[idx] : A_ROW[idx];
+  const top = 16, travel = yA - R - top;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  /* 落下域の目安（段別着地の帯） */
+  ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fillRect(0, yQ - R, W, yA - yQ + 2 * R);
+  /* 鍵盤図 */
+  const dim = (row, idx) => o.keyset && !o.keyset.has(keyOf(row, idx));
+  for (let row = 0; row < 2; row++) for (let idx = 0; idx < COLS; idx++) {
+    const k = keyOf(row, idx); const p = pos(row, idx);
+    const black = row === 1 && Q_BLACK.has(k); const empty = row === 1 && !black;
+    hexPath(ctx, p.x, p.y, black ? (R - 1) * 0.86 : R - 1, black ? 30 : 0);
+    ctx.fillStyle = empty ? 'rgba(255,255,255,0.03)' : (black ? 'rgba(98,166,242,0.16)' : 'rgba(192,140,240,0.14)');
+    if (dim(row, idx)) ctx.fillStyle = 'rgba(255,255,255,0.02)';
+    ctx.fill();
+    ctx.strokeStyle = empty ? 'rgba(255,255,255,0.08)' : (dim(row, idx) ? 'rgba(255,255,255,0.1)' : ROW_COLORS[row]); ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = empty || dim(row, idx) ? 'rgba(255,255,255,0.22)' : '#f4f2ea';
+    ctx.font = `700 ${Math.round(R * 0.95)}px Rajdhani, sans-serif`; ctx.fillText(k, p.x, p.y + 1);
+    if (black) { ctx.font = `600 ${Math.round(R * 0.4)}px Rajdhani, sans-serif`; ctx.fillStyle = ROW_COLORS[1]; ctx.fillText('♯', p.x + R * 0.42, p.y - R * 0.42); }
+  }
+  /* 辺ヒント（入門者のみ）: from の鍵の、to へ最も近い辺を明るく */
+  if (o.hint && o.profile === 'beginner') {
+    const f = o.hint[0], t = o.hint[1]; const pf = pos(f[0], f[1]), pt = pos(t[0], t[1]);
+    const ang = Math.atan2(pt.y - pf.y, pt.x - pf.x) * 180 / Math.PI; let best = 0, bd = 999;
+    for (let i = 0; i < 6; i++) { const mid = 60 * i; let d = Math.abs(((ang - mid) % 360 + 540) % 360 - 180); if (d < bd) { bd = d; best = i; } }
+    const a1 = Math.PI / 180 * (60 * best - 30), a2 = Math.PI / 180 * (60 * best + 30);
+    ctx.strokeStyle = '#fff5c2'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(pf.x + (R - 1) * Math.cos(a1), pf.y + (R - 1) * Math.sin(a1)); ctx.lineTo(pf.x + (R - 1) * Math.cos(a2), pf.y + (R - 1) * Math.sin(a2)); ctx.stroke();
+  }
+  if (o.keyboardOnly) { ctx.fillStyle = '#9a978f'; ctx.font = '500 12px "Zen Kaku Gothic New", sans-serif'; ctx.fillText(o.caption || '', W / 2, 18); return; }
+  /* 落下セル: t は着地までの時間（0〜1.5 s）。段別着地＝自分の鍵の列を落ちる。上の段は 0.96 倍の奥行き */
+  const cells = o.cells || [];
+  for (const c of cells) {
+    const p = pos(c.row, c.idx); const y = p.y - (c.t / 1.5) * travel; const r = (R - 1) * (c.row === 1 ? 0.96 : 1) * (c.row === 1 && Q_BLACK.has(Q_ROW[c.idx]) ? 0.86 : 1);
+    const k = keyOf(c.row, c.idx); const black = c.row === 1 && Q_BLACK.has(k);
+    if (c.hold) { const hl = (c.hold / 1.5) * travel; ctx.fillStyle = ROW_COLORS[c.row] + '66'; ctx.beginPath(); ctx.roundRect(p.x - r * 0.45, y - hl, r * 0.9, hl, r * 0.45); ctx.fill(); }
+    hexPath(ctx, p.x, y, r, black ? 30 : 0); ctx.fillStyle = ROW_COLORS[c.row]; ctx.fill();
+    if (!c.chord) { ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.stroke(); }
+    ctx.fillStyle = '#0b0d12'; ctx.font = `700 ${Math.round(r * 0.95)}px Rajdhani, sans-serif`; ctx.fillText(k, p.x, y + 1);
+    if (black) { ctx.font = `600 ${Math.round(r * 0.4)}px Rajdhani, sans-serif`; ctx.fillText('♯', p.x + r * 0.42, y - r * 0.42); }
+  }
+  /* 殻: 離れた和音を薄い凸包で */
+  if (o.shell) { const [a, b] = o.shell; const pa = pos(a.row, a.idx), pb = pos(b.row, b.idx); const ya = pa.y - (a.t / 1.5) * travel, yb = pb.y - (b.t / 1.5) * travel; ctx.strokeStyle = 'rgba(244,242,234,0.35)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(Math.min(pa.x, pb.x) - R, Math.min(ya, yb) - R, Math.abs(pa.x - pb.x) + 2 * R, Math.abs(ya - yb) + 2 * R, R); ctx.stroke(); }
+  /* 待ち: 着地位置で止まったセルに輪 */
+  if (o.wait) { const p = pos(o.wait[0], o.wait[1]); ctx.strokeStyle = '#52d490'; ctx.lineWidth = 2; hexPath(ctx, p.x, p.y, R + 4); ctx.stroke(); ctx.fillStyle = '#52d490'; ctx.font = '500 12px "Zen Kaku Gothic New", sans-serif'; ctx.fillText('ここで止まっています。正しいキーで進みます', W / 2, yQ - R - 14); }
+  /* 判定文字（鍵盤図の上に 600 ms） */
+  if (o.judge) { ctx.font = `700 ${Math.round(R * 0.8)}px Rajdhani, sans-serif`; ctx.fillStyle = o.judge[1]; ctx.fillText(o.judge[0], W / 2, yQ - R - (o.wait ? 32 : 14)); }
+  if (o.caption) { ctx.fillStyle = '#9a978f'; ctx.font = '500 12px "Zen Kaku Gothic New", sans-serif'; ctx.fillText(o.caption, W / 2, 16); }
+}
+const DEMO_CELLS = [
+  { row: 0, idx: 3, t: 0.3, chord: true }, { row: 0, idx: 4, t: 0.3, chord: true },
+  { row: 1, idx: 4, t: 0.6 }, { row: 0, idx: 6, t: 0.9, hold: 0.3 }, { row: 0, idx: 2, t: 1.15 }, { row: 0, idx: 5, t: 1.15 }, { row: 1, idx: 8, t: 1.3 },
+];
+const DEMO_SHELL = [{ row: 0, idx: 2, t: 1.15 }, { row: 0, idx: 5, t: 1.15 }];
+
+/* ---------- 画面ごとの描画 ---------- */
+function renderHeader() {
+  for (const seg of $$('.seg[data-key]')) { const k = seg.dataset.key; for (const b of $$('button', seg)) b.setAttribute('aria-pressed', String(String(state[k]) === b.dataset.val)); }
+  document.documentElement.removeAttribute('data-theme'); if (state.theme !== 'auto') document.documentElement.setAttribute('data-theme', state.theme);
+  const node = state.screen === 'S2' && state.paused ? 'Pause' : state.screen;
+  for (const n of $$('.flow .node')) n.classList.toggle('on', n.dataset.node === node);
+  const used = state.embedFail ? '埋め込み不可 → 自前音源' : state.syncUsed === 'video' ? (state.fallback ? '動画あり → 途中で動画なしへ' : '動画あり') : '自前音源';
+  $('#flowState').textContent = `現在: ${node} ／ ${profName()} ／ ${state.first === 'first' ? '初回' : '2 回目以降'} ／ 上帯 ${state.source === 'youtube' ? 'YouTube' : '自前音源'}（この回: ${used}）`;
+  for (const s of $$('.screen')) s.classList.toggle('on', s.dataset.screen === state.screen);
+}
+
+function renderS0() {
+  $$('#s0steps span').forEach((el, i) => { el.classList.toggle('on', i === state.s0step); el.classList.toggle('done', i < state.s0step); });
+  $$('[data-s0]').forEach(el => { el.hidden = Number(el.dataset.s0) !== state.s0step; });
+  $('#s0ime').hidden = !state.s0ime;
+  $('#legendNote').textContent = state.legend === 'jis' ? 'JIS 刻印: 「;」の右は「:」、Enter は縦長。getLayoutMap が使えないので選んでください（ja なら JIS が既定）。' : 'US 刻印: 「;」の右は「\'」。AZERTY・Dvorak は code が同じなので QWERTY 刻印で表示します。';
+  $('#diagN').textContent = state.diagN;
+  $('#diagResult').textContent = state.diagDone ? '結果: 同段 3 組と和音 3 組を通過、矩形で 1 組落ちました → 上限 3。' : '';
+  $('#diagHold').style.width = state.diagDone ? '100%' : '60%';
+  $('#calibBox').hidden = state.sound === 'no'; $('#calibSkip').hidden = state.sound !== 'no';
+  $('#calibN').textContent = state.calibN; $('#calibHold').style.width = (state.calibN / 24 * 100) + '%';
+  $('#calibResult').textContent = state.calibResult || 'Space で打ちます（ボタンは Enter だけで押せます）。';
+  $$('#tutSteps span').forEach((el, i) => { el.classList.toggle('on', i === state.tut); el.classList.toggle('done', i < state.tut); });
+  if (state.s0step === 0) drawStage($('#cvS0a'), { profile: 'beginner', keyboardOnly: true, hint: [[0, 2], [0, 3]], caption: 'Ableton 型: A 段が白鍵（C D E F G A B C D E）、Q 段が黒鍵。明るい辺が次のキーを指します' });
+  if (state.s0step === 3) { const ks = [new Set(['D']), new Set(['D', 'F', 'J', 'K']), null][state.tut]; drawStage($('#cvS0d'), { profile: 'beginner', keyset: ks, cells: state.tut === 0 ? [{ row: 0, idx: 2, t: 0 }, { row: 0, idx: 2, t: 0.8 }] : DEMO_CELLS.filter(c => !ks || ks.has(c.row ? Q_ROW[c.idx] : A_ROW[c.idx])), wait: [0, 2], hint: [[0, 2], [0, 3]], caption: ['鍵数 1: D だけ', '鍵数 4: ホームポジション D F J K', '全鍵'][state.tut] }); }
+}
+
+function axesHtml(ax) { return `<div class="axes">${ax.map((v, i) => `<span>${AXES[i]}</span><div class="bar"><i style="width:${v * 25}%"></i></div>`).join('')}</div>`; }
+function visibleSongs() {
+  let list = SONGS.filter(s => state.first === 'again' || s.kind === 'bundled');
+  if (state.filter === 'bundled') list = list.filter(s => s.kind === 'bundled');
+  if (state.filter === 'midi') list = list.filter(s => s.kind === 'midi');
+  if (state.filter === 'video') list = list.filter(s => s.video);
+  if (state.sort === 'rec') list = list.slice().sort((a, b) => a.axes[0] - b.axes[0] || a.sec - b.sec);
+  if (state.sort === 'name') list = list.slice().sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  if (state.sort === 'len') list = list.slice().sort((a, b) => a.sec - b.sec);
+  return list;
+}
+function renderS1() {
+  $('#s1prof').textContent = profName();
+  $('#btnImport').hidden = state.first !== 'again';
+  $('#btnS4').hidden = state.first !== 'again';
+  $('#s1store').hidden = !state.s1store;
+  $('#s1calib').innerHTML = '校正 ' + calibText();
+  $('#s1streak').innerHTML = state.first === 'again' ? 'ストリーク <b class="num">3 日</b>（自前音源のプレイだけが対象）' : '';
+  if (state.first === 'first' && song().kind === 'midi') state.song = 'twinkle';
+  const list = visibleSongs();
+  $('#songs').innerHTML = list.map(s => {
+    const b = s.best && s.best[state.profile];
+    return `
+    <button class="song${s.id === state.song ? ' sel' : ''}" data-song="${s.id}" aria-pressed="${s.id === state.song}">
+      <div class="t"><span class="name">${s.name}</span>${s.done ? '<span class="pill good" title="完走">完走</span>' : ''}</div>
+      <div class="m"><span>${s.rights === 'private' ? '持ち込み（private）' : '出どころ ' + s.rights}</span><span class="num">${s.bpm} BPM</span><span class="num">${s.len}</span></div>
+      <div class="m"><span class="pill ${s.video ? '' : 'gray'}">${s.video ? (state.noEmbed[s.id] ? '動画なしで遊べます（埋め込み不可を記録）' : '動画あり／なしで遊べる') : '自前音源'}</span>${s.tutorial ? '<span class="pill gray">チュートリアル</span>' : ''}</div>
+      ${axesHtml(s.axes)}
+      <div class="best">${b ? `自己ベスト <b class="num">${b.acc}%</b> ${b.rank} <span class="note">（${profName()} ・ ${b.v}）</span>` : `<span class="note">自己ベスト —（${profName()}）</span>`}</div>
+      <div class="note">譜面版: ${variantsText(s)}</div>
+    </button>`; }).join('') || '<p class="note">該当する曲がありません。</p>';
+  const s = song();
+  $('#vTitle').textContent = `譜面版を選ぶ: ${s.name}`;
+  $('#vSrc').textContent = s.video ? '動画 ID あり' : '動画 ID なし（初版の同梱曲は紐づけない）';
+  $('#limitNote').textContent = state.limit === '2' ? '既定。' : '保証なし: 和音で 3 キー目が無反応なら設定で上限を戻せます。';
+  /* 動画の切替: 曲に動画 ID が無ければ「はい」は選べず、押下表示もこの曲で実際に使う音源に合わせる */
+  for (const b of $$('#variantBox .seg[data-key="source"] button')) { b.disabled = !s.video && b.dataset.val === 'youtube'; b.setAttribute('aria-pressed', String((b.dataset.val === 'youtube') === playVideo())); }
+  $('#videoNote').textContent = !s.video
+    ? 'この曲は動画 ID を持たないので、上帯の切替に関わらず自前音源で遊びます（称号・ストリークの対象）。'
+    : state.noEmbed[s.id]
+      ? 'この曲は埋め込み不可を記録済みなので「いいえ」が既定です。ピアノ音＋伴奏で遊びます。'
+      : state.source === 'youtube'
+        ? '動画の音に合わせて遊びます。称号・ストリークの対象外（スコアと自己ベストは残ります）。'
+        : 'ピアノ音＋伴奏で遊びます。称号・ストリークの対象。';
+  const vid = `${state.layout}/${state.limit}`;
+  const has = s.variants.includes(vid);
+  $('#vMissing').hidden = has;
+  $('#vMissing').innerHTML = s.kind === 'midi'
+    ? 'この配列／上限の版はまだありません。<button class="small" data-act="makevariant">この配列／上限の版を作る</button>'
+    : `この曲は ${layoutName()}／上限 ${state.limit} の版を持ちません${s.tutorial ? '（チュートリアル曲は Ableton 型／上限 2 だけ）' : ''}。`;
+  $('#btnPlay').disabled = !has;
+}
+
+function bandsHtml() {
+  const b = state.bands; const out = [];
+  if (b.sync) out.push('<div class="band sync"><b>同期中</b><span>動画の時刻を合わせています。再開後 300 ms は判定を猶予します。</span><span class="sp"></span><button class="small" data-band="sync">閉じる</button></div>');
+  /* 動画なしの帯: 表示（novideoDismissed）と退避状態（fallback／embedFail）を分ける。「閉じる」は帯を隠すだけで、復帰は「戻す」だけ */
+  if ((state.fallback || state.embedFail) && !state.novideoDismissed) {
+    out.push(state.embedFail
+      ? '<div class="band novideo"><b>この動画は埋め込めないので、ピアノ音で遊びます</b><span>開始から動画を使っていない回として記録します（称号・ストリークの対象）。この曲は「動画なし」が既定になります。</span><span class="sp"></span><button class="small" data-act="novideo-close">閉じる</button></div>'
+      : '<div class="band novideo"><b>動画が止まったので、ピアノ音で続けます</b><span>切替の後はピアノ音の時計で判定します。戻すのは手動だけです。</span><span class="sp"></span><button class="small" data-act="restore">戻す</button><button class="small" data-act="novideo-close">閉じる</button></div>');
+  }
+  if (b.wait) out.push('<div class="band wait"><b>音待ち</b><span>どのノートも自分のキーにはまる位置で止まり、正しいキーを押すと進みます（練習室だけ）。</span><span class="sp"></span><button class="small" data-band="wait">閉じる</button></div>');
+  if (b.ime) out.push('<div class="band ime"><b>半角/全角キーで英数に戻してください</b><span>日本語入力中の打鍵は無視します。曲は止めません。</span><span class="sp"></span><button class="small" data-band="ime">閉じる</button></div>');
+  if (b.autoplay) out.push('<div class="band"><b>再生はクリックで始めます</b><span>自動再生がブロックされました。プレイヤーの ▶ を押してください。</span><span class="sp"></span><button class="small" data-band="autoplay">閉じる</button></div>');
+  if (b.store) out.push('<div class="band err"><b>保存できません</b><span>今回の記録はメモリ内だけに残ります。</span><span class="sp"></span><button class="small" data-band="store">閉じる</button></div>');
+  return out.join('');
+}
+function renderS2() {
+  const s = song(); const video = isVideo(); const used = state.syncUsed === 'video';
+  $('#bbSync').disabled = !video; $('#bbNovideo').disabled = !used; $('#bbAuto').disabled = !video; $('#btnEvacA').disabled = !video;
+  $('#bandHint').textContent = !used
+    ? '（この回は自前音源。同期中・自動再生ブロック・動画なしの帯は出ません）'
+    : (state.fallback && state.novideoDismissed ? '（動画なしモードは続いています。帯を閉じただけです。戻すには帯を出し直して「戻す」）' : '');
+  $('#bands').innerHTML = bandsHtml();
+  const pl = $('#player'); pl.className = 'player' + (video ? '' : ' audio');
+  pl.innerHTML = video
+    ? '<div><div class="cp">▶ YouTube プレイヤー 480×270（下限 356×200）</div><div>click-to-play ・ 前に何も置かない ・ 半分超が見えるまで再生しない</div></div>'
+    : state.fallback
+      ? '<div><div class="cp">動画なしモード（途中から）</div><div>矩形は一時停止のまま残し、ピアノ音＋伴奏で続けます。判定は performance.now の時計。</div></div>'
+      : state.embedFail
+        ? '<div><div class="cp">埋め込み不可 → 自前音源</div><div>動画は読み込めなかったので、最初からピアノ音＋伴奏で遊びます。称号・ストリークの対象。</div></div>'
+        : '<div><div class="cp">自前音源</div><div>旋律のガイド音＋伴奏（Salamander）を Web Audio で予約再生。動画なしでも全機能。</div></div>';
+  const beg = state.profile === 'beginner';
+  $('#hud').innerHTML = beg
+    ? `<div class="note">曲名</div><div><b>${s.name}</b></div><div class="note">進行</div><div class="bar"><i style="width:46%"></i></div><div class="note">精度</div><div class="big">94.2<span style="font-size:16px">%</span></div>`
+    : `<div class="note">曲名</div><div><b>${s.name}</b></div><div class="note">進行</div><div class="bar"><i style="width:46%"></i></div>
+       <div class="btnrow"><div><div class="note">精度</div><div class="big">96.8<span style="font-size:16px">%</span></div></div><div><div class="note">ランク</div><div class="rank">S</div></div><div><div class="note">コンボ</div><div class="big">48</div></div></div>
+       <div class="gauge"><span class="note">ゲージ</span><div class="bar" style="flex:1"><i style="width:72%;background:var(--good)"></i></div><span class="num">72</span></div>
+       <div class="note">ハイスピード <b class="num">1.0 s</b> ・ FAST <b class="num">37</b> ／ SLOW <b class="num">22</b></div>`;
+  $('#playNote').textContent = (beg ? '入門者: 失敗なし。最後まで弾けば「完走」。NEAR（隣のキー）は 0.4 の重み。' : '音ゲー向け: ゲージ 50 開始、+1.5／+0.5／−6。0 で途中終了。終了時 70 以上でクリア。') + (state.practice ? ` この回は練習記録（${waitName()}・テンポ ${tempoText()}${beg ? '・' + keysetName() : ''}）。` : '');
+  $('#btnGameover').hidden = beg;
+  $('#pauseOv').hidden = !state.paused;
+  drawStage($('#cvS2'), { profile: state.profile, cells: DEMO_CELLS, shell: DEMO_SHELL, hint: [[0, 6], [1, 6]], judge: ['GREAT  −8 ms', '#62d4a0'], caption: `${layoutName()} ／ 上限 ${state.limit} ／ ${beg ? '流れる時間 1.5 s・辺ヒントあり' : '流れる時間 1.0 s・辺ヒントなし'}` });
+}
+
+function renderS3() {
+  const s = song(); const beg = state.profile === 'beginner';
+  const video = state.syncUsed === 'video'; /* この回に動画を使ったか（途中で動画なしへ切り替わった回を含む）。S7a 経由は audio */
+  const practice = state.practice, over = state.gameover;
+  $('#s3title').textContent = practice ? '練習の結果' : (over ? '途中終了' : '結果');
+  $('#s3role').textContent = practice ? '練習記録（待ち・テンポ≠1.0・鍵数制限）は精度%と自力率だけを残し、自己ベストにも提案の母集団にも入りません。' : '精度・ランク・内訳・提案・称号。比較は同じ譜面版の中だけ。';
+  $('#s3fallback').hidden = !state.fallback;
+  const src = state.embedFail ? '自前音源（動画が埋め込めなかった回）' : video ? (state.fallback ? '動画あり → 途中から自前音源' : '動画あり') : '自前音源';
+  $('#s3song').textContent = `${s.name} ・ ${layoutName()}／上限 ${state.limit} ・ ${profName()} ・ ${src}`;
+  $('#s3acc').textContent = over ? '71.4%' : practice ? '88.0%' : (beg ? '94.2%' : '96.8%');
+  $('#s3rankBox').hidden = practice;
+  $('#s3rank').textContent = over ? '—' : (beg ? 'A' : 'S');
+  $('#s3fc').hidden = beg || over || practice;
+  let rows;
+  if (practice) rows = [['条件', `${waitName()} ・ テンポ ${tempoText()} ・ ${beg ? keysetName() : '全鍵'}`], ['残すもの', '精度%と自力率だけ（自己ベスト・称号・オフセット提案の対象外）']];
+  else rows = beg
+    ? [['ぴったり／よい／おしい', '61 ／ 38 ／ 9'], ['となり（NEAR、隣のキー）', '4'], ['はずれ', '6'], ['完走', over ? '—' : 'はい（固定テンポ・1.0 倍・全鍵）']]
+    : [['PERFECT／GREAT／GOOD', '72 ／ 36 ／ 6'], ['MISS', over ? '21' : '4'], ['最大コンボ', over ? '31' : '118'], ['ゲージ終値', over ? '0（途中終了）' : '84（クリア ≥70）'], ['点', over ? '—' : '108,420']];
+  $('#s3table').innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+  $('#s3self').innerHTML = selfRateHtml(beg, true);
+  $('#s3chordBox').hidden = practice;
+  $('#s3gamer').hidden = beg || practice;
+  $('#s3offsetCard').hidden = practice;
+  $('#s3offer').hidden = state.offer !== '';
+  $('#s3offerKind').textContent = video ? 'YouTube' : '自前音源';
+  $('#btnPractice').hidden = state.first === 'first';
+  const target = !video && !practice && !over;
+  $('#s3reward').innerHTML = target
+    ? (state.first === 'first'
+      ? `<h3>称号・ストリーク</h3><div class="btnrow"><span class="pill accent">初クリア</span></div><p>ストリーク <b class="num">1 日目</b>（自前音源のプレイがある日の連続）。同梱 10 曲完走まであと <b class="num">9</b> 曲。</p>`
+      : `<h3>称号・ストリーク</h3><div class="btnrow"><span class="pill accent">初クリア</span><span class="pill good">3 日連続</span></div><p>ストリーク <b class="num">3 日</b>（自前音源のプレイがある日の連続）。同梱 10 曲完走まであと <b class="num">6</b> 曲。</p>`)
+      + `<p class="note">対象プレイ＝開始から動画を使っていない回だけ${state.embedFail ? '（埋め込み不可で最初から自前音源になった回を含む）' : ''}。</p>`
+    : video
+      ? `<h3>称号・ストリーク</h3><p class="note"><b>この回は対象外です。</b>${state.fallback ? '途中まで動画を使った回' : 'YouTube 再生の曲'}は端末内だけに記録します。称号・ストリーク・デイリーは自前音源のプレイだけが対象です（スコアと自己ベストは残ります）。</p>`
+      : `<h3>称号・ストリーク</h3><p class="note">${practice ? '練習記録は称号・ストリークの対象になりません。' : '途中終了は完走になりません。'}</p>`;
+  if (state.first === 'first' && !practice) $('#s3reward').innerHTML += '<p class="note">初回導線はここで終わります。「ホームへ」で曲一覧に進みます。</p>';
+}
+
+function renderS4() {
+  const video = playVideo(); const beg = state.profile === 'beginner';
+  $('#s4loopband').hidden = !state.fromS3;
+  for (const b of $$('#waitSeg button')) { const off = video && b.dataset.val !== 'fixed'; b.disabled = off; }
+  if (video && state.wait !== 'fixed') state.wait = 'fixed';
+  for (const b of $$('#waitSeg button')) b.setAttribute('aria-pressed', String(b.dataset.val === state.wait));
+  $('#waitNote').textContent = video
+    ? '動画ありでは固定テンポだけです（待ちは動画の自動停止・再開の反復になるため出しません）。'
+    : { note: '音待ち: どのノートも自分のキーにはまる位置で止まり、正しいキーを押すと進みます。', phrase: 'フレーズ待ち: 2 小節の頭で止まり、正しいキーで再開します（0.3 秒巻き戻し＋250 ms の空白）。', fixed: '固定テンポ: 止まりません。通常プレイと同じ。' }[state.wait];
+  /* テンポは倍率の値で持ち、いまの段の並びで最も近い段に丸める（動画あり 4 段⇄なし 7 段の切替で値が変わらない） */
+  const steps = video ? TEMPO_VIDEO : TEMPO_NOVIDEO;
+  let ti = 0; steps.forEach((t, i) => { if (Math.abs(t - state.tempo) < Math.abs(steps[ti] - state.tempo)) ti = i; }); state.tempo = steps[ti];
+  $('#tempoSteps').innerHTML = steps.map((t, i) => `<span class="${i === ti ? 'on' : ''}" data-tempo="${t}" role="button" tabindex="0">${t.toFixed(2).replace(/0$/, '')}</span>`).join('');
+  $('#tempoNote').textContent = (video ? '動画あり 4 段。効かなければ「この動画ではテンポを変えられません」。' : '動画なし 7 段。') + ' 正答率 90% 超で上げ、70% 未満で下げ。1.0 以外の回は練習記録。';
+  const L = [['キー文字', 'k'], ['音名', 'n'], ['なし', '0']];
+  $('#nine9').innerHTML = '<span></span>' + L.map(l => `<span class="h">ノート側: ${l[0]}</span>`).join('') + L.map(r => `<span class="h">鍵盤側: ${r[0]}</span>` + L.map(c => `<span class="c${state.nine === r[1] + c[1] ? ' on' : ''}" data-nine="${r[1] + c[1]}" role="button" tabindex="0">${r[1] === '0' && c[1] === '0' ? '自力' : (r[1] + c[1] === 'kk' ? '既定' : '')}</span>`).join('')).join('');
+  $('#s4self').innerHTML = selfRateHtml(beg, false);
+  $('#keysetBox').hidden = !beg;
+  const ks = beg ? { dfjk: new Set(['D', 'F', 'J', 'K']), 8: new Set(['A', 'S', 'D', 'F', 'J', 'K', 'L', ';']), all: null }[state.keyset] : null;
+  drawStage($('#cvS4'), { profile: 'beginner', keyset: ks, cells: DEMO_CELLS.filter(c => !ks || ks.has(c.row ? Q_ROW[c.idx] : A_ROW[c.idx])), shell: ks ? null : DEMO_SHELL, wait: state.wait !== 'fixed' ? [0, 3] : null, hint: [[0, 6], [0, 7]], caption: `練習室 ／ ${waitName()} ／ テンポ ${tempoText()} ／ ラベル ${state.nine === '00' ? '無し' : 'あり'}` });
+}
+
+function renderS5() {
+  /* 動画を使うかは持ち込み曲ごと（s5video）。上帯の「曲の音源」には触れない */
+  const video = state.source === 'youtube' && state.s5video;
+  $('#s5sync').classList.toggle('off', !video);
+  $('#s5videoNote').hidden = video;
+  $('#s5fail').hidden = !state.s5fail;
+  for (const b of $$('[data-fold]')) b.classList.toggle('sel', b.dataset.fold === state.fold);
+  $$('#stage5 .step').forEach(el => {
+    const i = Number(el.dataset.step); el.classList.toggle('on', i === state.s5step); el.classList.toggle('done', i < state.s5step && !(i === 3 && !video));
+    const d = $('[data-stepdone]', el); if (d) d.hidden = !(i < state.s5step && !(i === 3 && !video));
+  });
+  $('#foldNote').innerHTML = `選択: ${{ octave: 'オクターブ寄せ', cut: '切り捨て', nearest: '最寄りの鍵' }[state.fold]}。<button class="small">試聴（8 小節）</button>`;
+}
+
+function renderS6() {
+  const beg = state.profile === 'beginner'; const video = state.source === 'youtube';
+  const opt = (list, on) => list.map(l => `<span class="opt${l === on ? ' on' : ''}">${l}</span>`).join('');
+  const cal = state.sound !== 'no' && state.calib === 'applied';
+  const offRow = (kind, base) => {
+    const extra = state.offsetSaved[kind]; const tot = (cal ? base : 0) + extra; const ms = v => String(v).replace("-", "−");
+    return tot ? `<span class="num">${ms(tot)} ms</span>（${cal ? `校正 ${ms(base)} ms` : '校正なし'}${extra ? ` ＋ 結果画面の提案 ${ms(extra)} ms` : ''}）` : `<span class="note">${calibText()}</span>`;
+  };
+  const groups = [
+    ['プロファイル', [['プロファイル', opt(['入門者', '音ゲー向け'], profName()) + ' <button class="small" data-act="swapprof">切替</button> <button class="small">既定へ戻す</button>'], ['切替の効き', '<span class="note">既定値を一括で入れ替えます。記録はプロファイルごとに別に持ち、混ざりません。</span>']]],
+    ['配列', [['配列', opt(['Ableton 型', 'VMPK 型', '対照 W–H'], layoutName())], ['刻印', opt(['JIS', 'US'], state.legend === 'jis' ? 'JIS' : 'US') + ' <span class="note">getLayoutMap が使えれば自動</span>']]],
+    ['幾何', [['格子', opt(['正六角（1/2 ずれ）', '物理せん断', '退避: 正六角のまま文字だけ'], '正六角（1/2 ずれ）')], ['段ずれの自己申告', '<span class="note">A–Q 間 1/4 ・ Z–A 間 1/2（u 単位）</span>']]],
+    ['着地と判定', [['着地', opt(['段別（鍵にはまる）＋奥行き', '一本線（対照）'], '段別（鍵にはまる）＋奥行き')], ['辺ヒント', opt(['次を辺で指す', 'なし'], beg ? '次を辺で指す' : 'なし')], ['判定窓', beg ? '<span class="num">24 ／ 100 ／ 180 ms</span>（遅れ側 ×1.3）' : '<span class="num">30 ／ 90 ／ 200 ms</span>（遅れ側 ×1.0）'], ['NEAR（隣のキー）', opt(['距離 1', 'なし'], beg ? '距離 1' : 'なし')], ['ホールドの離し窓', beg ? '終点の 1.5×GOOD 前から' : '300 ms'], ['流れる時間', beg ? '<span class="num">1.5 s</span>' : '<span class="num">1.0 s</span>']]],
+    ['同時押し', [['上限', `<span class="num">${state.limit}</span>（端末の上限 3） <button class="small">テストをやり直す</button>`], ['超えた和音', '<span class="note">低い音から落とし、最上声を残す</span>']]],
+    ['校正', [['状態', calibText()], ['オフセット（YouTube）', offRow('video', -18)], ['オフセット（自前音源）', offRow('audio', -6)], ['やり直す', '<button class="small">メトロノーム 24 打</button> <span class="note">SD 30 ms 未満のときだけ適用</span>']]],
+    ['ラベル（9 マス）', [['鍵盤側 × ノート側', opt(['キー文字', '音名', 'なし'], 'キー文字') + ' × ' + opt(['キー文字', '音名', 'なし'], 'キー文字')], ['足場外し', opt(['手動', '成績連動'], '成績連動') + ' <span class="note">鍵盤側／ノート側を別スイッチ</span>']]],
+    ['色と演出', [['色', opt(['段ごと', '白鍵／黒鍵', '音名ごと', 'グレースケール（確認用）'], '段ごと')], ['演出の予算', opt(['標準', '控えめ', 'なし'], '標準') + ' <span class="note">閃光 1 秒 3 回以下、同時に光る面積 25% 以下</span>'], ['低負荷モード', opt(['自動', 'ON', 'OFF'], '自動') + ' <span class="note">rAF 95 パーセンタイル 20 ms 超が 10 秒で「演出なし→殻なし→奥行きなし」</span>']]],
+    ['音', [['ガイド音', opt(['ON', 'OFF'], 'OFF')], ['メトロノーム', opt(['ON', 'OFF'], 'OFF')], ['空打ち発音', opt(['ON', 'OFF'], 'ON') + ' <span class="note">動画ありでは誤打のみ −18 dB・300 ms</span>'], ['伴奏の音量', '<span class="num">70%</span>'], ...(video ? [] : [['ピアノ音を重ねる', opt(['ON', 'OFF'], 'ON') + ' <span class="note">動画ありでは出しません</span>']])]],
+    ['入力', [['IME 検知時に曲を止める', opt(['ON', 'OFF'], 'OFF')], ['役割キー', '<span class="note">Space 開始・再開・校正タップ、Enter 決定、Esc 一時停止。修飾キーは使いません</span>']]],
+    ['計測盤', [['貯まった行', '<span class="num">128</span> 行（リング 1,000 行。初版は送信しません）'], ['書き出し', '<button class="small">JSON で書き出す</button>']]],
+    ['データ', [['記録', '<button class="small">記録を削除</button> <button class="small">持ち込み曲を削除</button>'], ['譜面版', '<button class="small">全持ち込み曲の版を作り直す</button>'], ['移す', '<button class="small">書き出し</button> <button class="small">取り込み</button> <span class="note">Safari は 7 日で消えることがあります</span>'], ['端末プロファイル', '<button class="small">初期化（初回導線をやり直す）</button>']]],
+    ['クレジット', [['ピアノ音', 'Salamander Grand Piano V3（CC BY 3.0）'], ['同梱曲', '<button class="small">権利表を見る</button> <span class="note">曲・作曲者没年・編曲者没年・出どころ・ライセンス・確認日</span>']]],
+  ];
+  $('#settings').innerHTML = groups.map(g => `<div class="g"><h4>${g[0]}</h4>${g[1].map(r => `<div class="r"><span class="l">${r[0]}</span><span class="v">${r[1]}</span></div>`).join('')}</div>`).join('');
+}
+
+function renderS7() {
+  for (const b of $$('.tabs button[data-evac]')) b.setAttribute('aria-pressed', String(b.dataset.evac === state.evac));
+  const rect = '<div class="rect"><div>プレイヤー矩形（一時停止のまま残す。前には何も置かない）</div></div>';
+  const where = '<p class="note">製品ではこの帯は S2 のプレイヤー矩形の外（上帯の列）に出ます。モックでは帯のボタンで S2 へ戻れます。</p>';
+  const v = {
+    a: `<div class="band err"><b>この動画は埋め込みで再生できません</b><span>onError（コードは M3-09 で照合）。この曲は「動画なし」を既定にして記録します。</span><span class="sp"></span><button class="small primary" data-act="evac-novideo">ピアノ音で遊ぶ → S2</button><button class="small" data-go="S1">ホームへ</button></div>${rect}<p class="note">S2 の読込時。コード 101／150 は埋め込み禁止、2 は ID 不正、5 は HTML5 プレイヤーの失敗。動画を使わずに始める回なので、称号・ストリークの対象（design §4.4: syncUsed＝audio、fallbackAt 無し）。</p>${where}`,
+    b: `<div class="band sync"><b>同期中 …</b><span>BUFFERING／PAUSED、または時刻の飛びが 250 ms を超えました。再開後 300 ms は判定を猶予し、猶予内に窓が終わるノートは skipped にします。</span><span class="sp"></span><button class="small primary" data-act="evac-resync">再同期できた → S2</button></div>${rect}<p class="note">S2 の再生中。pause が効かない間（広告中とみなす）はこの帯のまま待ちます。Pause の再開もここを通ります。</p>${where}`,
+    c: `<div class="band novideo"><b>動画が止まったので、ピアノ音で続けます</b><span>可視・PLAYING のまま時刻が 2 秒凍結し、pauseVideo() が 500 ms 以内に PAUSED を返したので切り替えました。</span><span class="sp"></span><button class="small primary" data-act="evac-stay">このまま続ける → S2</button><button class="small" data-act="restore-demo">戻す（手動のみ）→ S2</button></div>${rect}<p class="note">切替の後の判定時計は performance.now。「戻す」は手動だけで、戻すと同期中を通ります。この回は称号の対象外になります（途中まで動画を使ったため）。</p>${where}`,
+    d: `<div class="band err"><b>保存できません</b><span>保存の例外（プライベートウィンドウ・容量超過・ブロック）。メモリ内のプロファイルで続行します。</span><span class="sp"></span><button class="small primary" data-act="export">*.hexnote.json を書き出す</button><button class="small" data-act="evac-continue">続行（メモリ内）→ 元の画面</button></div>${rect}<p class="note">全画面で起こりうる帯。S5 では書き出しを即座に勧めます。sessionStorage の hexnote.booted で初回導線のループを防ぎます。</p>${where}`,
+  }[state.evac];
+  $('#evac').innerHTML = v;
+}
+
+function render() {
+  renderHeader();
+  ({ S0: renderS0, S1: renderS1, S2: renderS2, S3: renderS3, S4: renderS4, S5: renderS5, S6: renderS6, S7: renderS7 })[state.screen]();
+  persist();
+}
+
+/* ---------- 操作 ---------- */
+const ACT = {
+  'ime-on': () => { state.s0ime = true; }, 'ime-off': () => { state.s0ime = false; },
+  s0next: () => { if (state.s0step < 3) state.s0step++; },
+  /* S0d の「あとで」は曲を弾いていないので S3 を飛ばしてホームへ（first の切替は go('S1') で行う） */
+  s0later: () => { toast('「あとで」は離脱として記録し、既定値で先へ進みます'); if (state.s0step < 3) state.s0step++; else { state.song = 'twinkle'; go('S1'); } },
+  diagsim: () => { if (state.diagN < 10) state.diagN++; if (state.diagN >= 10) state.diagDone = true; },
+  calibsim: () => { state.calibN = 24; state.calib = 'applied'; state.calibResult = '平均 −18 ms、ばらつき 12 ms。適用します。'; },
+  calibbad: () => { state.calibN = 24; state.calib = 'rejected'; state.calibResult = 'ばらつきが大きい（SD 41 ms）ので適用しません。プレイ後に提案します。'; },
+  tutnext: () => { state.tut = (state.tut + 1) % 3; },
+  /* チュートリアル曲は同梱・自前音源固定（design §1.3 S0d、decisions #9） */
+  tutdone: () => { state.song = 'tut'; state.layout = 'ableton'; state.limit = '2'; state.syncUsed = 'audio'; state.fallback = false; state.embedFail = false; state.practice = false; state.gameover = false; state.offer = ''; go('S3'); },
+  swapprof: () => { state.profile = state.profile === 'beginner' ? 'gamer' : 'beginner'; },
+  's1store-off': () => { state.s1store = false; },
+  makevariant: () => { const s = song(); const v = `${state.layout}/${state.limit}`; if (!s.variants.includes(v)) s.variants.push(v); toast('この配列／上限の版を生成しました（折り畳みは持ち込み時の選択）'); },
+  s4fromS1: () => { state.fromS3 = false; state.practice = false; go('S4'); },
+  play: () => startPlay(false),
+  pause: () => { state.paused = true; },
+  resume: () => { state.paused = false; state.bands.sync = isVideo(); toast('再開は同期中を通ります（300 ms の猶予）'); },
+  restart: () => { state.paused = false; state.bands.sync = isVideo(); toast('最初から。再生は利用者のクリックで始めます'); },
+  finish: () => { state.offer = ''; go('S3'); },
+  gameover: () => { state.gameover = true; state.offer = ''; go('S3'); },
+  'evac-a': () => { state.evac = 'a'; go('S7'); },
+  /* S7a: 開始から動画を使わない回。fallback とは別の状態（embedFail） */
+  'evac-novideo': () => { state.embedFail = true; state.fallback = false; state.syncUsed = 'audio'; state.novideoDismissed = false; state.noEmbed[song().id] = true; state.bands.sync = false; state.bands.autoplay = false; toast('この曲は「動画なし」を既定にして記録します'); go('S2'); },
+  'evac-resync': () => { state.bands.sync = true; state.paused = false; go('S2'); },
+  'evac-stay': () => { state.syncUsed = 'video'; state.fallback = true; state.embedFail = false; state.novideoDismissed = false; state.bands.sync = false; go('S2'); },
+  'evac-continue': () => { state.s1store = true; go(state.evacFrom === 'S7' ? 'S1' : state.evacFrom); },
+  /* S7c の模擬: 動画を使っている回だけ。帯を閉じた後に押すと帯を出し直す */
+  'fallback-sim': () => { if (state.syncUsed !== 'video') return; state.fallback = true; state.novideoDismissed = false; state.bands.sync = false; toast('模擬: 可視・PLAYING のまま 2 秒凍結 → 動画なしへ（S7c）'); },
+  'novideo-close': () => { state.novideoDismissed = true; },
+  restore: () => { state.fallback = false; state.novideoDismissed = false; state.bands.sync = true; toast('戻しました。同期中を通ります'); },
+  'restore-demo': () => { toast('戻すと S2（動画あり）へ。同期中を通ります'); state.syncUsed = 'video'; state.fallback = false; state.embedFail = false; state.bands.sync = true; go('S2'); },
+  'offset-yes': () => { state.offer = 'yes'; const k = state.syncUsed === 'video' ? 'video' : 'audio'; state.offsetSaved[k] += -12; toast(`オフセット −12 ms を${k === 'video' ? ' YouTube ' : '自前音源'}用に保存しました（合計 ${String((state.sound !== 'no' && state.calib === 'applied' ? (k === 'video' ? -18 : -6) : 0) + state.offsetSaved[k]).replace("-", "−")} ms）`); },
+  'offset-no': () => { state.offer = 'no'; },
+  topractice: () => { state.fromS3 = true; state.practice = true; go('S4'); },
+  again: () => startPlay(state.practice),
+  playfromS4: () => { const practice = state.wait !== 'fixed' || state.tempo !== 1.0 || (state.profile === 'beginner' && state.keyset !== 'all'); state.bands.wait = state.wait !== 'fixed'; startPlay(practice); },
+  s5next: () => { state.s5step++; if (state.s5step === 3 && !(state.source === 'youtube' && state.s5video)) state.s5step = 4; },
+  s5back: () => { state.s5step--; if (state.s5step === 3 && !(state.source === 'youtube' && state.s5video)) state.s5step = 2; if (state.s5step < 0) state.s5step = 0; },
+  /* 持ち込み曲ごとのフラグ。上帯の「曲の音源」は書き換えない */
+  s5skipvideo: () => { state.s5video = false; state.s5step = 4; toast('この曲は動画を使わない譜面として保存します（sync.sources は空）'); },
+  s5usevideo: () => { state.s5video = true; state.s5step = 3; },
+  s5save: () => { state.s5fail = false; state.s5step = 0; toast('保存しました。Ableton×{2,3}・VMPK×{2,3} の 4 版を生成'); go('S1'); },
+  s5failsim: () => { state.s5fail = true; state.s1store = true; },
+  's5fail-off': () => { state.s5fail = false; },
+  export: () => { toast('*.hexnote.json を書き出します（モックでは何も保存しません）'); },
+  back: () => { go(state.prev === 'S6' ? 'S1' : state.prev); },
+};
+document.addEventListener('click', e => {
+  const t = e.target.closest('button, [data-tempo], [data-nine], [data-song], .node');
+  if (!t) return;
+  if (t.classList.contains('node')) {
+    const n = t.dataset.node;
+    /* 図の S2 を押したときも「プレイの開始」として扱う（S2・S6・S7 からは単に戻る） */
+    if (n === 'S2' && !['S2', 'S6', 'S7'].includes(state.screen)) { if (state.screen === 'S4') ACT.playfromS4(); else startPlay(false); render(); return; }
+    go(n); return;
+  }
+  if (t.dataset.song) { state.song = t.dataset.song; render(); return; }
+  if (t.dataset.tempo) { state.tempo = Number(t.dataset.tempo); render(); return; }
+  if (t.dataset.nine) { state.nine = t.dataset.nine; render(); return; }
+  if (t.dataset.go) { go(t.dataset.go); return; }
+  if (t.dataset.band) { state.bands[t.dataset.band] = !state.bands[t.dataset.band]; render(); return; }
+  if (t.dataset.evac) { state.evac = t.dataset.evac; render(); return; }
+  if (t.dataset.fold) { state.fold = t.dataset.fold; render(); return; }
+  const seg = t.closest('.seg[data-key]');
+  if (seg && t.dataset.val !== undefined) {
+    const k = seg.dataset.key; state[k] = t.dataset.val;
+    if (k === 'first') {
+      /* 起動の切替: 初回にすると S0 の進み具合を戻し、起動の分岐（初回→S0、2 回目以降→S1）を通す */
+      if (t.dataset.val === 'first') Object.assign(state, { s0step: 0, tut: 0, calibN: 0, calibResult: '', calib: 'none', sound: 'yes', diagN: 3, diagDone: false, fromS3: false });
+      go('Boot'); return;
+    }
+    if (k === 'source') {
+      state.fallback = false; state.embedFail = false; state.novideoDismissed = false; state.bands.sync = false;
+      state.syncUsed = playVideo() ? 'video' : 'audio';
+      if (state.screen === 'S5' && state.s5step === 3 && !(state.source === 'youtube' && state.s5video)) state.s5step = 4;
+    }
+    if (k === 'wait') state.bands.wait = t.dataset.val !== 'fixed';
+    render(); return;
+  }
+  const act = t.dataset.act; if (!act) return;
+  if (ACT[act]) { ACT[act](); render(); }
+});
+document.addEventListener('change', e => { if (e.target.id === 'sortSel') { state.sort = e.target.value; render(); } });
+document.addEventListener('keydown', e => {
+  const tg = e.target instanceof Element ? e.target : document.body;
+  if (tg.matches('input, select, textarea')) return;
+  if ((e.key === 'Enter' || e.key === ' ') && tg.matches('[data-tempo], [data-nine]')) { e.preventDefault(); tg.click(); return; }
+  if (e.key === 'Escape' && state.screen === 'S2') { state.paused = !state.paused; render(); return; }
+  /* 一時停止の覆いの「再開 Space」。ボタンにフォーカスがあるときはボタン自身の Space に任せる */
+  if (e.key === ' ' && state.screen === 'S2' && state.paused && !tg.matches('button, summary, a, [role="button"]')) { e.preventDefault(); ACT.resume(); render(); }
+});
+let rz = 0; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(render, 120); });
+/* 起動の分岐を通す（初回→S0、2 回目以降→S1）。screen は保存しない */
+state.syncUsed = playVideo() ? 'video' : 'audio';
+go('Boot');
+})();
+</script>
