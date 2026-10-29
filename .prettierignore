@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dev-dist/
+package-lock.json
+content/samples/
+# 機械生成物（照合用。空白を変えない）
+tests/fixtures/
+tests/harness/expected/

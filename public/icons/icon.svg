@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="96" fill="#111318"/>
+  <polygon points="256,72 415,164 415,348 256,440 97,348 97,164" fill="none" stroke="#9fb4ff" stroke-width="28" stroke-linejoin="round"/>
+  <text x="256" y="300" text-anchor="middle" font-family="system-ui, sans-serif" font-size="150" font-weight="700" fill="#e8e9ec">F</text>
+</svg>

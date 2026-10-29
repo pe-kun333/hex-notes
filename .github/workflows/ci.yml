@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: ライセンス検査（依存。許可一覧は decisions #16）
+        run: npm run licenses
+      - name: ライセンス検査（同梱ファイルと帰属）
+        run: npm run licenses:files
+      - name: 権利表の検査（欠け 1 件で fail。ADR 0005）
+        run: npm run charts:rights
+      - name: 型検査
+        run: npm run typecheck
+      - name: 単体試験
+        run: npm test
+      - name: 譜面の検査（hexnote-chart/1）
+        run: npm run charts:validate
+      - name: ビルド
+        run: npm run build
+      - name: 初回読込の大きさ（≤ 10 MB、decisions #10）
+        run: npm run size
+      - name: 回帰ハーネスの差分表（M0-10 から）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-diff
+          path: tests/harness/expected/
+          if-no-files-found: ignore
