@@ -33,7 +33,7 @@ jobs:
         run: npm run size
       - name: 回帰ハーネスの差分表（M0-10 から）
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: harness-diff
           path: tests/harness/expected/
