@@ -1,0 +1,31 @@
+{
+  "format": "hexnote-chart/1",
+  "id": "sha256:f33acca604a12c03fe51f9f1e0cf7879a15e193f7d4520f8aa62abb8f8c553a7",
+  "name": "きらきら星（冒頭）",
+  "notes": [
+    { "midi": 60, "beat": 0, "dur": 1 },
+    { "midi": 60, "beat": 1, "dur": 1 },
+    { "midi": 67, "beat": 2, "dur": 1 },
+    { "midi": 67, "beat": 3, "dur": 1 },
+    { "midi": 69, "beat": 4, "dur": 1 },
+    { "midi": 69, "beat": 5, "dur": 1 },
+    { "midi": 67, "beat": 6, "dur": 2 }
+  ],
+  "pulse": { "resolution": 240, "tempo": [{ "beat": 0, "bpm": 100 }] },
+  "sync": { "sources": [] },
+  "source": {
+    "kind": "bundled",
+    "rights": "pd",
+    "title": "きらきら星（冒頭）",
+    "composer": "フランス民謡"
+  },
+  "variants": [
+    {
+      "id": "ableton/2/octave",
+      "layout": "ableton",
+      "limit": 2,
+      "fold": "octave",
+      "keys": ["KeyA", "KeyA", "KeyG", "KeyG", "KeyH", "KeyH", "KeyG"]
+    }
+  ]
+}

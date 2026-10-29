@@ -156,14 +156,16 @@ Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W
 ### 3.2 フィールド
 
 - 必須: `format "hexnote-chart/1"`（未知は無視、`/2` は拒む）、`id "sha256:…"`、`name`、`notes Note[]`（beat 昇順、同拍は midi 昇順）、`pulse {resolution（既定 240）, tempo[], timeSig[]?}`（読み込み時に ms 表へ）、`sync {sources: SyncSource[]}`（空なら動画なし専用。/1 は sources[0] だけ読む）、`source`。任意: `bpm, beats`（写し）、`accompaniment Note[]`（弾かない伴奏。無ければ旋律とメトロノームだけ）、`variants Variant[]`（無ければ生成）、`metrics`（density, leap, leapMax, chord, rowCross, level 等）、`created, generator, ext`。
-- Note: `{midi, beat（1/resolution に丸め）, dur（拍）}` 必須、`vel`（既定 80）と `track`（accompaniment のみ）任意。和音は同じ beat の複数 Note。配列添字が番号になり keys が参照する。hand／finger／lyric は ext。
+- Note: `{midi, beat（1/resolution に丸め）, dur（拍）}` 必須、`vel`（0〜127 の整数、既定 80）と `track`（accompaniment のみ）任意。和音は同じ beat の複数 Note。配列添字が番号になり keys が参照する。notes は 1 つ以上で、同拍・同音の Note は置かない（添字が番号になるため。順序と重複は 1/resolution の目盛りで比べる）。accompaniment も beat 昇順・同拍 midi 昇順。hand／finger／lyric は ext。
+- pulse: `tempo` は 1 つ以上、先頭は beat 0、beat 昇順、bpm は 0 より大きく 1000 以下。`timeSig` も beat 昇順。resolution は 1〜9600 の整数。beat・dur は 0〜1,000,000 拍（上限は仮。巨大値で丸めが効かなくなるのを防ぐ）。
+- SyncSource（audio）: videoId を持たず、offset 0・rate 1 を書く（必須のまま）。
 - SyncSource: `{kind "youtube"|"audio", videoId, offset 秒（拍 0 の動画時刻）, rate（動画 BPM÷譜面 BPM）, begin?, label?, measured?}`。audio は「動画を使わない」の印で file を持たない。sources[1..] は /1 では無視。
 - Variant: `{id "ableton/2/octave"（配列/上限/折り畳み）, layout "ableton"|"vmpk"|"genshin"|"wicki", limit 2–4, fold "octave"|"cut"|"nearest", keys (string|null)[]（notes と同じ長さ。落とした音は null）, stats?, metrics?}`。`garage`→ableton、`fl`→vmpk は別名。custom・zones は ext。鍵数制限は variant を増やさず実行時フィルタ（results.keyset）。
 - Source: `{kind "bundled"|"midi", rights "pd"|"own"|"cc0"|"cc-by"|"private", license? {id, holder, url}（cc-by で必須、pd／own／cc0 は任意）, title?, composer?, arranger?, origin?}`。同梱曲は pd／own／cc0／cc-by（決定 #18、2026-10-30。権利表 content/charts/RIGHTS.md の license 列と対応）。private は共有・索引に出さない。text／editor／licensed は ext。
 
 ### 3.3 ハッシュと変換
 
-`id = "sha256:" + SHA-256(canonical JSON of {format, notes[midi,beat,dur], pulse.resolution, pulse.tempo})`。小数 4 桁、キー順固定。accompaniment・sync・variants・source・name は含めない。履歴は使った sources[0] の offset／rate を自分の行に写す。m5 の出力は変換器（notes を原曲音高に戻し、keys/layout/limit を variants[0] に畳み、source と id を補う）を通してからバリデータに掛ける（M0-02）。
+`id = "sha256:" + SHA-256(canonical JSON of {format, notes[midi,beat,dur], pulse.resolution, pulse.tempo})`。小数 4 桁、キー順固定。accompaniment・sync・variants・source・name は含めない。canonical JSON の形（決定 #19、2026-10-30）: `{"format":"hexnote-chart/1","notes":[{"midi":60,"beat":0,"dur":1},…],"pulse":{"resolution":240,"tempo":[{"beat":0,"bpm":120},…]}}` の入れ子とキー順、空白なし、notes は正規化（beat 昇順・同拍 midi 昇順）の後の順。数値は `Math.round(x·10⁴)/10⁴`（m5 の r4）で丸めてから JSON の数値として書く。SHA-256 の 16 進は小文字 64 桁。実装は src/chart/hash.ts。ms 表（src/chart/mstable.ts）は float のまま持ち、区間の開始 ms を Δbeat×60000/bpm で累積する。履歴は使った sources[0] の offset／rate を自分の行に写す。m5 の出力は変換器（notes を原曲音高に戻し、keys/layout/limit を variants[0] に畳み、source と id を補う）を通してからバリデータに掛ける（M0-02）。
 
 ## 4. システム構成
 
