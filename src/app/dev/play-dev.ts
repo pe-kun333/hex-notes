@@ -3,14 +3,34 @@
 // 時計は手順 7 の時計層（動画なしの ClockSource、src/play/session.ts でプレイの状態機械とつなぐ。decisions #32・#35）。
 // Space で開始・再開（再開は同期中＝猶予 300 ms を通る）、Escape・タブの切替・窓の外の click で一時停止、一時停止中の
 // Escape か「中止」で中止。手弾きは手順 5 の attachKeyboard、押下の時刻は press の tsPerf を時計の写像で曲 ms にする。
-// 判定は開発用の仮（±300 ms の対応付けと入門者の窓。再生中で猶予の終わり以後の押下だけ判定し、猶予内に窓が終わる音は
-// skipped として対応付けと集計から外す。製品の判定層は手順 8）。performance.now の直呼びは src/app/ だけ（src/README.md）。
+// 判定は手順 8 の判定層（src/judge/。プロファイル 2 組・NEAR・ホールド・猶予中の押下の保留・skipped・校正のオフセット、
+// decisions #38〜#40）。「位置で読めるか」の記録（readability.ts、±300 ms の対応付け）は判定と別に、再生中で猶予の
+// 終わり以後の押下だけ取る（ADR 0006 の確認を他の端末でもやり直せるように残す）。performance.now の直呼びは src/app/
+// だけ（src/README.md）。
 
 import { buildVariant } from '../../chart/variants.ts'
-import { skippedAt } from '../../clock/grace.ts'
 import { songAt } from '../../clock/map.ts'
 import type { ClockMap } from '../../clock/types.ts'
 import type { InputEvent } from '../../input/keyboard.ts'
+import {
+  endAtMs,
+  initialJudge,
+  judgeClock,
+  judgePress,
+  judgeRelease,
+  judgeSweep,
+  neighborOf,
+  resultsByIndex,
+  rulesOf,
+  summarizeJudge,
+  timingSamples,
+  type JudgeOutcome,
+  type JudgeState,
+  type JudgeSummary,
+} from '../../judge/judge.ts'
+import { proposeOffset, type OffsetVerdict } from '../../judge/calibration-offset.ts'
+import { selfRatio } from '../../judge/self-rate.ts'
+import { PROFILES } from '../../judge/windows.ts'
 import {
   initialSession,
   sessionIdle,
@@ -21,7 +41,7 @@ import {
 } from '../../play/session.ts'
 import type { PlayEvent } from '../../play/state.ts'
 import { LAYOUTS } from '../../layout/presets.ts'
-import type { Chart, Judgment, KeyCode, LayoutId, Variant } from '../../shared/types.ts'
+import type { Chart, KeyCode, LayoutId, Profile, Variant } from '../../shared/types.ts'
 import type { FrameNote, LabelMode } from '../../render/canvas/cells.ts'
 import { buildFrame, frameNotes } from '../../render/canvas/commands.ts'
 import { admitFlash, emptyBudget, type BudgetState } from '../../render/canvas/budget.ts'
@@ -30,36 +50,13 @@ import { flush } from '../../render/canvas/flush.ts'
 import { feedFrame, initialLowLoad, type LowLoadState } from '../../render/canvas/lowload.ts'
 import { regionsOf } from '../../render/canvas/primitives.ts'
 import { buildKeyboardGrid, type KeyboardGrid } from '../../render/hex/grid.ts'
-import { hexDist } from '../../render/hex/hex.ts'
 import type { LandingMode } from '../../render/hex/landing.ts'
 import { TRAVEL_MS, computeSizing, sizeForViewport, type Sizing } from '../../render/hex/sizing.ts'
 import { attachKeyboard } from './dom-input.ts'
-import {
-  MATCH_MS,
-  matchPress,
-  summarize,
-  type NoteOutcome,
-  type ReadabilitySummary,
-} from './readability.ts'
+import { matchPress, summarize, type NoteOutcome, type ReadabilitySummary } from './readability.ts'
 
 /** 開始から拍 0 までの予備 ms（m1' LEAD 2.2 s を丸めた値） */
 const LEAD_MS = 2000
-/** 最後の着地の後に走りを閉じるまで ms（§4.2 終了「最終ノート＋1.2 秒」） */
-const TAIL_MS = 1200
-/** 開発用の仮の窓（入門者 24/100/180、遅れ側 ×1.3。§2.3。製品の判定は手順 8） */
-const WINDOWS: readonly [Judgment, number][] = [
-  ['perfect', 24],
-  ['great', 100],
-  ['good', 180],
-]
-const LATE_FACTOR = 1.3
-/** 遅れ側の窓の実時間 ms（good 180 × 1.3。skipped の判定、grace.ts） */
-const W_LATE_MS = 180 * LATE_FACTOR
-/**
- * 取り逃しを確かめるまでの余裕 ms（±300 ms の窓の後）。押下の時刻は Event.timeStamp で、ハンドラに届くのがフレームより
- * 遅れることがある（decisions #25 の申し送りの G の候補 50 ms、仮。製品は手順 8 で決める）
- */
-const MISS_GRACE_MS = 50
 
 const SONGS = ['twinkle', 'ode', 'scale', 'chroma', 'duet', 'canon'] as const
 const STRESS = 'stress'
@@ -130,6 +127,11 @@ type RunRecord = {
   /** 利用者が付ける主観（読めた／読めない）。未記入は null */
   readable: boolean | null
   outcomes: NoteOutcome[]
+  profile: Profile
+  offsetMs: number
+  judge: JudgeSummary
+  /** 校正の段 2 の提案（固定テンポ・1.0 倍・全鍵の回だけが母集団。play-dev は常にそれ） */
+  proposal: OffsetVerdict
 }
 
 type Run = {
@@ -139,16 +141,19 @@ type Run = {
   map: ClockMap
   /** 最後の tick の t（曲 ms） */
   t: number
-  /** 最後の再アンカーの猶予の終わり（perf ms）。これより前の押下は判定しない */
+  /** 最後の再アンカーの猶予の終わり（perf ms）。「読めるか」の記録はこれより前の押下を取らない */
   graceUntil: number
   notes: FrameNote[]
-  states: Map<number, FrameNote['state']>
+  /** 判定層の状態（ノートの状態・点・自力率） */
+  judge: JudgeState
+  /** 「読めるか」の記録（判定とは別の ±300 ms の対応付け） */
   outcomes: NoteOutcome[]
-  /** 押下中の鍵 → ホールド中の音の添字 */
-  holds: Map<KeyCode, number>
-  /** フレームが取り逃しにした音の添字（後から届いた押下は記録だけして返しを出さない） */
-  swept: Set<number>
+  /** notes の index → outcomes の位置 */
+  posOf: Map<number, number>
+  /** 終了の曲 ms（最終ノートの終わり＋1.2 秒、§4.2） */
   endMs: number
+  profile: Profile
+  offsetMs: number
 }
 
 function main(): void {
@@ -200,9 +205,19 @@ function main(): void {
     'both',
   )
   const hintBox = el('input', { type: 'checkbox', checked: true })
+  const profileSel = select<Profile>(
+    [
+      ['beginner', '入門者（24/100/180・遅れ ×1.3・NEAR）'],
+      ['gamer', '音ゲー向け（30/90/200・点・ゲージ）'],
+    ],
+    'beginner',
+  )
+  const offsetIn = el('input', { type: 'number', min: '-120', max: '120', step: '1', value: '0' })
+  offsetIn.style.width = '5em'
   const flashBtn = el('button', { type: 'button', textContent: '閃光を試す（1 秒に 5 回）' })
   const stopBtn = el('button', { type: 'button', textContent: '中止' })
   const status = el('div', { className: 'band', hidden: false })
+  const hud = el('div', { className: 'note' })
   const info = el('div', { className: 'note' })
   const tbody = el('tbody')
   const table = el(
@@ -216,6 +231,9 @@ function main(): void {
         {},
         ...[
           '走り',
+          '精度',
+          '内訳',
+          '平均・UR',
           '外し率',
           'dt SD',
           '上段 SD',
@@ -234,7 +252,7 @@ function main(): void {
   })
 
   panel.append(
-    el('h1', {}, '描画層（開発ページ、手順 6・7）'),
+    el('h1', {}, '描画層（開発ページ、手順 6・7・8）'),
     el(
       'ol',
       {},
@@ -251,12 +269,14 @@ function main(): void {
     el(
       'div',
       { className: 'row' },
+      profileSel,
+      el('label', {}, '校正 ', offsetIn, ' ms'),
       labelSel,
       el('label', {}, hintBox, '辺ヒント'),
-      flashBtn,
-      stopBtn,
     ),
+    el('div', { className: 'row' }, flashBtn, stopBtn),
     status,
+    hud,
     info,
     table,
     out,
@@ -341,32 +361,53 @@ function main(): void {
     status.textContent = s
   }
 
-  /** 状態機械と時計の 1 歩を走りに写す。再アンカー（resync）では猶予内に窓が終わる音を skipped にする */
-  const applyStep = (r: Run, step: SessionStep): void => {
+  /** 判定の事象を演出と「読めるか」の記録に写す */
+  const applyJudge = (r: Run, out: readonly JudgeOutcome[], realNow: number): void => {
+    for (const o of out) {
+      if (o.kind === 'skipped') {
+        const p = r.posOf.get(o.index)
+        const rec = p === undefined ? undefined : r.outcomes[p]
+        if (p !== undefined && rec && rec.pressMs === null)
+          r.outcomes[p] = { ...rec, skipped: true }
+      } else if (o.kind === 'hit' && o.grade === 'near') {
+        pushFx({ kind: 'slide', atMs: realNow, from: o.noteCode, to: o.code })
+        pushFx({ kind: 'judgeText', atMs: realNow, grade: 'near', dtMs: o.dtMs })
+      } else if (o.kind === 'hit') {
+        pushFx({ kind: 'edgeReturn', atMs: realNow, code: o.code, grade: o.grade })
+        pushFx({ kind: 'judgeText', atMs: realNow, grade: o.grade, dtMs: o.dtMs })
+      } else if (o.kind === 'miss')
+        pushFx({ kind: 'judgeText', atMs: realNow, grade: 'miss', dtMs: null })
+      else if (o.kind === 'failed') {
+        setStatus('ゲージが 0 になりました（音ゲー向けの途中終了）')
+        playInput({ kind: 'chartEnd' })
+      }
+    }
+  }
+
+  /**
+   * 状態機械と時計の 1 歩を走りに写す。時計の事象（resync・graceEnd）を判定層へ渡す（猶予内に窓が終わる音の skipped、
+   * 猶予中に溜めた押下の判定）
+   */
+  const applyStep = (r: Run, step: SessionStep, realNow: number): void => {
     const before = r.session.play.phase
     r.session = step.session
     r.map = step.out.map
     r.t = step.out.t
-    for (const ev of step.out.events) {
-      if (ev.kind !== 'resync') continue
-      r.graceUntil = ev.graceUntil
-      r.outcomes.forEach((o, i) => {
-        if (o.pressMs !== null || r.swept.has(i)) return
-        if (!skippedAt(o.tLandMs, ev.nominal, W_LATE_MS, ev.graceUntil)) return
-        r.outcomes[i] = { ...o, skipped: true }
-        r.swept.add(i)
-        r.states.set(o.index, 'done')
-      })
-    }
+    for (const ev of step.out.events) if (ev.kind === 'resync') r.graceUntil = ev.graceUntil
+    const j = judgeClock(r.judge, step.out.events, { map: step.out.map, now: realNow })
+    r.judge = j.state
+    applyJudge(r, j.out, realNow)
     const phase = r.session.play.phase
     if (phase === before) return
-    if (phase === 'syncing') setStatus('同期中（300 ms の猶予。判定を保留）')
+    if (phase === 'syncing') setStatus('同期中（300 ms の猶予。押下は猶予の終わりに判定）')
     else if (phase === 'playing') setStatus('再生中（Escape・タブの切替で一時停止）')
     else if (phase === 'paused') setStatus('一時停止中: Space で再開、Escape か「中止」で中止')
   }
 
   const playInput = (ev: PlayEvent): void => {
-    if (run) applyStep(run, sessionInput(run.session, performance.now(), ev))
+    if (!run) return
+    const now = performance.now()
+    applyStep(run, sessionInput(run.session, now, ev), now)
   }
 
   const startRun = (): void => {
@@ -383,22 +424,31 @@ function main(): void {
       pressMs: null,
       pressedCode: null,
     }))
-    const last = notesTemplate.reduce((m, n) => Math.max(m, n.tEndMs), 0)
+    const profile = profileSel.value as Profile
+    const offset = Number(offsetIn.value)
+    const offsetMs = Number.isFinite(offset) ? Math.max(-120, Math.min(120, Math.round(offset))) : 0
+    const label = labelSel.value as LabelMode
+    const rules = rulesOf(PROFILES[profile], {
+      neighbor: neighborOf(g.byCode),
+      offsetMs,
+      labels: { kb: label, note: label },
+    })
     const r: Run = {
       session,
       map: { a: 0, b: -LEAD_MS },
       t: -LEAD_MS,
       graceUntil: -Infinity,
       notes: notesTemplate,
-      states: new Map(),
+      judge: initialJudge(notesTemplate, rules),
       outcomes,
-      holds: new Map(),
-      swept: new Set(),
-      endMs: last + TAIL_MS,
+      posOf: new Map(notesTemplate.map((n, i) => [n.index, i])),
+      endMs: endAtMs(notesTemplate),
+      profile,
+      offsetMs,
     }
     run = r
     effects = []
-    applyStep(r, sessionInput(session, now, { kind: 'start' }))
+    applyStep(r, sessionInput(session, now, { kind: 'start' }), now)
     canvas.focus({ preventScroll: true })
   }
 
@@ -419,15 +469,36 @@ function main(): void {
       summary: summarize(r.outcomes),
       readable: null,
       outcomes: r.outcomes,
+      profile: r.profile,
+      offsetMs: r.offsetMs,
+      judge: summarizeJudge(r.judge),
+      proposal: proposeOffset(timingSamples(r.judge), r.offsetMs),
     }
     runs.push(rec)
     addRow(rec)
     writeOut()
-    setStatus('終わりました。表の「読めた」を付けてください。Space でもう一度')
+    setStatus(
+      rec.proposal.ok
+        ? `終わりました。校正の提案: ${rec.proposal.offset} ms（平均 ${Math.round(rec.proposal.mean)} ms）。Space でもう一度`
+        : '終わりました。表の「読めた」を付けてください。Space でもう一度',
+    )
   }
 
   const fmt = (x: number | null, unit = ''): string =>
     x === null ? '—' : `${Math.round(x)}${unit}`
+
+  const showHud = (r: Run): void => {
+    const s = summarizeJudge(r.judge)
+    const c = s.counts
+    const self = selfRatio(s.selfRate)
+    const base =
+      `精度 ${(s.acc * 100).toFixed(1)}%・${s.rank}・ぴったり ${c.perfect}／よい ${c.great}／おしい ${c.good}` +
+      `／となり ${c.near}／はずれ ${c.miss}・判定なし ${s.skipped}・自力率 ${self === null ? '—' : `${Math.round(self * 100)}%`}`
+    const g = s.gamer
+    hud.textContent = g
+      ? `${base}・点 ${Math.round(g.points)}・ゲージ ${g.gauge.toFixed(1)}・コンボ ${r.judge.score.combo}`
+      : base
+  }
 
   const addRow = (rec: RunRecord): void => {
     const s = rec.summary
@@ -450,11 +521,21 @@ function main(): void {
       writeOut()
       canvas.focus({ preventScroll: true })
     })
+    const j = rec.judge
+    const c = j.counts
     tbody.append(
       el(
         'tr',
         {},
-        el('td', {}, `${rec.song}・${rec.layout}・${rec.mode}`),
+        el('td', {}, `${rec.song}・${rec.layout}・${rec.mode}・${rec.profile}`),
+        el('td', {}, `${(j.acc * 100).toFixed(1)}% ${j.rank}`),
+        el(
+          'td',
+          {},
+          `${c.perfect}/${c.great}/${c.good}/${c.near}/${c.miss}` +
+            (j.skipped > 0 ? `（判定なし ${j.skipped}）` : ''),
+        ),
+        el('td', {}, `${fmt(j.meanMs)}・${fmt(j.ur)}`),
         el('td', {}, `${Math.round(s.missRate * 100)}%`),
         el('td', {}, fmt(s.dtSd)),
         el('td', {}, fmt(top)),
@@ -469,7 +550,7 @@ function main(): void {
   const writeOut = (): void => {
     out.value = JSON.stringify(
       {
-        page: 'play-dev（手順 6）',
+        page: 'play-dev（手順 6・8）',
         ua: navigator.userAgent,
         runs: runs.map((r) => ({
           ...r,
@@ -488,64 +569,44 @@ function main(): void {
     )
   }
 
-  const gradeOf = (dt: number): Judgment => {
-    for (const [g, w] of WINDOWS) if (dt < 0 ? -dt <= w : dt <= w * LATE_FACTOR) return g
-    return 'miss'
-  }
-
   const pushFx = (fx: FxIntent): void => {
     effects = [...effects, fx]
   }
 
   const onPress = (code: KeyCode, tsPerf: number): void => {
-    if (!run || !grid) return
+    if (!run) return
     // 押下の前に今の相へ進める（猶予の終わりを次のフレームまで待たない）
     const realNow = performance.now()
-    applyStep(run, sessionIdle(run.session, realNow))
-    // 判定は再生中で、押した時刻が猶予の終わり以後の押下だけ（同期中・一時停止中の押下は捨てる。§2.6 の「判定保留」を
-    // 開発用にこう読んだ仮。猶予中の押下を保留して後で判定するかは手順 8、kickoff §7-16）
-    if (run.session.play.phase !== 'playing' || tsPerf < run.graceUntil) return
-    const t = songAt(run.map, tsPerf)
-    const i = matchPress(run.outcomes, code, t)
-    if (i === null) return
-    const o = run.outcomes[i]
-    const n = run.notes[i]
-    if (!o || !n) return
-    run.outcomes[i] = { ...o, pressMs: t, pressedCode: code }
-    // フレームが取り逃しにした後に届いた押下（長いタスクの後など）は、記録だけして返しを出さない
-    if (run.swept.has(i)) return
-    const dt = t - n.tLandMs
-    if (o.code === code) {
-      const grade = gradeOf(dt)
-      run.states.set(n.index, n.hold && grade !== 'miss' ? 'holding' : 'done')
-      if (n.hold && grade !== 'miss') run.holds.set(code, i)
-      pushFx({ kind: 'edgeReturn', atMs: realNow, code, grade })
-      pushFx({ kind: 'judgeText', atMs: realNow, grade, dtMs: dt })
-    } else {
-      const a = grid.byCode.get(o.code)
-      const b = grid.byCode.get(code)
-      const near = a && b && hexDist(a, b) === 1 && Math.abs(dt) <= 180 * (dt > 0 ? LATE_FACTOR : 1)
-      run.states.set(n.index, 'done')
-      if (near) {
-        pushFx({ kind: 'slide', atMs: realNow, from: o.code, to: code })
-        pushFx({ kind: 'judgeText', atMs: realNow, grade: 'near', dtMs: dt })
-      } else pushFx({ kind: 'judgeText', atMs: realNow, grade: 'miss', dtMs: null })
+    applyStep(run, sessionIdle(run.session, realNow), realNow)
+    const r = run
+    const phase = r.session.play.phase
+    // 「読めるか」の記録: 再生中で、押した時刻が猶予の終わり以後の押下だけ（判定とは別。手順 6 の記録のまま）
+    if (phase === 'playing' && tsPerf >= r.graceUntil) {
+      const t = songAt(r.map, tsPerf)
+      const i = matchPress(r.outcomes, code, t)
+      const o = i === null ? undefined : r.outcomes[i]
+      if (i !== null && o) r.outcomes[i] = { ...o, pressMs: t, pressedCode: code }
     }
+    // 判定: 再生・同期中の押下を判定層へ（同期中の猶予は溜めて猶予の終わりに判定、時計が止まった広告中は空打ち）
+    if (phase !== 'playing' && phase !== 'syncing') return
+    const j = judgePress(r.judge, { code, tsPerf }, { map: r.map, now: realNow })
+    r.judge = j.state
+    applyJudge(r, j.out, realNow)
   }
 
-  const onRelease = (code: KeyCode): void => {
+  const onRelease = (code: KeyCode, tsPerf: number, forced: boolean): void => {
     if (!run) return
-    const i = run.holds.get(code)
-    if (i === undefined) return
-    run.holds.delete(code)
-    const n = run.notes[i]
-    if (n) run.states.set(n.index, 'done')
+    const realNow = performance.now()
+    applyStep(run, sessionIdle(run.session, realNow), realNow)
+    const j = judgeRelease(run.judge, { code, tsPerf, forced }, { map: run.map, now: realNow })
+    run.judge = j.state
+    applyJudge(run, j.out, realNow)
   }
 
   const onEvents = (events: InputEvent[]): void => {
     for (const ev of events) {
       if (ev.kind === 'press') onPress(ev.code, ev.tsPerf)
-      else if (ev.kind === 'release') onRelease(ev.code)
+      else if (ev.kind === 'release') onRelease(ev.code, ev.tsPerf, ev.forced)
       else if (ev.kind === 'role' && ev.role === 'primary') {
         if (!run) startRun()
         else playInput({ kind: 'resume' })
@@ -600,33 +661,27 @@ function main(): void {
     if (lo.changed)
       setStatus(`低負荷: 段 ${low.level} に落としました（演出なし→殻なし→奥行きなし）`)
     const now = performance.now()
-    if (run) applyStep(run, sessionTick(run.session, now, null))
+    if (run) {
+      const r = run
+      applyStep(r, sessionTick(r.session, now, null), now)
+      const j = judgeSweep(r.judge, { map: r.map, now })
+      r.judge = j.state
+      applyJudge(r, j.out, now)
+      // 終了（最終ノートの終わり＋1.2 秒、§4.2）を状態機械へ。ゲージ 0 の途中終了もここで閉じる
+      if (r.t > r.endMs && r.session.play.phase === 'playing') playInput({ kind: 'chartEnd' })
+    }
     if (sizing && grid) {
       const t = run ? run.t : -LEAD_MS
       let notes: FrameNote[] = notesTemplate
       if (run) {
         const r = run
-        r.outcomes.forEach((o, i) => {
-          if (o.pressMs !== null || r.swept.has(i) || !(t > o.tLandMs + MATCH_MS + MISS_GRACE_MS))
-            return
-          r.swept.add(i)
-          if (r.states.get(o.index) !== 'done') {
-            r.states.set(o.index, 'done')
-            pushFx({ kind: 'judgeText', atMs: now, grade: 'miss', dtMs: null })
-          }
-        })
-        for (const [code, i] of r.holds) {
-          const n = r.notes[i]
-          if (n && t >= n.tEndMs) {
-            r.holds.delete(code)
-            r.states.set(n.index, 'done')
-          }
-        }
+        const byIndex = resultsByIndex(r.judge)
         notes = r.notes.map((n) => {
-          const st = r.states.get(n.index)
-          return st === undefined ? n : { ...n, state: st }
+          const st = byIndex.get(n.index)?.state ?? 'pending'
+          return st === n.state ? n : { ...n, state: st }
         })
-        if (t > r.endMs) stopRun(true)
+        showHud(r)
+        if (r.session.play.phase === 'ended') stopRun(true)
       }
       effects = pruneEffects(effects, now)
       const cmds = buildFrame({

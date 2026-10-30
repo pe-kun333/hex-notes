@@ -12,7 +12,7 @@
 | `render/canvas/` | 描画層（描画コマンド列 → Canvas。Canvas に触れるのは flush.ts だけ） | 手順 6    |
 | `clock/`         | 時計層（ClockSource、写像、停止検知、audio-bridge、ダミー動画）      | 手順 7    |
 | `play/`          | プレイの状態機械（design.md §4.2）と時計をつなぐ session             | 手順 7    |
-| `judge/`         | 判定・採点層                                                         | 手順 8    |
+| `judge/`         | 判定・採点層（窓・NEAR・ホールド・精度・自力率・校正のオフセット）   | 手順 8    |
 | `audio/`         | 音源層（予約再生、合成音、Salamander）                               | 手順 10   |
 | `storage/`       | 保存層                                                               | 手順 11   |
 | `telemetry/`     | 計測層                                                               | 手順 12   |
