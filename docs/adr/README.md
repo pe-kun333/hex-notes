@@ -9,3 +9,4 @@
 | 0003 | content/ はリポジトリ直下に置き、ビルド時に dist/ へ写す（§7-12） | 採用 |
 | 0004 | Service Worker は vite-plugin-pwa の generateSW、更新は prompt（§7-14） | 採用 |
 | 0005 | 権利表の欄は U-03 の 6 欄＋file・owner（§7-15 の欄だけ） | 採用 |
+| 0006 | 段別着地が「位置で読めるか」の確かめ方（play-dev、5 観点）と結果（読めた、段別を保つ） | 採用 |
