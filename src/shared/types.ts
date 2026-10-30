@@ -218,8 +218,8 @@ export interface DeviceInfo {
   limit: ChordLimit
   at: string
   layoutMapOk: boolean
-  /** Event.timeStamp の刻み（ms） */
-  tsResolution: number
+  /** Event.timeStamp の刻み（ms）。実際の keydown・keyup から推定（src/input/resolution.ts、decisions #25）。推定できない間は無い */
+  tsResolution?: number
 }
 
 // ---------- 計測（§4.6 telemetry） ----------
@@ -244,7 +244,8 @@ export interface PlayTelemetry extends TelemetryBase {
   nearRate: number
   resyncCount: number
   fallback: boolean
-  inputLatencyMedian: number
+  /** 押下の now − timeStamp の中央値（ms）。標本が無ければ null（decisions #25） */
+  inputLatencyMedian: number | null
   frameIntervalSd: number
   clockResidualSd: number
 }
@@ -273,7 +274,8 @@ export interface DeviceTelemetry extends TelemetryBase {
   dpr: number
   limit: ChordLimit
   layoutMapOk: boolean
-  tsResolution: number
+  /** DeviceInfo.tsResolution と同じ。推定できない間は無い */
+  tsResolution?: number
 }
 
 export interface StorageFailTelemetry extends TelemetryBase {

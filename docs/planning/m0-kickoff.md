@@ -46,7 +46,7 @@ hexnote/
 | gh CLI、actions/checkout・setup-node・upload-artifact | リモート作成、CI、差分表の保存 | MIT |
 | @types/node 24.19.2 | Node API の型（tools・tests） | MIT |
 
-試験の環境: 描画層は「描画コマンド列を返す純関数」と「Canvas へ流す薄い関数」に分け、コマンド列を試験する。入力層は `{code, keyCode, isComposing, repeat, timeStamp}` のレコードを受け、DOM 無しで試す。画素差分・jsdom・ブラウザ runner は使わない（要るなら `@napi-rs/canvas`（MIT）、仮）。
+試験の環境: 描画層は「描画コマンド列を返す純関数」と「Canvas へ流す薄い関数」に分け、コマンド列を試験する。入力層は `{code, keyCode, isComposing, repeat, timeStamp}` のレコードを受け、DOM 無しで試す（2026-10-30 手順 5: 実装の型は `KeyEventRecord`〔＋type・ctrlKey・altKey・metaKey〕と、src/app/ がハンドラの冒頭で読んだ now を別の引数で渡す）。画素差分・jsdom・ブラウザ runner は使わない（要るなら `@napi-rs/canvas`（MIT）、仮）。
 
 Salamander V3（Alexander Holm、CC BY 3.0）は 30 音の間引き版だけ置く（§2.9 L148）。間引き＋Opus 変換は改変物なので帰属と改変表示が要る（手順 10）。
 
@@ -95,7 +95,7 @@ LICENSE と `content/samples/salamander/LICENSE`。README の帰属と「参照�
 
 ## 2. 移植の順序
 
-軸は §5.7 L288 の M0-02→03a→03b→06。入力層（M0-04）は前提が 01 だけ（§5.1 L208）なので手順 4 の直後に置き、以後の開発ページを手で弾けるようにする。手順 5・7・10・11 は人手があれば M0-02 と同時（§5.7 の 04／05／08／09）。一人開発では番号順。
+軸は §5.7 L288 の M0-02→03a→03b→06。入力層（M0-04）は前提が 01 だけ（§5.1 L212）なので手順 4 の直後に置き、以後の開発ページを手で弾けるようにする。手順 5・7・10・11 は人手があれば M0-02 と同時（§5.7 の 04／05／08／09）。一人開発では番号順。
 
 | 手順 | M0 id | 規模 | 累積日 | 前提 |
 |---|---|---|---|---|
@@ -147,10 +147,10 @@ LICENSE と `content/samples/salamander/LICENSE`。README の帰属と「参照�
 ### 手順 5: 入力層（M0-04、M）
 
 - 元: m1' keydown／keyup／blur L524–533、m3 L647–655（timeStamp と入力遅延）、m4 L650–659・L674、m2 L409–416（手直し）。
-- 作る: `src/input/keyboard.ts`（入力レコード → `{code, tsPerf}`）、`ime.ts`、`focus.ts`、`roles.ts`。開発ページ `src/app/dev/input-dev.ts`（押下集合と帯）。
-- 手直し: Enter＝やり直し（m1' L528、m3 L654、m4 L654）→ ボタン決定（§2.8 L141）。m2 Escape＝和音消去 → 一時停止。IME 無視のみ → 無視＋帯イベント。禁止 code 無し → Backquote・KanaMode・Convert・NonConvert・CapsLock・Lang1/2・Meta・F1〜F12。blur 全離しだけ → ＋Pause 要求。m2 の修飾付き keyup 捨て → 捨てない。
-- 期待値: 同じ code の 2 度目は無視。blur で押下集合が空。keyCode 229 → 入力列に入らず帯 1 件。
-- 完了条件: 「IME 中の打鍵が入らず帯が出る」（§5.1 L208）。Firefox 列は M0 末（U-05）。
+- 作る: `src/input/keyboard.ts`（入力レコード → `{code, tsPerf}`）、`ime.ts`、`focus.ts`、`roles.ts`。開発ページ `src/app/dev/input-dev.ts`（押下集合と帯）。2026-10-30 追加: `src/input/timestamp.ts`（tsPerf の式）・`resolution.ts`（刻みの推定。decisions #25）、`src/app/dev/dom-input.ts`（DOM の薄い部分。手順 6 の play-dev も使う）・`input.html`（開発時だけ index から導線）。
+- 手直し: Enter＝やり直し（m1' L528、m3 L654、m4 L654）→ ボタン決定（§2.8 L143）。m2 Escape＝和音消去 → 一時停止。IME 無視のみ → 無視＋帯イベント。禁止 code 無し → Backquote・KanaMode・Convert・NonConvert・CapsLock・Lang1/2・Meta・F1〜F12。blur 全離しだけ → ＋Pause 要求。m2 の修飾付き keyup 捨て → 捨てない。
+- 期待値: 同じ code の 2 度目は無視。blur で押下集合が空。keyCode 229 → 入力列に入らず帯 1 件。tsPerf の式と刻みの推定の表は tests-inventory 手順 5（decisions #25）。
+- 完了条件: 「IME 中の打鍵が入らず帯が出る」（§5.1 L212）。Firefox 列は M0 末（U-05）。
 
 ### 手順 6: 描画層（M0-03b、M）
 
@@ -169,6 +169,7 @@ LICENSE と `content/samples/salamander/LICENSE`。README の帰属と「参照�
 - 手直し: 停止検知「2000 ms 不変」だけ → 可視・PLAYING で 2 秒凍結→pauseVideo 要求→500 ms 以内に PAUSED なら切替、でなければ広告中（§2.6 L131、決定 #11）。呼び出し口は抽象。skipped「n.t < T+0.3」→「猶予内に窓が終わるノート」。判定窓を曲時間で比較 → 実時間で固定。direct／ema → 外す。非表示中は停止検知しない。
 - 期待値: 15 ms 量子化 121 点 → 傾き 0.99986（仮、未検算）。jump +300 → 飛び、+200 → 0（m3 `clk.feed` L324–350）。stuck 3 s → 2,000 ms で停止検知。`pauseLatencyMs: never` では切り替わらない。`visible: false` では検知しない。
 - 完了条件: 「傾き 1.00±0.01。非表示・広告模擬で切り替わらない」（§5.1 L209）。
+- 手順 5 からの申し送り（decisions #26、仮）: 入力層の Pause 要求（Escape の role pause と、blur・非表示・iframe の pause）は冪等で、再生中だけ一時停止へ移す。状態機械の試験で「待機＋pause iframe → 待機のまま（click-to-play の click）」「再生＋pause → 一時停止」「一時停止＋pause → 一時停止のまま（タブの切替で hidden と blur の 2 件）」を固定する。
 
 ### 手順 8: 判定・採点層（M0-06、M）
 
@@ -204,7 +205,7 @@ LICENSE と `content/samples/salamander/LICENSE`。README の帰属と「参照�
 
 ### 手順 12: 計測層（M0-12、S）
 
-元: m3 `logEvent` L385–386、`recordResult` L407–410（手直し）、`welford` L404、`mean／sd` L247–248（そのまま）。作る: `src/telemetry/rows.ts`（型は手順 2）、`ring.ts`、`collect.ts`、`export.ts`。手直し: 文字ラベル → §4.6 L194 の行、リング 40 → 1,000、入力遅延 mean → 中央値、動画 ID は入れない、予約遅れ最大値（手順 10）を play 行に。期待値: sd([1,2,3,4])＝1.2909944（m3 L248）、1,001 行目で先頭が消える。完了条件: 「§4.6 の行が貯まる」（§5.1 L216）。
+元: m3 `logEvent` L385–386、`recordResult` L407–410（手直し）、`welford` L404、`mean／sd` L247–248（そのまま）。作る: `src/telemetry/rows.ts`（型は手順 2）、`ring.ts`、`collect.ts`、`export.ts`。手直し: 文字ラベル → §4.6 L194 の行、リング 40 → 1,000、入力遅延 mean → 中央値（ok の押下の lag の中央値、標本が無ければ null。decisions #25。tsPerf の reason〔stale・future など〕の件数を残すかもここで決める。今は lag が null の押下として数えられるだけ）、動画 ID は入れない、予約遅れ最大値（手順 10）を play 行に。期待値: sd([1,2,3,4])＝1.2909944（m3 L248）、1,001 行目で先頭が消える。完了条件: 「§4.6 の行が貯まる」（§5.1 L216）。
 
 ### 手順 13: 回帰ハーネス（M0-10、S）
 
@@ -276,14 +277,14 @@ M1 に渡す物: `src/shared/types.ts`、`src/chart/`（バリデータ・ハッ
 6. **canonical JSON の丸め**（手順 2）: 四捨五入か切り捨てか。§3.3 L166。 → decisions #19 で閉じた（四捨五入 Math.round、入れ子とキー順を §3.3 に明記）。
 7. **R と v の式**（手順 4）: 音ゲー向け 1.0 s の R_h、「舞台高」「右列幅−32」の定義、514 の境界。§2.5 L124–126。 → 2026-10-30 decisions #24 で閉じた（右列の箱で書く、R は整数で T0 1500 固定、全段同じ v で上端クリップ、不足時は幅だけプレイヤー縮小・高さは v_min 固定。相談の記録 docs/planning/consult/A-sizing.md）。1093×vmpk は R 27 になり「3 視口で R 28」は 2 段だけに。
 8. **pauseVideo の呼び出し層**（手順 7）: 時計層が要求イベント、YouTube 層が結果を返す形。§2.6 L131、§4.1 L172。 相談済みの提案（docs/planning/consult/C-clock.md: tick の戻り値に pause 要求、結果は次の tick の state 標本。裁定は手順 7 の着手時）。
-9. **tsPerf の出所**（手順 5）: Event.timeStamp（16.7 ms 刻み、§6.1 L299）か performance.now()。
+9. **tsPerf の出所**（手順 5）: Event.timeStamp（16.7 ms 刻み、§6.1 L299）か performance.now()。 → 2026-10-30 decisions #25 で閉じた（仮。timeStamp を既定、使えない値だけ now、補正なし、刻みは実際の keydown・keyup で推定し 8 ms 以上は注記だけ。相談 E、docs/planning/consult/E-tsperf.md）。訂正: 「16.7 ms」は Chromium でなく Firefox の resistFingerprinting（16.667）、行は §6.1 L305（L299 は誤り）。
 10. **10 MB の中身**（手順 10）: 生か gzip か、同梱曲は 1 曲か 10 曲か。
 11. **2 プロファイルの既定値**（手順 8・13）: 音ゲー向けは M2-05。仮: 定数だけ持つ。
 12. **LICENSE の置き方・content の名前・配信**（手順 1）: ルート＋各ディレクトリ全文か REUSE か。public/ 直置きか static-copy か。 → 2026-10-30 ADR 0003 で閉じた（content/ は直下のまま build 時に dist/ へ写す。REUSE は採らない）。
 13. **黒鍵位相の合否の式**（手順 9）: m2 の閾 0.125／0.375。
 14. **SW の方式と更新**（手順 1）: vite-plugin-pwa か自前か。prompt か autoUpdate か。 → ADR 0004 で閉じた（generateSW、prompt）。
 15. **権利表の欄**（手順 11、U-03）: 6 欄の定義が 2 通り。Source.rights に cc0・cc-by が無い（§3.2 L162 と §2.9 L147）。 → ADR 0005（U-03 の 6 欄＋file・owner）と decisions #18（rights に cc0・cc-by を追加）で閉じた。
-16. **ホールド離し窓の終端、skipped の分母**（手順 8）: §2.3 L110。
+16. **ホールド離し窓の終端、skipped の分母**（手順 8）: §2.3 L110。 相談 E（decisions #25）からの申し送り: 押下は tsPerf の順に消化する。timeStamp は待ちを含まないので、まだハンドラに届いていない押下の ts が窓の中にありうる。MISS の確定は `nowAt(t_n) + W_late < now − G`（G は仮 50 ms、または直近の入力遅延の p95 と 2 フレームの大きい方）のときだけにするかを手順 8 で決める。全離し（forced）は早離しとして採点しない。Pause を伴わない全離し（Meta の keyup・コンテキストメニュー）でホールドをどう閉じるかも手順 8 で決める。
 17. **Salamander**（手順 10）: V3 自前間引きか Tone.js の V2 30 音か。Opus か MP3 か。
 18. **自作値**（仮のまま注記）: 合成音の係数、コンプレッサ −18 dB／4:1、DPR 上限 2、q̂ の条件、低負荷の閾（M-7）、15 ms 量子化の傾き 0.99986。 q̂ の条件と傾きは相談済みの提案（docs/planning/consult/C-clock.md: 傾きは x_i ＝ i·2000/120・floor(x/15)·15 の 121 点で 0.99986452 と検算、q̂ は格子率と係数 β。裁定は手順 7 の着手時）。
 19. **TypeScript 7.0.2**（手順 1）: Go 実装での入力なし時の挙動と `erasableSyntaxOnly` の有無は未確認。Node 24 か 26 か、Windows の長いパスの規約。
@@ -293,4 +294,4 @@ M1 に渡す物: `src/shared/types.ts`、`src/chart/`（バリデータ・ハッ
 23. **m1' と m5 の折り畳みの違い**（手順 6）: m1' buildChart L282–283 は ±12・±24 の後に ±1・±11・±13 で寄せる（半音寄せ）。製品は m5 の 3 種（octave／cut／nearest、決定 #12）に揃えた。手順 6 の「同じ絵」は variants.ts の譜面版（`tests/fixtures/charts/m1/`）で取る。
 24. **間引き・同音の規則の確定**（手順 3）: decisions #20（原曲音高で比べる）・#21（60 以上は上の段）・#23（同梱曲の 4 版は octave）は仮。M-10・同梱曲の譜面化（M1-01）で不自然な版が出たら見直す。 → 2026-10-30 利用者が「4 件とも保つ」で確定（相談 D、docs/planning/consult/D-decisions-20-23.md）。#20・#22・#23 の仮を外し、#21 は wicki だけ M-10 まで仮。
 
-閉じた物: R と v の式（decisions #24、手順 4。相談 A）、変換器の入力（m5 内部表現。手順 3）、手順 3 の期待値の検算（m5 の元のコードと移植で一致）、変換器の細部（decisions #22）、並行の折り合い（§5.1 どおり 02 全体）、「同じ絵」の物差し（コマンド列スナップショット。手順 6）、M0-02 の範囲（m5 と m1' 6 曲を from-mel で同じ /1 へ。手順 3）。
+閉じた物: tsPerf の出所（decisions #25、手順 5。相談 E）、R と v の式（decisions #24、手順 4。相談 A）、変換器の入力（m5 内部表現。手順 3）、手順 3 の期待値の検算（m5 の元のコードと移植で一致）、変換器の細部（decisions #22）、並行の折り合い（§5.1 どおり 02 全体）、「同じ絵」の物差し（コマンド列スナップショット。手順 6）、M0-02 の範囲（m5 と m1' 6 曲を from-mel で同じ /1 へ。手順 3）。
