@@ -5,8 +5,9 @@
 if (import.meta.env.DEV) {
   const DEV_PAGES: readonly { href: string; label: string }[] = [
     { href: '/src/app/dev/input.html', label: '入力層（手順 5）' },
-    { href: '/src/app/dev/play.html', label: '描画層（手順 6・7）' },
+    { href: '/src/app/dev/play.html', label: '描画層・判定層（手順 6・7・8）' },
     { href: '/src/app/dev/clock.html', label: '時計層（手順 7）' },
+    { href: '/src/app/dev/layout.html', label: '配列層（手順 9、U-01 の記録）' },
   ]
   const app = document.getElementById('app')
   if (app !== null) {

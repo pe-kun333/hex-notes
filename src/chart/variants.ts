@@ -11,7 +11,8 @@
 
 import type { Chart, ChordLimit, FoldId, KeyCode, LayoutId, Variant } from '../shared/types.ts'
 import { CHORD_LIMITS, FOLD_IDS, LAYOUT_IDS, MAX_RESOLUTION } from '../shared/types.ts'
-import { KEY_CODES, LAYOUTS, midiRange } from '../layout/presets.ts'
+import { LAYOUTS, midiRange } from '../layout/presets.ts'
+import { candidatesOf, pickKey } from '../layout/same-pitch.ts'
 
 export type VariantSpec = {
   readonly layout: LayoutId
@@ -103,33 +104,8 @@ function foldIn(
   return { midi: best, moved: true }
 }
 
-/**
- * 音高 → 押す鍵の既定（decisions #21、仮）。候補が 1 つならそれ。複数（vmpk の 60〜64、wicki）なら
- * 60 以上は上の段、60 未満は下の段（design.md §2.1「60 以上は Q 段側」を全配列に広げた）。無ければ null
- */
-export function defaultKeyOf(layout: LayoutId, midi: number): KeyCode | null {
-  return pickKey(candidatesOf(layout).get(midi), midi)
-}
-
-/** 音高 → 候補の鍵（KEY_CODES の順＝上の段が先） */
-function candidatesOf(layout: LayoutId): Map<number, KeyCode[]> {
-  const map = LAYOUTS[layout].map
-  const byPitch = new Map<number, KeyCode[]>()
-  for (const code of KEY_CODES) {
-    if (!Object.hasOwn(map, code)) continue
-    const midi = map[code]
-    if (midi === undefined) continue
-    const list = byPitch.get(midi)
-    if (list) list.push(code)
-    else byPitch.set(midi, [code])
-  }
-  return byPitch
-}
-
-function pickKey(cands: readonly KeyCode[] | undefined, midi: number): KeyCode | null {
-  if (!cands || cands.length === 0) return null
-  return (midi >= 60 ? cands[0] : cands[cands.length - 1]) ?? null
-}
+/** 同音の鍵の既定（decisions #21）。手順 9 で src/layout/same-pitch.ts に移した（decisions #44）。ここから引けるように残す */
+export { defaultKeyOf } from '../layout/same-pitch.ts'
 
 /**
  * 譜面版を 1 つ作る。chart は notes と pulse.resolution だけ見る（validateChart を通った物）。

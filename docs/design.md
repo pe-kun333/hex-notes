@@ -94,7 +94,7 @@ S3・S4・S5・S6 から S1 へ戻れる。
 
 ### 2.1 配列プリセット（code → MIDI）
 
-Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W E T Y U O P ＝ 61 63 66 68 70 73 75。VMPK 型: Z 段白鍵 48〜64、A 段黒鍵、Q 段白鍵 60〜76、数字段黒鍵（表は spec 草稿 §1）。原神・Sky 型: 自然音 3 段。W–H（対照）: 48＋2·col＋5·(3−row)。使うキーは JIS／US で同じ 26 文字＋10 数字＋Comma／Period／Slash／Semicolon。VMPK 型の同音は keys が決める（既定「60 以上は Q 段側」）。譜面版の生成器は全配列で「候補が複数なら 60 以上は上の段、60 未満は下の段」（decisions #21、2026-10-30。wicki だけ M-10 まで仮）。刻印: getLayoutMap（Chromium・HTTPS）→無ければ JIS／US の選択（ja なら JIS 既定）。AZERTY・Dvorak は code が同じなので初版は QWERTY 刻印で表示し注記。
+Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W E T Y U O P ＝ 61 63 66 68 70 73 75。VMPK 型: Z 段白鍵 48〜64、A 段黒鍵、Q 段白鍵 60〜76、数字段黒鍵（表は spec 草稿 §1）。原神・Sky 型: 自然音 3 段。W–H（対照）: 48＋2·col＋5·(3−row)。使うキーは JIS／US で同じ 26 文字＋10 数字＋Comma／Period／Slash／Semicolon。VMPK 型の同音は keys が決める（既定「60 以上は Q 段側」）。譜面版の生成器は全配列で「候補が複数なら 60 以上は上の段、60 未満は下の段」（decisions #21、2026-10-30。wicki だけ M-10 まで仮）。刻印: getLayoutMap（Chromium・HTTPS）→無ければ JIS／US の選択（ja なら JIS 既定）。AZERTY・Dvorak は code が同じなので初版は QWERTY 刻印で表示し注記。細部（2026-10-31、仮。実装 src/layout/）: getLayoutMap が読めればその文字（大文字、1 文字でない値は QWERTY）を出し、上の「QWERTY 刻印で表示し注記」は読めないときと読む（decisions #43）。同音の候補と既定の選び方は src/layout/same-pitch.ts に置き、判定は譜面版の keys の鍵だけを正解にする（同音許容は後。#44）。段ずれは [数字–Q, Q–A, A–Z]（ADR 0001）で 0〜1 u、黒鍵の位相は段ずれの小数部の 1/2 からの差で 0.125 以下 合う・0.375 以下 1/4u ずれる・超えて 合わない、配列ごとに効く段間（ableton Q–A、vmpk 数字–Q と A–Z）の最悪で決める（#42）。幾何は 正六角（既定）／物理せん断／退避 で、効く段間が「合わない」なら退避を勧める。退避は鍵盤図を正六角のまま、キー文字を必ず出す（判定・NEAR・辺ヒントは変えない。#45）。
 
 ### 2.2 幾何・着地・辺ヒント・和音
 
