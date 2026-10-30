@@ -50,7 +50,7 @@ describe('variantId と同梱曲の 4 版', () => {
     expect(variantId(spec('wicki', 4, 'nearest'))).toBe('wicki/4/nearest')
   })
 
-  it('同梱曲の版は Ableton×{2,3}・VMPK×{2,3}（design.md §2.9）、fold octave（decisions #23、仮）。凍結してある', () => {
+  it('同梱曲の版は Ableton×{2,3}・VMPK×{2,3}（design.md §2.9）、fold octave（decisions #23）。凍結してある', () => {
     expect(Object.isFrozen(BUNDLED_VARIANT_SPECS)).toBe(true)
     expect(BUNDLED_VARIANT_SPECS.every((x) => Object.isFrozen(x))).toBe(true)
     expect(BUNDLED_VARIANT_SPECS.map(variantId)).toEqual([
@@ -119,7 +119,7 @@ describe('foldPitch（m5 の折り畳み 3 種）', () => {
   })
 })
 
-describe('defaultKeyOf（同音の鍵の既定。decisions #21、仮）', () => {
+describe('defaultKeyOf（同音の鍵の既定。decisions #21。wicki だけ M-10 まで仮）', () => {
   it('候補が 1 つならそれ。配列に無ければ null', () => {
     expect(defaultKeyOf('ableton', 60)).toBe('KeyA')
     expect(defaultKeyOf('ableton', 61)).toBe('KeyW')
