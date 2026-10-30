@@ -45,8 +45,8 @@ export function hintTargets(notes: readonly FrameNote[], tSong: number): HintTar
 }
 
 /**
- * ヒントの組（from の鍵 → to の鍵）。to を高い音から最大 2 つ取り、それぞれに六角距離が最も近い from の鍵を当てる
- * （同じ距離なら高い音）。同じ辺が 2 回出るときは 1 回にする。
+ * ヒントの組（from の鍵 → to の鍵）。to を高い音から順に見て、それぞれに六角距離が最も近い from の鍵（同じ距離なら
+ * 高い音）の辺を当てる。同じ辺は 1 回にし（飛ばして次の to を見る）、辺が 2 本になったら止める。
  */
 export function hintPairs(t: HintTargets, grid: KeyboardGrid): { from: GridCell; to: GridCell }[] {
   const cellOf = (n: FrameNote): GridCell | null => grid.byCode.get(n.code) ?? null

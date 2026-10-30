@@ -55,6 +55,10 @@
 | 6 | 予算 `admitFlash` | 同じ秒の 5 件／0・1・2・999・1000 ms／面積 25%・25%＋1／15% を 100 ms・200 ms 空けて 2 件 | full 3・degraded 2／4 件目だけ degraded／full・degraded／degraded・full | 設計 §2.8、相談 B、decisions #29（仮） | 検算済（tests/unit/render/canvas/feedback-budget-lowload.test.ts） |
 | 6 | 低負荷 `feedFrame` | 25 ms 間隔で 9,975 ms／10,000 ms／50,000 ms、16.7 ms で 30 s、1,500 ms の途切れ | 段 0／1／3、0、数え直し（段は保つ） | 設計 §2.8、相談 B、decisions #29（仮） | 検算済（tests/unit/render/canvas/feedback-budget-lowload.test.ts） |
 | 6 | 辺ヒント `hintTargets`・`hintPairs` | 着地 1,500／1,501 ms 前、A→A→G、A→S・A→G、和音 {A, D} → {S, F, H} | 出す／出さない、A→G、数字なし・「4」、D→H・D→S（D→F は D→H と同じ辺） | 設計 §2.2、m1' nextTargets、decisions #31（仮） | 検算済（tests/unit/render/canvas/chords-hints.test.ts） |
+| 6 | 全配列の鍵盤図 | ableton・vmpk・genshin・wicki × 3 箱 × 低負荷 段 0・3 × 2 着地、全鍵を押下・全鍵に縁の返しと閃光 full／degraded | 外に出るコマンド 0。wicki の端の列の黒鍵（Digit1・Slash）の径は √3/2·R − 1.5、端でない黒鍵（KeyQ）は 0.93·R | 設計 §2.8、decisions #30(e)（「疑う」b1） | 検算済（tests/unit/render/canvas/commands.test.ts） |
+| 6 | 判定文字（低い落下域） | ableton の箱 850×112・132・146（D 20・40・54）に「おしい ＋87 ms」 | 落下域に収まる。添え字は D 54 だけ | decisions #31(e)（「疑う」b7） | 検算済（tests/unit/render/canvas/commands.test.ts） |
+| 6 | 状態の分岐 `placeNote`・`tailCommand`・`approachGlow` | pending の着地 500 ms 前・着地後、holding・done、尾 t 1500／2500／3000、接近 −1／0／350／700／701 ms | 着地 y − v·500・着地 y、着地 y・null、高さ v·1500／v·500／null、なし／1／0.5／なし／なし。holding は縁 3 px で殻・塊・光りに入らない | 設計 §2.3・§2.5、m1' L405–418・APPROACH L264（「疑う」b5） | 検算済（tests/unit/render/canvas/cells.test.ts） |
+| 6 | 入れ違い `summarize` | 和音 {A, W}@1000 と S@1200 を A 1250・W 1000・S 1200（添字の順 2 通り）／単音 5 つ | どちらも 1／1 | ADR 0006（「疑う」a2・b4） | 検算済（tests/unit/app/readability.test.ts） |
 | 6 | 角の補助・明度 | R 25 の鍵盤図／ableton・vmpk の白鍵 | ♯ なし（黒鍵は 30° のまま）／A 段 shade2、vmpk は Q 段 shade1・Z 段 shade3 | 設計 §2.5 L129、decisions #30（仮） | 検算済（tests/unit/render/canvas/commands.test.ts） |
 | 6 | 「位置で読めるか」 | 6 曲×2 配列（＋負荷譜面）を段別と一本線で手弾き（play-dev） | 5 観点の 2 つ以上で「読めない」なら一本線へ戻す提案 | 設計 §5.7、相談 B、ADR 0006 | 利用者の手弾き待ち |
 | 7 | 時計 `lsq` | 15 ms 量子化の 121 点 | 傾き 0.99986 | 手計算（本書以外に根拠なし。§7-18） | 仮 |

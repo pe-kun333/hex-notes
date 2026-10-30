@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildFrame, frameNotes, seamCommands } from '../../../../src/render/canvas/commands.ts'
-import { CORNER_AID_MIN_R } from '../../../../src/render/canvas/cells.ts'
+import { CORNER_AID_MIN_R, drawRadius } from '../../../../src/render/canvas/cells.ts'
 import type { FxIntent } from '../../../../src/render/canvas/feedback.ts'
 import {
   LAYERS,
@@ -10,6 +10,8 @@ import {
   type DrawCommand,
 } from '../../../../src/render/canvas/primitives.ts'
 import { buildKeyboardGrid } from '../../../../src/render/hex/grid.ts'
+import { TRAVEL_MS, computeSizing } from '../../../../src/render/hex/sizing.ts'
+import { LAYOUTS } from '../../../../src/layout/presets.ts'
 import { SONGS, VARIANT_IDS, initialInput, setup } from './frame-setup.ts'
 
 // src/render/canvas/commands.ts（buildFrame）。出どころ: 台帳 手順 6「コマンド列の全図形が落下域＋鍵盤図の矩形内」、
@@ -214,12 +216,27 @@ describe('鍵盤図（§2.2・§2.5、decisions #30）', () => {
     )
   })
 
-  it('継ぎ目は vmpk だけ（2 本の折れ線、1 px）', () => {
-    expect(seamCommands(s.grid)).toHaveLength(0)
+  it('継ぎ目は vmpk だけ（2 本の折れ線、1 px）。4 段でも wicki には引かない（decisions #30(f)）', () => {
+    const counts = (['ableton', 'vmpk', 'genshin', 'wicki'] as const).map(
+      (l) => seamCommands(buildKeyboardGrid(l, 28, { left: 0, top: 0 })).length,
+    )
+    expect(counts).toEqual([0, 2, 0, 0])
     const v = setup('twinkle', 'vmpk/2/octave')
     const seam = seamCommands(v.grid)
-    expect(seam).toHaveLength(2)
     expect(seam.every((c) => c.width === 1 && c.pts.length === 21)).toBe(true)
+  })
+
+  it('文字「音名」でも鍵盤図はキー文字を残す（note → both）、「なし」はキー文字だけ（m1 drawCell L401、decisions #30(d)）', () => {
+    const keysTags = (labels: 'note' | 'none') =>
+      tags(
+        buildFrame(initialInput(s, { labels, t: { song: -5000, real: 0 } })).filter(
+          (c) => c.layer === 'keys',
+        ),
+      )
+    // ableton: 音のある 17 鍵＋空の 3 鍵
+    expect(keysTags('note')).toMatchObject({ label: 20, noteName: 17 })
+    expect(keysTags('none').label).toBe(20)
+    expect(keysTags('none').noteName).toBeUndefined()
   })
 })
 
@@ -287,5 +304,77 @@ describe('上端で切る（箱の上端にかかるセル）', () => {
       }
     }
     expect(found).toBe(true)
+  })
+})
+
+describe('全配列の鍵盤図（譜面なし。全鍵を押下・全鍵に縁の返しと閃光）', () => {
+  const boxes = [
+    { left: 0, top: 0, width: 850, height: 644 },
+    { left: 0, top: 0, width: 577, height: 490 },
+    { left: 0, top: 0, width: 600, height: 300 },
+  ]
+  it('ableton・vmpk・genshin・wicki × 3 箱 × 段 0・3 × 2 着地で、外に出るコマンドが 0（wicki の端の黒鍵を含む）', () => {
+    for (const layout of ['ableton', 'vmpk', 'genshin', 'wicki'] as const)
+      for (const box of boxes) {
+        const sizing = computeSizing(box, LAYOUTS[layout].rowsUsed, TRAVEL_MS.beginner)
+        const grid = buildKeyboardGrid(layout, sizing.R, { left: sizing.kbLeft, top: sizing.kbTop })
+        const codes = grid.cells.map((c) => c.code)
+        const effects: FxIntent[] = [
+          ...codes.map((code): FxIntent => ({ kind: 'edgeReturn', atMs: 0, code, grade: 'miss' })),
+          { kind: 'flash', atMs: 0, codes, mode: 'full' },
+          { kind: 'flash', atMs: 0, codes, mode: 'degraded' },
+        ]
+        const rg = regionsOf(sizing)
+        for (const level of [0, 3] as const)
+          for (const mode of ['cell', 'line'] as const) {
+            const cmds = buildFrame({
+              sizing,
+              grid,
+              mode,
+              notes: [],
+              t: { song: 0, real: 120 },
+              pressed: new Set(codes),
+              effects,
+              labels: 'both',
+              hints: true,
+              level,
+            })
+            const bad = cmds.filter((c) => !inRegion(bboxOf(c), c.region, rg))
+            expect(bad.map((c) => `${layout} ${box.width} ${level} ${mode} ${c.tag}`)).toEqual([])
+          }
+      }
+  })
+
+  it('wicki の端の列の黒鍵（Slash 66・gx 10.5、Digit1 63・gx 0）は径を √3/2·R − 1.5 に抑え、端でない黒鍵（KeyQ 58・gx 0.5）は抑えない', () => {
+    const g = buildKeyboardGrid('wicki', 28, { left: 0, top: 0 })
+    const cell = (code: string) => {
+      const c = g.byCode.get(code)
+      if (!c) throw new Error(code)
+      return c
+    }
+    const cap = (Math.sqrt(3) / 2) * 28 - 1.5
+    expect(drawRadius(g, cell('Slash'), 'cell', 0.93, true)).toBeCloseTo(cap, 9)
+    // Digit1 は 3 段上で 0.93·28·0.96³ ＝ 23.04 ＞ 22.75 なので、奥行きがあっても抑えが効く
+    expect(drawRadius(g, cell('Digit1'), 'cell', 0.93, true)).toBeCloseTo(cap, 9)
+    expect(drawRadius(g, cell('Digit1'), 'cell', 0.93, false)).toBeCloseTo(cap, 9)
+    expect(drawRadius(g, cell('KeyQ'), 'cell', 0.93, false)).toBeCloseTo(0.93 * 28, 9)
+  })
+})
+
+describe('落下域が低い箱の判定文字（添え字は収まるときだけ）', () => {
+  it('ableton の箱 850×112（D 20）・850×132（D 40）・850×146（D 54）で判定文字が落下域に収まる', () => {
+    for (const h of [112, 132, 146]) {
+      const s = setup('twinkle', 'ableton/2/octave', { left: 0, top: 0, width: 850, height: h })
+      const rg = regionsOf(s.sizing)
+      const cmds = buildFrame(
+        initialInput(s, {
+          effects: [{ kind: 'judgeText', atMs: 0, grade: 'good', dtMs: 87 }],
+          t: { song: 0, real: 100 },
+        }),
+      )
+      const texts = cmds.filter((c) => c.tag === 'judgeText')
+      expect(texts.length).toBe(h === 146 ? 2 : 1)
+      for (const c of texts) expect(inRegion(bboxOf(c), c.region, rg)).toBe(true)
+    }
   })
 })

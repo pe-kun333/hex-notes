@@ -198,6 +198,17 @@ describe('inRegion（stage は T 字形）', () => {
     expect(inRegion({ x0: 30, y0: -1, x1: 70, y1: 60 }, 'stage', rg)).toBe(false)
     expect(inRegion({ x0: 30, y0: 40, x1: 70, y1: 81 }, 'stage', rg)).toBe(false)
   })
+  it('stage: 鍵盤図が箱より広い（limited width）とき、落下域の高さで箱の外（x < 0）は不可、鍵盤図の高さなら可', () => {
+    const wide: Regions = {
+      fall: { x: 0, y: 0, w: 100, h: 50 },
+      keys: { x: -4, y: 50, w: 108, h: 30 },
+      stageArea: 100 * 50 + 108 * 30,
+    }
+    expect(inRegion({ x0: -3, y0: 10, x1: 5, y1: 20 }, 'stage', wide)).toBe(false)
+    expect(inRegion({ x0: -3, y0: 40, x1: 5, y1: 60 }, 'stage', wide)).toBe(false)
+    expect(inRegion({ x0: -3, y0: 55, x1: 5, y1: 70 }, 'stage', wide)).toBe(true)
+    expect(inRegion({ x0: 1, y0: 40, x1: 5, y1: 60 }, 'stage', wide)).toBe(true)
+  })
 })
 
 describe('スナップショットの形', () => {

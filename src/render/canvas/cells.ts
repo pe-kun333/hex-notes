@@ -5,7 +5,7 @@
 
 import type { KeyCode } from '../../shared/types.ts'
 import type { GridCell, KeyboardGrid } from '../hex/grid.ts'
-import { hexVertices, rotationOf, isBlackKey } from '../hex/hex.ts'
+import { SQ3, hexVertices, isBlackKey, rotationOf } from '../hex/hex.ts'
 import type { LandingMode } from '../hex/landing.ts'
 import { noteY, rowScale, targetY } from '../hex/landing.ts'
 import type { Layer, Paint, PolyCmd, Pt, RectCmd, Region, TextCmd } from './primitives.ts'
@@ -121,13 +121,34 @@ export function labelCommands(
 
 /** 描く径（R × 比 × 奥行き。depth false は奥行きを付けない＝低負荷の段 3） */
 export function drawRadius(
-  grid: Pick<KeyboardGrid, 'R'>,
-  cell: Pick<GridCell, 'stepsAboveBottom'>,
+  grid: KeyboardGrid,
+  cell: GridCell,
   mode: LandingMode,
   scale: number,
   depth: boolean,
 ): number {
-  return grid.R * scale * (depth ? rowScale(mode, cell, grid.R) : 1)
+  const r = grid.R * scale * (depth ? rowScale(mode, cell, grid.R) : 1)
+  if (rotationOf(cell.midi) === 0) return r
+  // 30° 回したセルは頂点が真横の ±r に来る。鍵盤図の左右の端の列では、最も太い縁の半分を含めて
+  // 矩形の横の半幅 √3/2·R に収める（wicki の端の黒鍵。decisions #30(e)、仮）
+  const [minGx, maxGx] = gxRange(grid)
+  if (cell.gx !== minGx && cell.gx !== maxGx) return r
+  return Math.min(r, (SQ3 / 2) * grid.R - EDGE_STROKE_HALF)
+}
+
+/** 鍵盤図の左右の端の列で、回したセルの頂点と矩形の端の間に残す幅（最も太い縁＝ホールド中の落ちるセル 3 px の半分） */
+export const EDGE_STROKE_HALF = 1.5
+
+const GX_RANGE = new WeakMap<KeyboardGrid, readonly [number, number]>()
+
+/** 鍵盤図の gx の最小と最大（端の列） */
+function gxRange(grid: KeyboardGrid): readonly [number, number] {
+  const hit = GX_RANGE.get(grid)
+  if (hit) return hit
+  const gxs = grid.cells.map((c) => c.gx)
+  const range = [Math.min(...gxs), Math.max(...gxs)] as const
+  GX_RANGE.set(grid, range)
+  return range
 }
 
 export type KeyboardOptions = {
@@ -185,7 +206,8 @@ export function keyboardCommands(
         ? { ...meta, kind: 'poly', pts, stroke: 'pressedEdge', width: 2.5 }
         : { ...meta, kind: 'poly', pts, stroke: shade, width: 1.5, alpha: 0.55 + 0.45 * g },
     )
-    const mode = o.labels === 'none' ? 'key' : o.labels
+    // 鍵盤図ではキー文字を消さない（m1' drawCell L401: none → key、note → both。decisions #30(d)）
+    const mode = o.labels === 'none' ? 'key' : o.labels === 'note' ? 'both' : o.labels
     const paint: Paint = pressed ? inkOn(shade) : 'ink'
     texts.push(
       ...labelCommands(

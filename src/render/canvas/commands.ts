@@ -109,11 +109,10 @@ function laneCommands(grid: KeyboardGrid, mode: LandingMode, fallTop: number): L
 
 /**
  * 継ぎ目（VMPK 型の Q 段と A 段の間の 2 本線、§2.2）。A 段のセル（全径 R）の左上・上・右上の頂点を左から結ぶ折れ線を、
- * 上下に SEAM_OFFSET ずらして 2 本引く。Q 段と A 段の両方を使う 4 段の配列だけ。
+ * 上下に SEAM_OFFSET ずらして 2 本引く。VMPK 型だけ（A–Q 間がオクターブの継ぎ目。decisions #2・#30(f)）。
  */
 export function seamCommands(grid: KeyboardGrid): LineCmd[] {
-  if (!(grid.rowsUsed.includes(1) && grid.rowsUsed.includes(2) && grid.rowsUsed.length === 4))
-    return []
+  if (grid.layout !== 'vmpk') return []
   const aRow = grid.cells.filter((c) => c.row === 2).sort((a, b) => a.col - b.col)
   const h = (Math.sqrt(3) / 2) * grid.R
   const pts: Pt[] = []

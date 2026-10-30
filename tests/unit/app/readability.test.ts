@@ -71,3 +71,30 @@ describe('summarize（5 観点のうち数で出す 4 つ）', () => {
     expect(s.chordSpreadMedian).toBe(20)
   })
 })
+
+describe('入れ違いは隣り合う和音の間で数える（和音の中の並びに依らない）', () => {
+  it('和音 {A, W}@1000 と S@1200 を A 1250・W 1000・S 1200 で押すと、A と W の添字の順に依らず 1 回', () => {
+    const aFirst = summarize([
+      o(0, 'KeyA', 1, 1000, 0, 1250),
+      o(1, 'KeyW', 0, 1000, 0, 1000),
+      o(2, 'KeyS', 1, 1200, 1, 1200),
+    ])
+    const wFirst = summarize([
+      o(0, 'KeyW', 0, 1000, 0, 1000),
+      o(1, 'KeyA', 1, 1000, 0, 1250),
+      o(2, 'KeyS', 1, 1200, 1, 1200),
+    ])
+    expect(aFirst.inversions).toBe(1)
+    expect(wFirst.inversions).toBe(1)
+  })
+  it('単音の並び（負荷譜面の形）は隣り合う音の逆転の数。正しく押していない音は飛ばす', () => {
+    const s = summarize([
+      o(0, 'KeyA', 1, 0, 0, 10),
+      o(1, 'KeyW', 0, 286, 1, 250),
+      o(2, 'KeyS', 1, 571, 2, 240),
+      o(3, 'KeyE', 0, 857, 3, null),
+      o(4, 'KeyD', 1, 1143, 4, 1100),
+    ])
+    expect(s.inversions).toBe(1)
+  })
+})

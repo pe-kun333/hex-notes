@@ -157,20 +157,20 @@ function within(b: BBox, r: Rect): boolean {
 }
 
 /**
- * 外接矩形が領域に収まるか。stage は「鍵盤図の上端より上なら箱の全幅、下なら鍵盤図の幅」の T 字形で、
- * 外接矩形が fall に収まる、keys に収まる、または鍵盤図の幅に収まり上端が fall の上端以下・下端が鍵盤図の下端以上でない。
+ * 外接矩形が領域に収まるか（y は下向き）。stage は flush のクリップと同じ T 字形（fall の矩形の下に keys の矩形）で、
+ * 外接矩形の y0 ≥ fall の上端、y1 ≤ 鍵盤図の下端、鍵盤図の上端より上にかかるなら x が fall の幅の中、
+ * 下にかかるなら x が鍵盤図の幅の中。
  */
 export function inRegion(b: BBox, region: Region, rg: Regions): boolean {
   if (region === 'fall') return within(b, rg.fall)
   if (region === 'keys') return within(b, rg.keys)
-  if (within(b, rg.fall) || within(b, rg.keys)) return true
+  const f = rg.fall
   const k = rg.keys
-  return (
-    b.y0 >= rg.fall.y - EPS &&
-    b.y1 <= k.y + k.h + EPS &&
-    b.x0 >= k.x - EPS &&
-    b.x1 <= k.x + k.w + EPS
-  )
+  if (b.y0 < f.y - EPS || b.y1 > k.y + k.h + EPS) return false
+  const inX = (r: Rect): boolean => b.x0 >= r.x - EPS && b.x1 <= r.x + r.w + EPS
+  if (b.y0 < k.y - EPS && !inX(f)) return false
+  if (b.y1 > k.y + EPS && !inX(k)) return false
+  return true
 }
 
 // ---------- 外接矩形・面積 ----------

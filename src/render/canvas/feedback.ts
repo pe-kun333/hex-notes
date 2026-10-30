@@ -203,12 +203,16 @@ export function judgeTextCommands(
   const fall = o.regions.fall
   const x = fall.x + fall.w / 2
   const base = o.mode === 'line' ? lineY(o.grid) : o.grid.top
-  const px = 1.3 * R
+  // 落下域が低いときは文字を縮め（高さまで）、本体と添え字（中心が 0.95·R 下、0.6·R）が収まらなければ添え字を出さない
+  const px = Math.min(1.3 * R, fall.h)
   const subPx = 0.6 * R
+  const subBottom = 0.95 * R + subPx / 2
   const withSub =
-    fx.dtMs !== null && (fx.grade === 'great' || fx.grade === 'good' || fx.grade === 'near')
+    fx.dtMs !== null &&
+    (fx.grade === 'great' || fx.grade === 'good' || fx.grade === 'near') &&
+    px / 2 + subBottom <= fall.h
   const lo = fall.y + px / 2
-  const hi = fall.y + fall.h - px / 2 - (withSub ? 0.95 * R + subPx / 2 - px / 2 : 0)
+  const hi = fall.y + fall.h - (withSub ? subBottom : px / 2)
   const y = Math.min(Math.max(base - 2.2 * R - p * 10, lo), Math.max(lo, hi))
   const word = JUDGE_WORDS[fx.grade]
   const out: TextCmd[] = [

@@ -32,7 +32,10 @@ export type ReadabilitySummary = {
   readonly dtSd: number | null
   /** 段ごとの dt の標本標準偏差（rowIndex → SD） */
   readonly dtSdByRow: Readonly<Record<number, number | null>>
-  /** 着地の順に並べた隣り合う音（別の和音）で、押した順が逆になった回数 */
+  /**
+   * 正しく押した音を和音（group）ごとにまとめ、着地の順に隣り合う和音の組で「前の和音の押した時刻の最大 ＞ 次の和音の
+   * 押した時刻の最小」になった回数（和音の中の音の並びに依らない。ADR 0006 の判断は単音の負荷譜面で使う）
+   */
   readonly inversions: number
   /** 2 音以上の和音で全部を正しく押した物の、押した時刻の幅（最大 − 最小）の中央値 ms。無ければ null */
   readonly chordSpreadMedian: number | null
@@ -91,12 +94,24 @@ export function summarize(outcomes: readonly NoteOutcome[]): ReadabilitySummary 
   const rows = [...new Set(outcomes.map((o) => o.rowIndex))].sort((a, b) => a - b)
   const dtSdByRow: Record<number, number | null> = {}
   for (const r of rows) dtSdByRow[r] = sampleSd(ok.filter((o) => o.rowIndex === r).map(dt))
-  const order = [...ok].sort((a, b) => a.tLandMs - b.tLandMs || a.index - b.index)
+  const pressedGroups = new Map<number, { land: number; min: number; max: number }>()
+  for (const o of ok) {
+    const p = o.pressMs ?? 0
+    const g = pressedGroups.get(o.group)
+    if (g)
+      pressedGroups.set(o.group, {
+        land: Math.min(g.land, o.tLandMs),
+        min: Math.min(g.min, p),
+        max: Math.max(g.max, p),
+      })
+    else pressedGroups.set(o.group, { land: o.tLandMs, min: p, max: p })
+  }
+  const chordOrder = [...pressedGroups.values()].sort((a, b) => a.land - b.land)
   let inversions = 0
-  for (let i = 1; i < order.length; i++) {
-    const a = order[i - 1]
-    const b = order[i]
-    if (a && b && a.group !== b.group && (b.pressMs ?? 0) < (a.pressMs ?? 0)) inversions++
+  for (let i = 1; i < chordOrder.length; i++) {
+    const a = chordOrder[i - 1]
+    const b = chordOrder[i]
+    if (a && b && a.max > b.min) inversions++
   }
   const groups = new Map<number, NoteOutcome[]>()
   for (const o of outcomes) groups.set(o.group, [...(groups.get(o.group) ?? []), o])

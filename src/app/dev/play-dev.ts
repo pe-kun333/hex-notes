@@ -39,6 +39,11 @@ const WINDOWS: readonly [Judgment, number][] = [
   ['good', 180],
 ]
 const LATE_FACTOR = 1.3
+/**
+ * 取り逃しを確かめるまでの余裕 ms（±300 ms の窓の後）。押下の時刻は Event.timeStamp で、ハンドラに届くのがフレームより
+ * 遅れることがある（decisions #25 の申し送りの G の候補 50 ms、仮。製品は手順 8 で決める）
+ */
+const MISS_GRACE_MS = 50
 
 const SONGS = ['twinkle', 'ode', 'scale', 'chroma', 'duet', 'canon'] as const
 const STRESS = 'stress'
@@ -118,6 +123,8 @@ type Run = {
   outcomes: NoteOutcome[]
   /** 押下中の鍵 → ホールド中の音の添字 */
   holds: Map<KeyCode, number>
+  /** フレームが取り逃しにした音の添字（後から届いた押下は記録だけして返しを出さない） */
+  swept: Set<number>
   endMs: number
 }
 
@@ -311,6 +318,7 @@ function main(): void {
       states: new Map(),
       outcomes,
       holds: new Map(),
+      swept: new Set(),
       endMs: last + TAIL_MS,
     }
     effects = []
@@ -352,13 +360,20 @@ function main(): void {
       .sort((a, b) => a - b)
     const top = rows.length > 0 ? (s.dtSdByRow[rows[0] ?? 0] ?? null) : null
     const bottom = rows.length > 0 ? (s.dtSdByRow[rows[rows.length - 1] ?? 0] ?? null) : null
-    const yes = el('input', { type: 'checkbox', title: '読めた' })
+    // 未記入（null）・読めた・読めないの 3 つ。未記入は ADR 0006 の主観の数に入れない
+    const yes = select<'' | 'yes' | 'no'>(
+      [
+        ['', '未記入'],
+        ['yes', '読めた'],
+        ['no', '読めない'],
+      ],
+      '',
+    )
     yes.addEventListener('change', () => {
-      rec.readable = yes.checked
+      rec.readable = yes.value === '' ? null : yes.value === 'yes'
       writeOut()
       canvas.focus({ preventScroll: true })
     })
-    rec.readable = false
     tbody.append(
       el(
         'tr',
@@ -416,6 +431,8 @@ function main(): void {
     const n = run.notes[i]
     if (!o || !n) return
     run.outcomes[i] = { ...o, pressMs: t, pressedCode: code }
+    // フレームが取り逃しにした後に届いた押下（長いタスクの後など）は、記録だけして返しを出さない
+    if (run.swept.has(i)) return
     const dt = t - n.tLandMs
     if (o.code === code) {
       const grade = gradeOf(dt)
@@ -497,12 +514,15 @@ function main(): void {
       let notes: FrameNote[] = notesTemplate
       if (run) {
         const r = run
-        for (const o of r.outcomes) {
-          if (o.pressMs === null && t > o.tLandMs + MATCH_MS && r.states.get(o.index) !== 'done') {
+        r.outcomes.forEach((o, i) => {
+          if (o.pressMs !== null || r.swept.has(i) || !(t > o.tLandMs + MATCH_MS + MISS_GRACE_MS))
+            return
+          r.swept.add(i)
+          if (r.states.get(o.index) !== 'done') {
             r.states.set(o.index, 'done')
             pushFx({ kind: 'judgeText', atMs: now, grade: 'miss', dtMs: null })
           }
-        }
+        })
         for (const [code, i] of r.holds) {
           const n = r.notes[i]
           if (n && t >= n.tEndMs) {
