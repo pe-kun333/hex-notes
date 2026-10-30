@@ -48,4 +48,10 @@
 | 17 | M0 作業表の手直し | 配列の code→MIDI 表は M0-02 前半へ前倒し（M0-07 は段ずれ・刻印・位相・退避だけ）。一本線へ戻すときのやり直し最大 6 日は 31 日の外の予備。鍵数制限の実行時フィルタは M0 では型だけ、本体は M1-10 | design.md §5.1 に注記。手順は m0-kickoff.md の 14 手順・累積 31 日 |
 | 18 | 同梱曲の権利の語彙（m0-kickoff.md §7-15） | 譜面の `source.rights` を `pd｜own｜cc0｜cc-by｜private` に広げる（§2.9 の「PD・CC0・CC BY・自作」に揃える）。CC BY は `source.license {id, holder, url}` が必須 | design.md §3.2 を改訂。権利表（content/charts/RIGHTS.md、ADR 0005）の license 列との対応: PD→pd、own→own、CC0-1.0→cc0、CC-BY-4.0／3.0→cc-by。M0-01 で確定（2026-10-30） |
 
-次の段階: M0 整備に入る。着手手順は ideas/R2/m0-kickoff.md（リポジトリの初期化コマンド列と 14 手順）。実装は新しいリポジトリで行い、モックの部品を層ごとに移植する。
+次の段階: M0 整備に入る。着手手順は docs/planning/m0-kickoff.md（リポジトリの初期化コマンド列と 14 手順）。モックの部品を層ごとに移植する。
+
+## M0 の実装中に確定（手順ごとに追記）
+
+| # | 論点 | 決定 | 帰結 |
+|---|---|---|---|
+| 19 | 譜面 id の canonical JSON と ms 表（m0-kickoff.md §7-5・§7-6。手順 2、2026-10-30） | canonical JSON は `{format, notes[{midi,beat,dur}], pulse{resolution, tempo[{beat,bpm}]}}` の入れ子・キー順、空白なし、数値は `Math.round(x·10⁴)/10⁴`（四捨五入。m5 の r4）、notes は正規化後の順。ms 表は float のまま、区間の開始 ms を Δbeat×60000/bpm で累積 | design.md §3.3 に明記。実装 src/chart/hash.ts・mstable.ts、見本 id は tests/unit/chart/hash.test.ts に固定。§3.2 に検査の規則（notes 1 つ以上・同拍同音なし・vel 整数・tempo 先頭 beat 0・上限）を追記 |

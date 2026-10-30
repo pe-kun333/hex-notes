@@ -6,10 +6,20 @@
 |---|---|---|---|---|---|
 | 1 | ライセンス式 `isAllowed` | `(MIT AND GPL-3.0)`、`MIT*`、`(MIT OR CC0-1.0)`、`UNKNOWN` | 止まる／通る／通る／止まる | decisions #16、ADR 0002、手順書 §1.6（推定印 1 件の代替） | 検算済（tests/unit/licenses.test.ts） |
 | 1 | 帰属 `checkAttribution` | 6 項目の行が無い・値が空・「未同梱」・URL 無し | 項目欠けで fail | 手順書 手順 10 の期待値、CC BY 3.0 §4(b) | 検算済（tests/unit/licenses.test.ts） |
-| 2 | ms 表 `mstable` | tempo [{beat 0, 120}, {beat 4, 60}] | 拍 4 ＝ 2,000 ms | m5 `makeClock` L317–321（`b2s`） | 未検算 |
-| 2 | バリデータ | format `hexnote-chart/2` | 拒否 | 設計 §3.2 | 未検算 |
-| 2 | 配列表 `presets` | wicki の KeyZ／KeyA | 48／53 | m2 `LAYOUTS` L219 | 未検算 |
-| 2 | 配列表 `presets` | ableton の KeyA／KeyW | 60／61 | 設計 §2.1 | 未検算 |
+| 2 | ms 表 `mstable` | tempo [{beat 0, 120}, {beat 4, 60}] | 拍 4 ＝ 2,000 ms | m5 `makeClock` L317–321（`b2s`） | 検算済（tests/unit/chart/mstable.test.ts） |
+| 2 | ms 表 `mstable` | 同上の tempo の拍 6／3,000 ms、3 区間 [{0,120},{4,60},{8,240}] の拍 12 | 4,000 ms／拍 5、7,000 ms（区間の開始 ms は 0・2,000・6,000） | m5 `makeClock` L317–321 の累積（手計算） | 検算済（tests/unit/chart/mstable.test.ts） |
+| 2 | ms 表 `mstable` | tempo [] | RangeError（既定 120 は持たない。バリデータの `empty` と同じ） | 手順書 手順 2 の手直し「bpm 既定 120 → pulse.tempo 必須」 | 検算済（tests/unit/chart/mstable.test.ts） |
+| 2 | バリデータ | format `hexnote-chart/2` | 拒否 | 設計 §3.2 | 検算済（tests/unit/chart/validate.test.ts） |
+| 2 | バリデータ | notes [{64@1}, {60@1+1e-9}]／notes []／layout `constructor` | 同拍 midi 昇順の違反（1/resolution の目盛りで比較）／`empty`／別名を引かず `enum` | 設計 §3.2（notes 1 つ以上・重複不可は本書以外に無い） | 仮（tests/unit/chart/validate.test.ts） |
+| 2 | ハッシュ `hash` | `abc`／空文字／`日本語` の SHA-256 | ba7816bf…15ad／e3b0c442…b855／77710aed…e0a5 | FIPS 180-4 の既知値 | 検算済（tests/unit/chart/hash.test.ts） |
+| 2 | ハッシュ `hash` | 見本 {notes 60@0 dur 1, 64@1 dur 0.5, 67@1.5 dur 0.33333; tempo [{0,120},{4,60}]} の canonical JSON | 固定文字列（dur 0.3333）、id `sha256:3ba25045…2860` | 設計 §3.3、丸めは m5 `r4` L416 の式（Math.round、§7-6 を四捨五入に決定）。node:crypto で別計算 | 検算済（tests/unit/chart/hash.test.ts） |
+| 2 | ハッシュ `round4` | 1.00005／0.00015 | 1.0001／0.0001（JS の 2 進丸め。他言語も同じ式で） | m5 `r4` L416 | 検算済（tests/unit/chart/hash.test.ts） |
+| 2 | 見本譜面 `fixture` | tests/fixtures/charts/minimal.hexnote.json（きらきら星 7 音、bpm 100） | normalize→validate 0 件、id `sha256:f33acca6…53a7`、最後の音の終わり 4,800 ms、keys が ableton の表と合う | 設計 §3.2・§3.3、node:crypto で別計算 | 検算済（tests/unit/chart/fixture.test.ts） |
+| 2 | 検査ツール `validate-charts` | フィクスチャ／id 1 文字改変／空ディレクトリ／未ソート／未丸め beat・別名 layout／表に無い鍵／dir がファイル | exit 0／1（`id`）／0／1（`order`、`--lenient` は 0）／1（`not_normalized`）／1（`unknown_key`）／2 | 手順書 §1.3 L57（CI の並び）、手順 2 | 検算済（tests/unit/tools/validate-charts.test.ts） |
+| 2 | 配列表 `presets` | wicki の KeyZ／KeyA | 48／53 | m2 `LAYOUTS` L219 | 検算済（tests/unit/layout/presets.test.ts） |
+| 2 | 配列表 `presets` | ableton の KeyA／KeyW | 60／61 | 設計 §2.1 | 検算済（tests/unit/layout/presets.test.ts） |
+| 2 | 配列表 `presets` | 表の総数／音域 | ableton 17・vmpk 34・genshin 21・wicki 40／60–76・48–76・48–83・48–81 | spec 草稿 §1、設計 §2.1 | 検算済（tests/unit/layout/presets.test.ts） |
+| 2 | 配列表 `presets` | vmpk の 60 の逆引き／`resolveLayoutId('constructor')` | [KeyQ, Comma]（Q 段が先）／null | 設計 §2.1「60 以上は Q 段側（仮）」 | 検算済（tests/unit/layout/presets.test.ts） |
 | 3 | 変換器 `convert-m5` | canon、ableton、octave、limit 2 | out 34、dropThin 17 | m5 `buildVariant` L324–363 | 仮 |
 | 3 | 間引き | 和音 [60, 64, 67, 72]、limit 2 | 残る 67、72（低い音から落とす） | 設計 §2.4 | 未検算 |
 | 3 | 変換後 | 同上の曲 | notes 51、id `ableton/2/octave`、keys 長 51 で null 17 | 手計算 | 仮 |
