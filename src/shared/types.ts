@@ -9,6 +9,8 @@ export type ChartFormat = typeof CHART_FORMAT
 
 /** 既定の拍の分解能（1 拍を何等分するか）。beat はこの単位に丸める */
 export const DEFAULT_RESOLUTION = 240
+/** resolution の上限（§3.2、仮）。検査・変換器・譜面版の生成が共有する */
+export const MAX_RESOLUTION = 9600
 
 /** 配列プリセットの id（decisions #1・#4）。別名は LAYOUT_ALIASES */
 export type LayoutId = 'ableton' | 'vmpk' | 'genshin' | 'wicki'

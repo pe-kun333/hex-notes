@@ -1,0 +1,77 @@
+{
+  "format": "hexnote-chart/1",
+  "id": "sha256:aa17a0529421ac750e3a0f366cd9227838b073258fd09420b16ea3fc6c29016d",
+  "name": "半音階ドリル",
+  "bpm": 100,
+  "beats": 14,
+  "notes": [
+    { "midi": 60, "beat": 0, "dur": 0.5 },
+    { "midi": 61, "beat": 0.5, "dur": 0.5 },
+    { "midi": 62, "beat": 1, "dur": 0.5 },
+    { "midi": 63, "beat": 1.5, "dur": 0.5 },
+    { "midi": 64, "beat": 2, "dur": 0.5 },
+    { "midi": 65, "beat": 2.5, "dur": 0.5 },
+    { "midi": 66, "beat": 3, "dur": 0.5 },
+    { "midi": 67, "beat": 3.5, "dur": 0.5 },
+    { "midi": 68, "beat": 4, "dur": 0.5 },
+    { "midi": 69, "beat": 4.5, "dur": 0.5 },
+    { "midi": 70, "beat": 5, "dur": 0.5 },
+    { "midi": 71, "beat": 5.5, "dur": 0.5 },
+    { "midi": 72, "beat": 6, "dur": 0.5 },
+    { "midi": 71, "beat": 6.5, "dur": 0.5 },
+    { "midi": 70, "beat": 7, "dur": 0.5 },
+    { "midi": 69, "beat": 7.5, "dur": 0.5 },
+    { "midi": 68, "beat": 8, "dur": 0.5 },
+    { "midi": 67, "beat": 8.5, "dur": 0.5 },
+    { "midi": 66, "beat": 9, "dur": 0.5 },
+    { "midi": 65, "beat": 9.5, "dur": 0.5 },
+    { "midi": 64, "beat": 10, "dur": 0.5 },
+    { "midi": 63, "beat": 10.5, "dur": 0.5 },
+    { "midi": 62, "beat": 11, "dur": 0.5 },
+    { "midi": 61, "beat": 11.5, "dur": 0.5 },
+    { "midi": 60, "beat": 12, "dur": 2 }
+  ],
+  "pulse": {
+    "resolution": 240,
+    "tempo": [
+      { "beat": 0, "bpm": 100 }
+    ]
+  },
+  "sync": { "sources": [] },
+  "source": { "kind": "bundled", "rights": "own", "title": "半音階ドリル", "origin": "docs/planning/mocks/m1-geometry.html SONGS.chroma" },
+  "variants": [
+    {
+      "id": "ableton/2/octave",
+      "layout": "ableton",
+      "limit": 2,
+      "fold": "octave",
+      "keys": ["KeyA", "KeyW", "KeyS", "KeyE", "KeyD", "KeyF", "KeyT", "KeyG", "KeyY", "KeyH", "KeyU", "KeyJ", "KeyK", "KeyJ", "KeyU", "KeyH", "KeyY", "KeyG", "KeyT", "KeyF", "KeyD", "KeyE", "KeyS", "KeyW", "KeyA"],
+      "stats": { "srcNotes": 25, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 }
+    },
+    {
+      "id": "ableton/3/octave",
+      "layout": "ableton",
+      "limit": 3,
+      "fold": "octave",
+      "keys": ["KeyA", "KeyW", "KeyS", "KeyE", "KeyD", "KeyF", "KeyT", "KeyG", "KeyY", "KeyH", "KeyU", "KeyJ", "KeyK", "KeyJ", "KeyU", "KeyH", "KeyY", "KeyG", "KeyT", "KeyF", "KeyD", "KeyE", "KeyS", "KeyW", "KeyA"],
+      "stats": { "srcNotes": 25, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 }
+    },
+    {
+      "id": "vmpk/2/octave",
+      "layout": "vmpk",
+      "limit": 2,
+      "fold": "octave",
+      "keys": ["KeyQ", "Digit2", "KeyW", "Digit3", "KeyE", "KeyR", "Digit5", "KeyT", "Digit6", "KeyY", "Digit7", "KeyU", "KeyI", "KeyU", "Digit7", "KeyY", "Digit6", "KeyT", "Digit5", "KeyR", "KeyE", "Digit3", "KeyW", "Digit2", "KeyQ"],
+      "stats": { "srcNotes": 25, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 }
+    },
+    {
+      "id": "vmpk/3/octave",
+      "layout": "vmpk",
+      "limit": 3,
+      "fold": "octave",
+      "keys": ["KeyQ", "Digit2", "KeyW", "Digit3", "KeyE", "KeyR", "Digit5", "KeyT", "Digit6", "KeyY", "Digit7", "KeyU", "KeyI", "KeyU", "Digit7", "KeyY", "Digit6", "KeyT", "Digit5", "KeyR", "KeyE", "Digit3", "KeyW", "Digit2", "KeyQ"],
+      "stats": { "srcNotes": 25, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 }
+    }
+  ],
+  "generator": "hexnote from-mel (M0-02)"
+}

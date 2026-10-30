@@ -94,7 +94,7 @@ S3・S4・S5・S6 から S1 へ戻れる。
 
 ### 2.1 配列プリセット（code → MIDI）
 
-Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W E T Y U O P ＝ 61 63 66 68 70 73 75。VMPK 型: Z 段白鍵 48〜64、A 段黒鍵、Q 段白鍵 60〜76、数字段黒鍵（表は spec 草稿 §1）。原神・Sky 型: 自然音 3 段。W–H（対照）: 48＋2·col＋5·(3−row)。使うキーは JIS／US で同じ 26 文字＋10 数字＋Comma／Period／Slash／Semicolon。VMPK 型の同音は keys が決める（既定「60 以上は Q 段側」、仮）。刻印: getLayoutMap（Chromium・HTTPS）→無ければ JIS／US の選択（ja なら JIS 既定）。AZERTY・Dvorak は code が同じなので初版は QWERTY 刻印で表示し注記。
+Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W E T Y U O P ＝ 61 63 66 68 70 73 75。VMPK 型: Z 段白鍵 48〜64、A 段黒鍵、Q 段白鍵 60〜76、数字段黒鍵（表は spec 草稿 §1）。原神・Sky 型: 自然音 3 段。W–H（対照）: 48＋2·col＋5·(3−row)。使うキーは JIS／US で同じ 26 文字＋10 数字＋Comma／Period／Slash／Semicolon。VMPK 型の同音は keys が決める（既定「60 以上は Q 段側」、仮）。譜面版の生成器は全配列で「候補が複数なら 60 以上は上の段、60 未満は下の段」（decisions #21、2026-10-30、仮）。刻印: getLayoutMap（Chromium・HTTPS）→無ければ JIS／US の選択（ja なら JIS 既定）。AZERTY・Dvorak は code が同じなので初版は QWERTY 刻印で表示し注記。
 
 ### 2.2 幾何・着地・辺ヒント・和音
 
@@ -117,7 +117,7 @@ Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W
 
 ### 2.4 同時押し上限と診断
 
-既定 2（膜式の矩形 3 隅ゴースト）。診断 10 組、各組を押したまま 1 秒保持: 同段 3 キー（Z X C／A S D／Q W E）、3u 離れた和音（A D G／S F J／D G K）、矩形 4 キー（Q W A S／E R D F）、両手 2＋2（A S K L／Z X Comma Period）。同段 3 組と和音 3 組を全部通せば 3、さらに矩形と両手も通せば 4、1 つでも落ちれば 2。間引き: 同じ拍の音が上限を超えたら低い音から落とし最上声を残す。難度指標: 密度（音/秒）、跳躍（六角距離）、同時押し率、段またぎ率。注意の目安: 密度 >3.5、最大跳躍 ≥6（仮）。測る: 和音 3 組が本番を代表するか（実機 2 台）。
+既定 2（膜式の矩形 3 隅ゴースト）。診断 10 組、各組を押したまま 1 秒保持: 同段 3 キー（Z X C／A S D／Q W E）、3u 離れた和音（A D G／S F J／D G K）、矩形 4 キー（Q W A S／E R D F）、両手 2＋2（A S K L／Z X Comma Period）。同段 3 組と和音 3 組を全部通せば 3、さらに矩形と両手も通せば 4、1 つでも落ちれば 2。間引き: 同じ拍の音が上限を超えたら低い音から落とし最上声を残す（比べるのは原曲音高。同拍で同じ音高に畳まれた音も原曲音高の高い方を残す。decisions #20、2026-10-30、仮）。難度指標: 密度（音/秒）、跳躍（六角距離）、同時押し率、段またぎ率。注意の目安: 密度 >3.5、最大跳躍 ≥6（仮）。測る: 和音 3 組が本番を代表するか（実機 2 台）。
 
 ### 2.5 セル寸法と配置
 
@@ -144,7 +144,7 @@ Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W
 
 - プレイヤー: IFrame Player API、click-to-play、playsinline=1、disablekb=1、controls 既定。前に何も置かない。半分超が可視になるまで再生しない。再生開始は利用者の click のみ。プログラムからの pause／seek／play は Pause 再開・ループ頭出し・停止検知の 3 用途だけ。
 - 音: 動画の音だけ。打鍵音は誤打のみ −18 dB・300 ms（仮）。報酬はプレイ単位（§4.4）。
-- 同梱曲: 初版 10 曲（チュートリアル 1 曲＋入門 9）。権利は PD（作曲者・編曲者とも没後 70 年、校訂版不可）／CC0／CC BY／自作。譜面版 Ableton×{2,3}・VMPK×{2,3} を自動生成、W–H 版は M-10 の計測用のみ。初版は動画 ID を紐づけない（後の受入基準: テンポ一定、rate 1 本で残差 SD<20 ms、ピアノカバー不可）。
+- 同梱曲: 初版 10 曲（チュートリアル 1 曲＋入門 9）。権利は PD（作曲者・編曲者とも没後 70 年、校訂版不可）／CC0／CC BY／自作。譜面版 Ableton×{2,3}・VMPK×{2,3} を自動生成（fold は octave。decisions #23、2026-10-30、仮）、W–H 版は M-10 の計測用のみ。初版は動画 ID を紐づけない（後の受入基準: テンポ一定、rate 1 本で残差 SD<20 ms、ピアノカバー不可）。
 - 伴奏: 同梱・持ち込みとも accompaniment（§3.2）を Salamander で鳴らす。rendered audio は持たない。初回読込 ≤10 MB（仮、§8）。Salamander 30 音は遅延読込し合成音で先に鳴らす（寸法は測る）。
 
 ## 3. 譜面形式 hexnote-chart/1
@@ -165,7 +165,7 @@ Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W
 
 ### 3.3 ハッシュと変換
 
-`id = "sha256:" + SHA-256(canonical JSON of {format, notes[midi,beat,dur], pulse.resolution, pulse.tempo})`。小数 4 桁、キー順固定。accompaniment・sync・variants・source・name は含めない。canonical JSON の形（決定 #19、2026-10-30）: `{"format":"hexnote-chart/1","notes":[{"midi":60,"beat":0,"dur":1},…],"pulse":{"resolution":240,"tempo":[{"beat":0,"bpm":120},…]}}` の入れ子とキー順、空白なし、notes は正規化（beat 昇順・同拍 midi 昇順）の後の順。数値は `Math.round(x·10⁴)/10⁴`（m5 の r4）で丸めてから JSON の数値として書く。SHA-256 の 16 進は小文字 64 桁。実装は src/chart/hash.ts。ms 表（src/chart/mstable.ts）は float のまま持ち、区間の開始 ms を Δbeat×60000/bpm で累積する。履歴は使った sources[0] の offset／rate を自分の行に写す。m5 の出力は変換器（notes を原曲音高に戻し、keys/layout/limit を variants[0] に畳み、source と id を補う）を通してからバリデータに掛ける（M0-02）。
+`id = "sha256:" + SHA-256(canonical JSON of {format, notes[midi,beat,dur], pulse.resolution, pulse.tempo})`。小数 4 桁、キー順固定。accompaniment・sync・variants・source・name は含めない。canonical JSON の形（決定 #19、2026-10-30）: `{"format":"hexnote-chart/1","notes":[{"midi":60,"beat":0,"dur":1},…],"pulse":{"resolution":240,"tempo":[{"beat":0,"bpm":120},…]}}` の入れ子とキー順、空白なし、notes は正規化（beat 昇順・同拍 midi 昇順）の後の順。数値は `Math.round(x·10⁴)/10⁴`（m5 の r4）で丸めてから JSON の数値として書く。SHA-256 の 16 進は小文字 64 桁。実装は src/chart/hash.ts。ms 表（src/chart/mstable.ts）は float のまま持ち、区間の開始 ms を Δbeat×60000/bpm で累積する。履歴は使った sources[0] の offset／rate を自分の行に写す。m5 の出力は変換器（notes を原曲音高に戻し、keys/layout/limit を variants[0] に畳み、source と id を補う）を通してからバリデータに掛ける（M0-02）。変換の細部は decisions #22（2026-10-30、仮。実装 src/chart/convert-m5.ts）。譜面版の生成は src/chart/variants.ts（同梱曲は §2.9 の 4 版で fold は octave（decisions #23）、指標 metrics は作らない。m0-kickoff.md §7-21）。変換器の出力は M0 の照合用で、keys は m5 の規則で選ぶので同じ chartId・variantId でも variants.ts の版と違いうる（decisions #22）。
 
 ## 4. システム構成
 

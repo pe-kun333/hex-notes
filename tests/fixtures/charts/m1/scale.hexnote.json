@@ -1,0 +1,85 @@
+{
+  "format": "hexnote-chart/1",
+  "id": "sha256:984209338e62e9d5a51a80444c816db848c274593ed0138e8e4741c5edb34d23",
+  "name": "スケール走り",
+  "bpm": 120,
+  "beats": 18,
+  "notes": [
+    { "midi": 48, "beat": 0, "dur": 0.5 },
+    { "midi": 50, "beat": 0.5, "dur": 0.5 },
+    { "midi": 52, "beat": 1, "dur": 0.5 },
+    { "midi": 53, "beat": 1.5, "dur": 0.5 },
+    { "midi": 55, "beat": 2, "dur": 0.5 },
+    { "midi": 57, "beat": 2.5, "dur": 0.5 },
+    { "midi": 59, "beat": 3, "dur": 0.5 },
+    { "midi": 60, "beat": 3.5, "dur": 0.5 },
+    { "midi": 62, "beat": 4, "dur": 0.5 },
+    { "midi": 64, "beat": 4.5, "dur": 0.5 },
+    { "midi": 65, "beat": 5, "dur": 0.5 },
+    { "midi": 67, "beat": 5.5, "dur": 0.5 },
+    { "midi": 69, "beat": 6, "dur": 0.5 },
+    { "midi": 71, "beat": 6.5, "dur": 0.5 },
+    { "midi": 72, "beat": 7, "dur": 0.5 },
+    { "midi": 74, "beat": 7.5, "dur": 0.5 },
+    { "midi": 76, "beat": 8, "dur": 0.5 },
+    { "midi": 74, "beat": 8.5, "dur": 0.5 },
+    { "midi": 72, "beat": 9, "dur": 0.5 },
+    { "midi": 71, "beat": 9.5, "dur": 0.5 },
+    { "midi": 69, "beat": 10, "dur": 0.5 },
+    { "midi": 67, "beat": 10.5, "dur": 0.5 },
+    { "midi": 65, "beat": 11, "dur": 0.5 },
+    { "midi": 64, "beat": 11.5, "dur": 0.5 },
+    { "midi": 62, "beat": 12, "dur": 0.5 },
+    { "midi": 60, "beat": 12.5, "dur": 0.5 },
+    { "midi": 59, "beat": 13, "dur": 0.5 },
+    { "midi": 57, "beat": 13.5, "dur": 0.5 },
+    { "midi": 55, "beat": 14, "dur": 0.5 },
+    { "midi": 53, "beat": 14.5, "dur": 0.5 },
+    { "midi": 52, "beat": 15, "dur": 0.5 },
+    { "midi": 50, "beat": 15.5, "dur": 0.5 },
+    { "midi": 48, "beat": 16, "dur": 2 }
+  ],
+  "pulse": {
+    "resolution": 240,
+    "tempo": [
+      { "beat": 0, "bpm": 120 }
+    ]
+  },
+  "sync": { "sources": [] },
+  "source": { "kind": "bundled", "rights": "own", "title": "スケール走り", "origin": "docs/planning/mocks/m1-geometry.html SONGS.scale" },
+  "variants": [
+    {
+      "id": "ableton/2/octave",
+      "layout": "ableton",
+      "limit": 2,
+      "fold": "octave",
+      "keys": ["KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "KeyL", "KeyK", "KeyJ", "KeyH", "KeyG", "KeyF", "KeyD", "KeyS", "KeyA", "KeyJ", "KeyH", "KeyG", "KeyF", "KeyD", "KeyS", "KeyA"],
+      "stats": { "srcNotes": 33, "droppedFold": 0, "movedFold": 14, "droppedThin": 0, "chordMax": 1 }
+    },
+    {
+      "id": "ableton/3/octave",
+      "layout": "ableton",
+      "limit": 3,
+      "fold": "octave",
+      "keys": ["KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "KeyL", "KeyK", "KeyJ", "KeyH", "KeyG", "KeyF", "KeyD", "KeyS", "KeyA", "KeyJ", "KeyH", "KeyG", "KeyF", "KeyD", "KeyS", "KeyA"],
+      "stats": { "srcNotes": 33, "droppedFold": 0, "movedFold": 14, "droppedThin": 0, "chordMax": 1 }
+    },
+    {
+      "id": "vmpk/2/octave",
+      "layout": "vmpk",
+      "limit": 2,
+      "fold": "octave",
+      "keys": ["KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "KeyO", "KeyI", "KeyU", "KeyY", "KeyT", "KeyR", "KeyE", "KeyW", "KeyQ", "KeyM", "KeyN", "KeyB", "KeyV", "KeyC", "KeyX", "KeyZ"],
+      "stats": { "srcNotes": 33, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 }
+    },
+    {
+      "id": "vmpk/3/octave",
+      "layout": "vmpk",
+      "limit": 3,
+      "fold": "octave",
+      "keys": ["KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "KeyO", "KeyI", "KeyU", "KeyY", "KeyT", "KeyR", "KeyE", "KeyW", "KeyQ", "KeyM", "KeyN", "KeyB", "KeyV", "KeyC", "KeyX", "KeyZ"],
+      "stats": { "srcNotes": 33, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 }
+    }
+  ],
+  "generator": "hexnote from-mel (M0-02)"
+}
