@@ -2,6 +2,14 @@
 // docs/decisions.md #1・#7・#12・#18。実行時の検査は src/chart/validate.ts、正規化は同 normalize。
 // ここは型と定数だけ。DOM・Node のどちらにも触れない（tools/ からも import する）。
 
+// ---------- 時刻 ----------
+
+/**
+ * 今の時刻（performance.timeOrigin 基準の ms）を返す関数。層は performance.now を直に呼ばず、これを受ける
+ * （直呼びは src/clock/clock-source.ts と src/app/ だけ。m0-kickoff §2「時刻源は注入」、decisions #32）
+ */
+export type NowFn = () => number
+
 // ---------- 譜面 hexnote-chart/1 ----------
 
 export const CHART_FORMAT = 'hexnote-chart/1' as const
@@ -247,7 +255,11 @@ export interface PlayTelemetry extends TelemetryBase {
   /** 押下の now − timeStamp の中央値（ms）。標本が無ければ null（decisions #25） */
   inputLatencyMedian: number | null
   frameIntervalSd: number
-  clockResidualSd: number
+  /**
+   * 時計の残差（locked の tick の dev の標本標準偏差、n − 1。ms）。動画なしで始めた回など標本が 2 つ未満なら null
+   * （decisions #32 (f)）
+   */
+  clockResidualSd: number | null
 }
 
 export interface CalibTelemetry extends TelemetryBase {

@@ -18,10 +18,18 @@ export type NoteOutcome = {
   readonly pressMs: number | null
   /** 対応した keydown の鍵（鍵違いなら code と違う） */
   readonly pressedCode: KeyCode | null
+  /**
+   * 猶予内に窓が終わったので判定しない音（時計の再アンカーの後、design.md §2.6）。対応付けの候補と集計の分母から外す
+   * （開発用の仮。分母の扱いは手順 8 の判定層で決める、kickoff §7-16）
+   */
+  readonly skipped?: boolean
 }
 
 export type ReadabilitySummary = {
+  /** 集計した音（skipped を除く） */
   readonly notes: number
+  /** 猶予内に窓が終わって判定しなかった音 */
+  readonly skipped: number
   /** ±300 ms に keydown が無い音 */
   readonly missed: number
   /** ±300 ms の keydown が別の鍵だった音 */
@@ -70,7 +78,7 @@ export function matchPress(
   let anyD = Number.POSITIVE_INFINITY
   for (let i = 0; i < outcomes.length; i++) {
     const o = outcomes[i]
-    if (o === undefined || o.pressMs !== null) continue
+    if (o === undefined || o.pressMs !== null || o.skipped === true) continue
     const d = Math.abs(pressMs - o.tLandMs)
     if (d > MATCH_MS) continue
     if (o.code === code && d < sameD) {
@@ -86,7 +94,8 @@ export function matchPress(
   return pick >= 0 ? pick : null
 }
 
-export function summarize(outcomes: readonly NoteOutcome[]): ReadabilitySummary {
+export function summarize(all: readonly NoteOutcome[]): ReadabilitySummary {
+  const outcomes = all.filter((o) => o.skipped !== true)
   const ok = outcomes.filter((o) => o.pressMs !== null && o.pressedCode === o.code)
   const missed = outcomes.filter((o) => o.pressMs === null).length
   const wrongKey = outcomes.filter((o) => o.pressMs !== null && o.pressedCode !== o.code).length
@@ -123,6 +132,7 @@ export function summarize(outcomes: readonly NoteOutcome[]): ReadabilitySummary 
   }
   return {
     notes: outcomes.length,
+    skipped: all.length - outcomes.length,
     missed,
     wrongKey,
     missRate: outcomes.length === 0 ? 0 : (missed + wrongKey) / outcomes.length,

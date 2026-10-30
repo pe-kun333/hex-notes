@@ -3,8 +3,8 @@
 // 無視して帯…修飾キーは使わない」、§4.1「{code, tsPerf} に正規化。repeat 捨て、IME 無視＋帯、blur で全離し、役割キー」、
 // kickoff 手順 5（m1' L524–533、m3 L647–655、m4 L650–659・L674、m2 L409–416 の手直し）、L49（試験は
 // {code, keyCode, isComposing, repeat, timeStamp} のレコード）。グローバル状態を持たない（状態は引数と戻り値）。
-// 時刻は ms。now は src/app/ がハンドラの冒頭で 1 回読んで値で渡す（performance.now の直呼びは src/clock/ と src/app/
-// だけ）。tsPerf の式は timestamp.ts（decisions #25、仮）。
+// 時刻は ms。now は src/app/ がハンドラの冒頭で 1 回読んで値で渡す（performance.now の直呼びは src/clock/clock-source.ts
+// の perfNow と src/app/ だけ。kickoff §2・decisions #32）。tsPerf の式は timestamp.ts（decisions #25、仮）。
 
 import type { KeyCode } from '../shared/types.ts'
 import type { FocusSignal, PauseReason } from './focus.ts'
@@ -45,7 +45,7 @@ export function emptyInputState(): InputState {
  * role は役割キーの押下（Space の校正タップも同じ tsPerf）。ime は IME の keydown の検知（毎回出す。S6 の「IME 検知時に
  * 曲を止める」と S0b の「229 なら組をやり直す」はこれを見る）、imeBand は帯の表示の点け消し（変わったときだけ）。
  * pause は一時停止の要求（blur・非表示・iframe）。Escape は role の pause で、呼ぶ側は両方で一時停止に入る
- * （要求は冪等。再生中だけ一時停止へ移し、他の状態では無視する。decisions #26）。
+ * （要求は冪等。どの相で効かせるかは呼ぶ側のプレイの状態機械 src/play/state.ts が決める。decisions #26・#35）。
  */
 export type InputEvent =
   | { kind: 'press'; code: KeyCode; tsPerf: number; lag: number | null }

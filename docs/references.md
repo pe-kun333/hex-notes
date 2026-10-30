@@ -12,7 +12,7 @@
 | 判定窓（YouTube 音源の先行例） | good 40／ok 80／bad 遅 +150・早 −250 ms、playbackRate 倍にスケール | Falling Nikochan `gameConstant.ts`（AGPL。仕様のみ。research/midi-score-sources [S26]） | 数値は採らない。`offset` と `ytBegin` を分ける設計だけ参考（§3.2 SyncSource） |
 | 連続スコア Wife3 | max_points 2、miss_weight −5.5、ridic 5·ts、zero 65·ts^0.75、dev 22.7·ts^0.75、max_boo 180·ts、ts_pow 0.75。|誤差| ≤ ridic で 2、≤ zero で 2·erf((zero−ms)/dev)、≤ 180·ts で線形に −5.5、以降 miss。m3 は ts＝1 で 2 点→100% に正規化、miss −275% | Etterna の Wife3（MIT。実装は参照のみ。research/judgment-ux [S6]、m3 `wife3` L259–260） | 初版は採用しない（§4 移植しない物）。将来の検討材料 |
 | UR（Unstable Rate） | 判定ずれの標準偏差 ×10 | osu! の定義 | 計測の行（§4.6）と結果画面 |
-| YouTube IFrame の時刻 | getCurrentTime の刻み約 15 ms、seek 後の凍結 210〜260 ms、後ろ向きの飛び ≤10 ms | 研究ノート research/youtube-iframe（自前計測と公開資料） | 時計層の補正（最小二乗 2 秒窓、量子化補正 +q̂/2、猶予 300 ms） |
+| YouTube IFrame の時刻 | getCurrentTime の刻み約 15 ms、seek 後の凍結 210〜260 ms、後ろ向きの飛び ≤10 ms | 自前計測と公開資料。design.md §6.1 T-1 が裏付けるのは刻み 15 ms・逆行があること・seek 後 210〜260 ms だけで、逆行 ≤10 ms の出どころは m3 dummy の backMs 10 とこの行のほかに無い。研究ノート research/youtube-iframe はリポジトリに無い（2026-10-30 に docs/planning/research/ の 13 話題を確かめた）。切り捨てか四捨五入かは未計測（M3-07） | 時計層の補正（最小二乗 2 秒窓、量子化補正 ＋β·q̂〔β 既定 0.5、切り捨てと仮定〕、飛び 250 ms、猶予 300 ms。decisions #33）とダミー動画（刻み 15 ms、seek の凍結 240 ms、逆行 ≤10 ms。#36） |
 | YouTube の規約 | プレイヤー前のオーバーレイ禁止、視聴への報酬禁止、最小 200×200、III.F.3.b・III.F.3.c | YouTube API Services Developer Policies | 帯と演出を矩形の外、報酬の切り分け（§4.4）、リスク L-1〜L-10 |
 | キーボードの段ずれ | 数字→Q 1/2u、Q→A 1/4u、A→Z 1/2u、1u ≈ 19.05 mm | Deskthority wiki（ANSI の千鳥配列） | 六角格子としての扱い。順は ADR 0001 |
 | 等方性配列の先行例 | 英数キーボードに Wicki-Hayden を載せる | Plamondon、US20090114078A1 | W–H は対照条件（decisions #4）。製品に載せるときだけクリアランス |
