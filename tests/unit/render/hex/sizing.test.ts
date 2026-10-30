@@ -66,7 +66,7 @@ function size(vp: [number, number], layout: 'ableton' | 'vmpk', T: number): Sizi
   return sizeForViewport({ w: vp[0], h: vp[1] }, LAYOUTS[layout].rowsUsed, T)
 }
 
-describe('定数（m0 L195–197、m1’ L373、decisions 既定値、§2.2）', () => {
+describe('定数（m0 L195–197、m1’ L372、decisions 既定値、§2.2）', () => {
   it('PAD 12・GAP 12・溝 16・鍵盤図の下 8・R 24〜28・v_min 0.2・T0 1500・T 1500／1000', () => {
     expect([PAD, GAP, GUTTER_X, KB_BOTTOM]).toEqual([12, 12, 16, 8])
     expect([R_MIN, R_MAX]).toEqual([24, 28])
@@ -177,7 +177,7 @@ describe('境界（vmpk・1.5 s。R_h の整数商は正確、D は 0.5 刻み�
     expect(r4(t.v)).toBe(0.2037)
   })
 
-  it('488 → R_h 24・R 24・D 300・v 0.2・limited なし。487 → R 24・D 299・limited height・v 0.2・T 1495', () => {
+  it('488 → R_h 24・R 24・D 300・v 0.2・limited なし。487 → R 24・D 299・limited height・v 0.2・T 1495・可視 上段 1615。プレイヤーは 480×270 のまま', () => {
     const s = vmpk(1366, 488)
     expect(s.rH).toBe(24)
     expect(s.R).toBe(24)
@@ -185,26 +185,47 @@ describe('境界（vmpk・1.5 s。R_h の整数商は正確、D は 0.5 刻み�
     expect(s.v).toBe(0.2)
     expect(s.travelMs).toBe(1500)
     expect(s.limited).toBeNull()
+    expect(s.player).toEqual(PLAYER_DEFAULT)
     const t = vmpk(1366, 487)
     expect(t.R).toBe(24)
     expect(t.D).toBe(299)
     expect(t.limited).toBe('height')
     expect(t.v).toBe(0.2)
     expect(t.travelMs).toBe(1495)
+    // 高さだけの不足ではプレイヤーを縮めない（縮めても高さは変わらない）
+    expect(t.player).toEqual(PLAYER_DEFAULT)
+    expect(t.box.width).toBe(850)
+    expect(visibleMs(t, 0)).toBe(1615)
+    expect(visibleMs(t, 0)).toBeGreaterThanOrEqual(t.travelMs)
   })
 
-  it('470 → D 282・v 0.2・T 1410（1.0 s でも同じ: D/0.2 ＝ 1410 < 1000 ではないので… 1.0 s は v 0.282・T 1000）', () => {
+  it('470 → D 282。1.5 s は v 0.2・T 1410（可視 1530／2070）、1.0 s は D/T 0.282 ≥ v_min なので v 0.282・T 1000（limited height のまま）', () => {
     const s = vmpk(1366, 470)
     expect(s.R).toBe(24)
     expect(s.D).toBe(282)
     expect(s.limited).toBe('height')
     expect(s.v).toBe(0.2)
     expect(s.travelMs).toBe(1410)
-    // 1.0 s: D 282 < 300 なので同じく v_min に固定され T は 1410 に伸びる（T0 基準の判定）
+    expect(s.player).toEqual(PLAYER_DEFAULT)
+    expect(s.box.width).toBe(850)
+    expect(visibleMs(s, 0)).toBe(1530)
+    expect(visibleMs(s, 3)).toBe(2070)
+    // 1.0 s: v ＝ max(D/T, v_min) ＝ 0.282 なので T は縮まない（T より長くはならない）
     const g = vmpk(1366, 470, 1000)
     expect(g.limited).toBe('height')
-    expect(g.v).toBe(0.2)
-    expect(g.travelMs).toBe(1410)
+    expect(g.v).toBe(0.282)
+    expect(g.travelMs).toBe(1000)
+  })
+
+  it('箱の高さが R 24 の鍵盤図（8 + 6.5·24 ＝ 164）以下なら RangeError。165 → D 1・v 0.2・T 5', () => {
+    expect(() => vmpk(1366, 164 + 24)).toThrow(RangeError)
+    const s = vmpk(1366, 165 + 24)
+    expect(s.box.height).toBe(165)
+    expect(s.R).toBe(24)
+    expect(s.D).toBe(1)
+    expect(s.limited).toBe('height')
+    expect(s.v).toBe(0.2)
+    expect(s.travelMs).toBe(5)
   })
 
   it('幅 1000 → R_w 22.69 でプレイヤー 356×200 に縮小 → 箱 608・R_w 28.92・R 28。幅 900 → 縮小後 R_w 23.90・R 24・limited width', () => {
@@ -224,6 +245,16 @@ describe('境界（vmpk・1.5 s。R_h の整数商は正確、D は 0.5 刻み�
     expect(t.D).toBe(480)
     expect(t.v).toBe(0.32)
     expect(t.travelMs).toBe(1500)
+    // 溝（16 px）を食う
+    expect(t.kbLeft - t.box.left).toBeLessThan(GUTTER_X)
+  })
+
+  it('最初から 356×200 より小さいプレイヤー（300×150、幅 900）を渡しても拡大せず素通し: 箱 564・R 26', () => {
+    const s = sizeForViewport({ w: 900, h: 668 }, VMPK, 1500, { w: 300, h: 150 })
+    expect(s.player).toEqual({ w: 300, h: 150 })
+    expect(s.box.width).toBe(564)
+    expect(s.R).toBe(26)
+    expect(s.limited).toBeNull()
   })
 
   it('幅 900・ableton → 縮小後 R_w 26.17・R 26（28 を割っただけでは何もしない）', () => {
@@ -235,11 +266,16 @@ describe('境界（vmpk・1.5 s。R_h の整数商は正確、D は 0.5 刻み�
     expect(s.D).toBe(545)
   })
 
-  it('幅と高さの両方が足りないときは limited height', () => {
+  it('幅と高さの両方が足りないときは limited height。幅側（箱 508・溝を食う）と高さ側（D 282・v 0.2・T 1410）の帰結は両方出る', () => {
     const s = vmpk(900, 470)
     expect(s.R).toBe(24)
     expect(s.limited).toBe('height')
     expect(s.player).toEqual(PLAYER_MIN)
+    expect(s.box.width).toBe(508)
+    expect(s.kbLeft - s.box.left).toBeLessThan(GUTTER_X)
+    expect(s.D).toBe(282)
+    expect(s.v).toBe(0.2)
+    expect(s.travelMs).toBe(1410)
   })
 
   it('大きな画面（1920×980）でも R は 28 で止まる', () => {

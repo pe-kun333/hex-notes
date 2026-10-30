@@ -47,7 +47,7 @@ export type KeyboardGrid = {
   readonly byCode: ReadonlyMap<KeyCode, GridCell>
 }
 
-/** 幅の係数（セル幅単位）: 使う段の gx の最大 − 最小 + 1（m0 kbW L227） */
+/** 幅の係数（セル幅単位）: 使う段の gx の最大 − 最小 + 1（m0 kbW L220） */
 export function widthUnits(rowsUsed: readonly number[]): number {
   if (rowsUsed.length === 0) throw new RangeError('grid: 使う段が無い')
   const cols = KEY_ROWS[0]?.length ?? 10
@@ -62,7 +62,7 @@ export function widthUnits(rowsUsed: readonly number[]): number {
   return maxGx - minGx + 1
 }
 
-/** 高さの係数（R 単位）: 2 + 1.5·(段数 − 1)（m0 kbH L227。§2.5 の k_n） */
+/** 高さの係数（R 単位）: 2 + 1.5·(段数 − 1)（m0 kbH L220。§2.5 の k_n） */
 export function heightUnits(rowsUsed: readonly number[]): number {
   if (rowsUsed.length === 0) throw new RangeError('grid: 使う段が無い')
   return 2 + 1.5 * (rowsUsed.length - 1)

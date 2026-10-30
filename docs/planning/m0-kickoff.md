@@ -140,7 +140,7 @@ LICENSE と `content/samples/salamander/LICENSE`。README の帰属と「参照�
 
 - 元: m0 `SQ3` L154、`ROW_OFF` L163、`hexDist` L169（そのまま）、`computeGeom` L214–250、`yLine` L238–241（手直し）。m1' `layout` L370（作り直し）、`targetY` L376、`rowScale／rotOf` L376–378、`DEPTH_SCALE` L211。m2 `DIRS` L231–238（そのまま）。
 - 作る: `src/render/hex/hex.ts`、`grid.ts`、`landing.ts`（cell｜line の 2 方式。既定 cell、line は対照オプション。決定 #3）、`sizing.ts`。
-- 手直し: 「セル 24 px」＝幅 hexW → 径 R（§2.5 L124）。hexW 上限 68 → R＝clamp(24, 28, min(R_w, R_h))。m0 BASE 0.5 px/ms 固定 → 1500 ms 固定で v＝(舞台高−32−k_n·R)/1500、v<0.2 で R を 24 へ、足りなければプレイヤー 356×200（L125）。DEPTH_SCALE 線形 → ×0.96/段、下限 max(0.88, 24/R)（§2.2 L101）。m0 perCell → 左右分割＋段別着地（§1.3 L79）。SCREENS → 3 視口（L126）。
+- 手直し: 「セル 24 px」＝幅 hexW → 径 R（§2.5 L124）。hexW 上限 68 → R＝clamp(24, 28, min(R_w, R_h))。m0 BASE 0.5 px/ms 固定 → 1500 ms 固定で v＝(舞台高−32−k_n·R)/1500、v<0.2 で R を 24 へ、足りなければプレイヤー 356×200（L125）。 → 2026-10-30 訂正: decisions #24 で差し替え。R ＝ clamp(24, 28, ⌊min(R_w, R_h)⌋) を T0 1500 で決め、v ＝ D/T（D ＝ H_col − 8 − k_n·R。旧記法の舞台高−32 と同値）。不足時は ⌊min⌋<24 かつ R_w<24 のときだけプレイヤー 356×200 で 1 回再計算、高さ不足は R 24・v ＝ max(D/T, v_min)・T ＝ D/v（sizing.ts）。DEPTH_SCALE 線形 → ×0.96/段、下限 max(0.88, 24/R)（§2.2 L101）。m0 perCell → 左右分割＋段別着地（§1.3 L79）。SCREENS → 3 視口（L126）。
 - 期待値: hexDist Digit1–KeyW＝2（m0 L169、ROWS L157–162）。内側 1366×668／1280×620／1093×514 の箱 850×644／764×596／577×490 で ableton R 28・v 0.3587／0.3267／0.2560、vmpk R 28／28／27・v 0.3027／0.2707／0.2043（decisions #24 で「舞台高 668／620／514 で R 28、v 0.30／0.27／0.20」を差し替え）。rowScale Q 段 0.96²＝0.9216。
 - 完了条件: 「3 視口で §2.5 どおり」（§5.1 L206）。
 

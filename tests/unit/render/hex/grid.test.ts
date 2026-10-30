@@ -7,7 +7,7 @@ import { LAYOUT_IDS } from '../../../../src/shared/types.ts'
 // src/render/hex/grid.ts。出どころ: design.md §2.2（格子）、§2.5（11.5・k_n 3.5／6.5）、m0-layout computeGeom
 // L214–250（kbW ＝ (maxGx − minGx + 1)·hexW、kbH ＝ (2 + 1.5·(段数 − 1))·R、cx・cy L236）。
 
-describe('幅と高さの係数（m0 kbW・kbH L227、§2.5）', () => {
+describe('幅と高さの係数（m0 kbW・kbH L220、§2.5）', () => {
   it('4 段（vmpk・wicki）は幅 11.5・高さ 6.5、2 段（ableton）は 10.5・3.5、3 段（genshin）は 11・5', () => {
     expect(widthUnits(LAYOUTS.vmpk.rowsUsed)).toBe(11.5)
     expect(heightUnits(LAYOUTS.vmpk.rowsUsed)).toBe(6.5)
@@ -29,7 +29,7 @@ describe('鍵盤図（m0 computeGeom L231–236）', () => {
   it('vmpk・R 28・左上 (100, 200): 幅 11.5·√3·28、高さ 6.5·28、40 セル', () => {
     const g = buildKeyboardGrid('vmpk', 28, { left: 100, top: 200 })
     expect(g.hexW).toBe(SQ3 * 28)
-    expect(g.width).toBe(11.5 * SQ3 * 28)
+    expect(g.width).toBeCloseTo(11.5 * SQ3 * 28, 10)
     expect(g.height).toBe(6.5 * 28)
     expect(g.height).toBe(182)
     expect(g.cells).toHaveLength(40)

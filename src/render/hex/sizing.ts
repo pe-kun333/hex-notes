@@ -1,6 +1,6 @@
 // セル径 R と流速 v（M0-03a、手順 4）。出どころ: docs/design.md §2.5（2026-10-30 改訂）、decisions #24（仮）、
-// m0-layout computeGeom L214–239（PAD・GAP・KB_BOTTOM・split の stage、kbTop）、m1-geometry layout L373
-// （左右の溝 16）。相談の記録は docs/planning/consult/A-sizing.md。
+// m0-layout computeGeom L214–239（PAD・GAP・KB_BOTTOM・split の stage、kbTop）、m1-geometry layout L370–375
+// （左右の溝 16 は L372）。相談の記録は docs/planning/consult/A-sizing.md。
 // 入力は右列の箱（CSS px）。視口からの変換は columnBox。グローバル状態を持たない。DOM に触れない。
 //
 // 式（単位: CSS px、ms）:
@@ -9,10 +9,11 @@
 //   D ＝ H_col − 8 − k_n·R（箱の上端から鍵盤図の上端までの落下距離）、v ＝ D/T
 // R は T0 ＝ 1500 ms で決め、プロファイル（T 1500／1000）では変えない。v だけが T で変わる。
 // 足りないとき（⌊min⌋ < 24）: R_w < 24 ならプレイヤーを 356×200 にして 1 回だけ再計算（split では幅にしか効かない）。
-// それでも R_w < 24 なら R 24 で溝を食う（limited 'width'）。R_h < 24 なら R 24・v ＝ v_min に固定し T を D/v_min に
-// 縮める（limited 'height'）。両方なら 'height'。
-// 境界の比べ方: R_h の整数商は k_n（3.5・6.5）が 2 進で正確なので正確。D は 0.5 px 刻み。v ≥ v_min の判定は
-// D ≥ T0·v_min（＝ 300、整数）に置き換える。R_w は √3 を含むので ⌊⌋ の後の整数だけを固定する。
+// それでも R_w < 24 なら R 24 で溝を食う（limited 'width'）。R_h < 24 なら R 24 のまま v ＝ max(D/T, v_min)、
+// T ＝ D/v（limited 'height'。v_min を割る T だけが縮む。T より長くはならない）。両方なら 'height'。
+// 箱の高さが R 24 の鍵盤図（8 + k_n·24）以下で D ≤ 0 なら RangeError（呼ぶ側が帯で知らせる。仮）。
+// 境界の比べ方: R_h の整数商は k_n（3.5・6.5）が 2 進で正確なので正確。D は 0.5 px 刻み。limited の判定は
+// R_h（T0 基準。D ≥ 300 と同値）で行う。R_w は √3 を含むので ⌊⌋ の後の整数だけを固定する。
 
 import type { Profile } from '../../shared/types.ts'
 import { heightUnits, widthUnits } from './grid.ts'
@@ -21,7 +22,7 @@ import { SQ3 } from './hex.ts'
 /** 画面の余白（m0 PAD・GAP L195） */
 export const PAD = 12
 export const GAP = 12
-/** 鍵盤図の左右の溝（m1' gutter L373。計 32） */
+/** 鍵盤図の左右の溝（m1' gutter L372。計 32） */
 export const GUTTER_X = 16
 /** 鍵盤図の下の余白（m0 KB_BOTTOM L197） */
 export const KB_BOTTOM = 8
@@ -83,7 +84,7 @@ export type Sizing = {
   readonly D: number
   /** 流速 px/ms */
   readonly v: number
-  /** 実際の流れる時間 ms（高さ不足で縮めたときは T より短い） */
+  /** 実際の流れる時間 ms（高さ不足で D/T が v_min を割るときだけ D/v_min に縮む。T より長くはならない） */
   readonly travelMs: number
   /** 使ったプレイヤー矩形 */
   readonly player: Size
@@ -120,9 +121,14 @@ export function computeSizing(
   const kbTop = box.top + box.height - KB_BOTTOM - kbH
   const kbLeft = box.left + (box.width - kbW) / 2
   const D = box.height - KB_BOTTOM - kbH
-  let v = D / travelMs
+  if (!(D > 0))
+    throw new RangeError(
+      `sizing: 箱の高さ ${box.height} px は R ${R_MIN} の鍵盤図（${KB_BOTTOM + s.kN * R_MIN} px）以下`,
+    )
+  const vRaw = D / travelMs
+  let v = vRaw
   let travel = travelMs
-  if (limited === 'height' && D < T0_MS * V_MIN) {
+  if (limited === 'height' && vRaw < V_MIN) {
     v = V_MIN
     travel = D / V_MIN
   }

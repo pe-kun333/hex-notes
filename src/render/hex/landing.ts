@@ -9,7 +9,7 @@ import type { GridCell, KeyboardGrid } from './grid.ts'
 export type LandingMode = 'cell' | 'line'
 export const DEFAULT_LANDING: LandingMode = 'cell'
 
-/** 一本線と鍵盤図の上端の隙間（R 単位。m0 LINE_GAP L196、m1' yLine L373） */
+/** 一本線と鍵盤図の上端の隙間（R 単位。m0 LINE_GAP L196、m1' yLine L374） */
 export const LINE_GAP = 0.8
 /** 奥行き: 1 段上がるごとの倍率と下限（§2.2） */
 export const DEPTH_STEP = 0.96
