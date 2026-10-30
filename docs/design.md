@@ -130,7 +130,7 @@ Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W
 
 ### 2.6 時計と同期
 
-主時計: 全モードで performance.now 単独。t＝a·now＋b を時計層が一本だけ持つ。AudioContext.currentTime は発音予約だけ（getOutputTimestamp で対応）。動画時刻の補正: getCurrentTime を毎フレーム読み変化時だけ標本、最小二乗 2 秒窓、span<300 ms は直前値＋経過×rate、量子化補正 +q̂/2。逆行・飛び: 負の増分は捨て、期待値との差 >250 ms は seek とみなし再初期化。猶予: seek・一時停止・BUFFERING・飛び・レート変更の後 300 ms は判定保留＋S7b、猶予内に窓が終わるノートは skipped。停止検知: 可視・PLAYING で 2 秒凍結→pauseVideo() を呼び 500 ms 以内に PAUSED なら S7c、ならなければ広告中とみなし S7b のまま、復帰は手動のみ。レート: onPlaybackRateChange で再同期、判定窓は実時間で固定。visibilitychange で Pause、非表示中は停止検知しない。目標: 残差 SD <5 ms（測る: M3-07）。
+主時計: 全モードで performance.now 単独。t＝a·now＋b を時計層が一本だけ持つ（状態を値で持つ純関数が、t と次の tick まで有効な写像 a・b を返し、判定・音源・描画が同じ写像で実時刻と曲の時刻を行き来する。t は動画の軸の ms で、譜面の軸へは sync の offset・rate で時計の外で換算する。校正のオフセットは時計層に入れない。decisions #32、2026-10-31、仮）。AudioContext.currentTime は発音予約だけ（getOutputTimestamp で対応。#37）。動画時刻の補正: getCurrentTime を毎フレーム読み変化時だけ標本、最小二乗 2 秒窓、span<300 ms は直前値＋経過×rate、量子化補正 ＋β·q̂（q̂ は span ≥1000 ms で √12·残差 SD〔上限 50〕。読みの増分から刻みを推定し、増分の 8 割以上がその格子に乗るときだけ使い、再アンカーで持ち越す。読みの変わった tick だけを標本にするので、√12·SD は刻みと「tick の間隔×再生レート」の小さい方になり、表示のリフレッシュレートと再生レートによらず切り捨ての偏りを打ち消す。β は既定 0.5〔切り捨てと仮定〕で M3-07 で決める。#33、仮）。再アンカーの後は読みが変わるまで t を保持して外挿しない（最初の変化が保持の値より 250 ms を超えて後ろか、名目の進みより 250 ms を超えて先なら飛び）。PLAYING 中の出力は逆行させない。逆行・飛び: 負の増分（最後に受け入れた標本以下の読み）は捨て、期待値との差 >250 ms は seek とみなし再初期化（猶予中でも）。有限でない読み・レートは読みの無いフレームと同じに扱う。猶予: seek・一時停止・BUFFERING・飛び・レート変更の後 300 ms は判定保留＋S7b、猶予内に窓が終わるノートは skipped（再アンカーの名目の写像で着地の実時刻＋遅れ側の窓 ≤ 猶予の終わり）。停止検知: 可視・PLAYING で 2 秒凍結（最後に読みが変わってから ≥2,000 ms。再アンカーと非表示からの復帰でも数え直す）→pauseVideo() を呼び 500 ms 以内に PAUSED なら S7c、ならなければ広告中とみなし S7b のまま、復帰は手動のみ（時計層は pauseVideo を呼ばず要求を返し、YouTube 連携層が呼ぶ。結果は次の読みの state で受ける。要求から 500 ms 以内の PAUSED は、間に読みが動き出しても BUFFERING を挟んでも S7c とし、t を止めていた（広告中・BUFFERING）なら猶予 300 ms を通して走り出す。広告中は 2.5 s ごとに要求し直し、500 ms を過ぎて来た PAUSED は一時停止として扱う。「戻す」は動画が PLAYING で読みが 2,000 ms 未満に変わったときだけ。#34、仮）。レート: onPlaybackRateChange で再同期（前の窓を捨てる。動画なしはテンポ段の切替で同じ）、判定窓は実時間で固定。visibilitychange で Pause、非表示中は停止検知しない。目標: 残差 SD <5 ms（測る: M3-07）。
 
 ### 2.7 校正・足場外し・待ち・ループ
 
@@ -140,7 +140,7 @@ Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W
 
 閃光 1 秒 3 回以下、同時に光る面積 25% 以下。ヒットの光はセル内のみ。節目の演出（コンボ 50 の倍数・完走時）も落下域と鍵盤図の領域内だけ、10 秒に 1 回まで。判定文字は鍵盤図の上に 600 ms。低負荷モード: rAF 間隔の 95 パーセンタイルが 20 ms 超を 10 秒続けたら「演出なし→殻なし→奥行きなし」の順に自動で落とし帯で知らせる（仮、M-7）。勘定（decisions #29、2026-10-30、仮）: 閃光＝鍵盤図のセルを塗って光らせる演出（セルの外には出ない）で、縁の返し・NEAR の滑り・判定文字は数えない。低負荷の段 1「演出なし」は閃光なしで、判定の返し（§1.3 S2）は残す。直近 1,000 ms に 3 つ、または同時に光る面積（落下域＋鍵盤図の 25%）を超える閃光は捨てずに縁 2 px へ格下げする。受け入れは演出を出すときに 1 回だけ決める。p95 は直近 1,000 ms の窓で取り、1,000 ms を超える間隔（非表示・一時停止）は途切れとして数え直す。自動では上げない。
 
-入力: code で判定、押下集合で keyup と対応付け、e.repeat か既にある code は捨てる。IME（keyCode 229／isComposing）の打鍵は無視して帯、曲は止めない（S0 を含む全画面）。役割キー: Space＝開始・再開・校正タップ・見本切替、Enter＝ボタン決定、Escape＝一時停止。禁止 code: Backquote, KanaMode, Convert, NonConvert, CapsLock, Lang1/2, Meta, F1〜F12。iframe に焦点が移ったら戻す。blur／visibilitychange で Pause。修飾キーは使わない。細部（keydown の見る順、IME の検知 ime と帯の点け消し、Ctrl・Alt・Meta 付きは素通し、Meta の keyup とコンテキストメニューで全離し、文字の欄は通さず select は通して焦点を外す、Pause 要求は冪等で再生中だけ効く）は decisions #26（2026-10-30、仮）。時刻: tsPerf は Event.timeStamp（主スレッドの待ちを含まない）。非有限・0 以下・now より後なら now（ハンドラの冒頭の performance.now）、1000 ms より古くても ts を保つ。keyup・校正タップも同じ式、blur・非表示などの全離しは now（Meta の keyup による全離しはその keyup の式）。刻みの補正（+q/2）はしない。刻みは実際の keydown・keyup の timeStamp で推定し、8 ms 以上は「判定が粗い環境」の注記だけ（decisions #25、2026-10-30、仮。実装 src/input/timestamp.ts・resolution.ts）。
+入力: code で判定、押下集合で keyup と対応付け、e.repeat か既にある code は捨てる。IME（keyCode 229／isComposing）の打鍵は無視して帯、曲は止めない（S0 を含む全画面）。役割キー: Space＝開始・再開・校正タップ・見本切替、Enter＝ボタン決定、Escape＝一時停止。禁止 code: Backquote, KanaMode, Convert, NonConvert, CapsLock, Lang1/2, Meta, F1〜F12。iframe に焦点が移ったら戻す。blur／visibilitychange で Pause。修飾キーは使わない。細部（keydown の見る順、IME の検知 ime と帯の点け消し、Ctrl・Alt・Meta 付きは素通し、Meta の keyup とコンテキストメニューで全離し、文字の欄は通さず select は通して焦点を外す、Pause 要求は冪等。効かせる相は 2026-10-31 に decisions #35 で「再生・待ち・同期中（同期中の iframe は無視）」に改めた）は decisions #26（2026-10-30、仮）。時刻: tsPerf は Event.timeStamp（主スレッドの待ちを含まない）。非有限・0 以下・now より後なら now（ハンドラの冒頭の performance.now）、1000 ms より古くても ts を保つ。keyup・校正タップも同じ式、blur・非表示などの全離しは now（Meta の keyup による全離しはその keyup の式）。刻みの補正（+q/2）はしない。刻みは実際の keydown・keyup の timeStamp で推定し、8 ms 以上は「判定が粗い環境」の注記だけ（decisions #25、2026-10-30、仮。実装 src/input/timestamp.ts・resolution.ts）。
 
 ### 2.9 YouTube・同梱曲・読込
 
@@ -173,13 +173,15 @@ Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W
 
 ### 4.1 モジュールとデータフロー
 
-入力層（{code, tsPerf} に正規化。tsPerf は §2.8 の式。repeat 捨て、IME 無視＋帯、blur で全離し＋Pause 要求、役割キー）。時計層（唯一の ClockSource。performance.now 単独、動画時刻は補正源、停止検知、猶予）。判定層（判定・精度・ランク・自力率）。描画層（Canvas 2D・rAF 1 本。領域と予算を層で強制、低負荷の段階。描画コマンド列を返す純関数と Canvas へ流す薄い関数 flush に分け、コマンドは poly／line／rect／text に layer・region・tag の印を付けた物、色は名前でパレットは flush、時刻は引数で受ける。decisions #27、2026-10-30、仮）。譜面層（読み書き・変換器・バリデータ・ms 表・variants 生成・鍵数制限の実行時フィルタ）。練習層（待ち・ループ・テンポ段・足場外し。動画ありでは待ちを出さない）。音源層（ガイド音＋accompaniment を 25 ms 周期・100 ms 先読みで予約。合成音→Salamander 遅延読込）。保存層（§4.3。try/catch、失敗はメモリ内で続行し S7d と storageFail）。YouTube 連携層（IFrame の生成・状態・onError・規約。pause／seek／play の 3 用途）。計測層（§4.6）。
+入力層（{code, tsPerf} に正規化。tsPerf は §2.8 の式。repeat 捨て、IME 無視＋帯、blur で全離し＋Pause 要求、役割キー）。時計層（唯一の ClockSource。performance.now 単独、動画時刻は補正源、停止検知、猶予。状態を値で持つ純関数 clockTick〔毎フレーム、動画の読み 1 つ〕と clockCommand〔入力のハンドラの now で命令〕が t・写像・事象・動画への要求を返す。停止検知の pauseVideo は要求で返し、結果は次の読みの state で受ける〔呼び出し口は抽象〕。decisions #32・#34、2026-10-31、仮）。プレイの状態機械（§4.2。時計の事象と入力の事象から、時計への命令と動画への要求を返す純関数。src/play/、#35、仮）。判定層（判定・精度・ランク・自力率）。描画層（Canvas 2D・rAF 1 本。領域と予算を層で強制、低負荷の段階。描画コマンド列を返す純関数と Canvas へ流す薄い関数 flush に分け、コマンドは poly／line／rect／text に layer・region・tag の印を付けた物、色は名前でパレットは flush、時刻は引数で受ける。decisions #27、2026-10-30、仮）。譜面層（読み書き・変換器・バリデータ・ms 表・variants 生成・鍵数制限の実行時フィルタ）。練習層（待ち・ループ・テンポ段・足場外し。動画ありでは待ちを出さない）。音源層（ガイド音＋accompaniment を 25 ms 周期・100 ms 先読みで予約。合成音→Salamander 遅延読込）。保存層（§4.3。try/catch、失敗はメモリ内で続行し S7d と storageFail）。YouTube 連携層（IFrame の生成・状態・onError・規約。pause／seek／play の 3 用途）。計測層（§4.6）。
 
 流れ: 起動（保存層→設定・校正・上限・透明度。失敗なら既定値＋S7d）→選曲（ms 表、端末に合う variant を選ぶか生成）→プレイ（入力→時計→判定→描画・音源・計測）→結果（対象プレイなら称号・ストリーク）→保存（results、校正の提案、telemetry）。
 
 ### 4.2 プレイの状態機械
 
 待機（選曲直後。利用者の click→同期中）→ 同期中（S7b。開始・seek・再開・BUFFERING・飛びの直後、300 ms 猶予。収まれば再生、停止検知→動画なし）→ 再生（Pause、曲末→終了）。待ち（S4 のみ。正解→同期中、250 ms 空白）。一時停止（Esc・blur・visibilitychange・PAUSED。再開→同期中）。動画なし（S2A。動画を使わない選曲／S7a／S7c。復帰は「戻す」の手動だけ→同期中）。終了（最終ノート＋1.2 秒→結果→保存→待機）。
+
+2026-10-31（decisions #35、仮）: 動画なしは相でなく源（動画／動画なし）で表し、動画なしでも一時停止と猶予を通る（待機は動画なしなら Space、動画ありなら click-to-play の最初の PLAYING で同期中）。停止検知の pauseVideo が 500 ms 以内に効けば源を動画なしへ（再生なら相はそのまま、S7c の帯。広告中・BUFFERING の同期中からは、止めていた t から猶予 300 ms を通って再生へ）、効かなければ広告中とみなし同期中へ（要求から結果までの 500 ms は再生のまま外挿）。PAUSED の出どころ: 停止検知の要求から 500 ms 以内の PAUSED は動画なし、利用者が iframe で止めた PAUSED（BUFFERING の後でも）と要求から 500 ms を過ぎて来た PAUSED は一時停止（自動では再生し直さない、#11）。BUFFERING は同期中、ENDED は終了（一時停止の間に終わっていたら再開で終了）。Pause 要求（Esc・blur・visibilitychange・iframe）は冪等で、再生・待ち・同期中で一時停止へ移し（同期中の iframe は click-to-play・広告の「スキップ」の click なので無視）、待機・一時停止・終了では無視する。動画ありの一時停止は pauseVideo、再開は playVideo を要求する（#11 の Pause 再開の用途）。
 
 ### 4.3 保存
 

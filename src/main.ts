@@ -5,7 +5,8 @@
 if (import.meta.env.DEV) {
   const DEV_PAGES: readonly { href: string; label: string }[] = [
     { href: '/src/app/dev/input.html', label: '入力層（手順 5）' },
-    { href: '/src/app/dev/play.html', label: '描画層（手順 6）' },
+    { href: '/src/app/dev/play.html', label: '描画層（手順 6・7）' },
+    { href: '/src/app/dev/clock.html', label: '時計層（手順 7）' },
   ]
   const app = document.getElementById('app')
   if (app !== null) {

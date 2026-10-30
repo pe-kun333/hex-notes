@@ -1,11 +1,25 @@
 // 描画層の開発ページ（M0-03b、手順 6）。6 曲×2 配列（＋負荷譜面）を段別着地か一本線で流し、手弾きで「位置で読めるか」を
 // 確かめる（§5.7「M0-03b の途中」、ADR 0006）。製品画面ではない（導線は開発時だけ、src/main.ts）。
-// 仮時計は m3 nvTime L351 相当（performance.now − 開始、手順 7 の時計層で差し替え）。手弾きは手順 5 の attachKeyboard、
-// 押下の時刻は press の tsPerf。判定は開発用の仮（±300 ms の対応付けと入門者の窓。製品の判定層は手順 8）。
-// performance.now の直呼びは src/app/ だけ（src/README.md）。
+// 時計は手順 7 の時計層（動画なしの ClockSource、src/play/session.ts でプレイの状態機械とつなぐ。decisions #32・#35）。
+// Space で開始・再開（再開は同期中＝猶予 300 ms を通る）、Escape・タブの切替・窓の外の click で一時停止、一時停止中の
+// Escape か「中止」で中止。手弾きは手順 5 の attachKeyboard、押下の時刻は press の tsPerf を時計の写像で曲 ms にする。
+// 判定は開発用の仮（±300 ms の対応付けと入門者の窓。再生中で猶予の終わり以後の押下だけ判定し、猶予内に窓が終わる音は
+// skipped として対応付けと集計から外す。製品の判定層は手順 8）。performance.now の直呼びは src/app/ だけ（src/README.md）。
 
 import { buildVariant } from '../../chart/variants.ts'
+import { skippedAt } from '../../clock/grace.ts'
+import { songAt } from '../../clock/map.ts'
+import type { ClockMap } from '../../clock/types.ts'
 import type { InputEvent } from '../../input/keyboard.ts'
+import {
+  initialSession,
+  sessionIdle,
+  sessionInput,
+  sessionTick,
+  type Session,
+  type SessionStep,
+} from '../../play/session.ts'
+import type { PlayEvent } from '../../play/state.ts'
 import { LAYOUTS } from '../../layout/presets.ts'
 import type { Chart, Judgment, KeyCode, LayoutId, Variant } from '../../shared/types.ts'
 import type { FrameNote, LabelMode } from '../../render/canvas/cells.ts'
@@ -39,6 +53,8 @@ const WINDOWS: readonly [Judgment, number][] = [
   ['good', 180],
 ]
 const LATE_FACTOR = 1.3
+/** 遅れ側の窓の実時間 ms（good 180 × 1.3。skipped の判定、grace.ts） */
+const W_LATE_MS = 180 * LATE_FACTOR
 /**
  * 取り逃しを確かめるまでの余裕 ms（±300 ms の窓の後）。押下の時刻は Event.timeStamp で、ハンドラに届くのがフレームより
  * 遅れることがある（decisions #25 の申し送りの G の候補 50 ms、仮。製品は手順 8 で決める）
@@ -117,7 +133,14 @@ type RunRecord = {
 }
 
 type Run = {
-  startNow: number
+  /** プレイの状態機械と時計（動画なし。t は譜面の ms、開始は −LEAD_MS） */
+  session: Session
+  /** 最後の tick・命令の写像（次の tick まで。押下の tsPerf → 曲 ms） */
+  map: ClockMap
+  /** 最後の tick の t（曲 ms） */
+  t: number
+  /** 最後の再アンカーの猶予の終わり（perf ms）。これより前の押下は判定しない */
+  graceUntil: number
   notes: FrameNote[]
   states: Map<number, FrameNote['state']>
   outcomes: NoteOutcome[]
@@ -178,6 +201,7 @@ function main(): void {
   )
   const hintBox = el('input', { type: 'checkbox', checked: true })
   const flashBtn = el('button', { type: 'button', textContent: '閃光を試す（1 秒に 5 回）' })
+  const stopBtn = el('button', { type: 'button', textContent: '中止' })
   const status = el('div', { className: 'band', hidden: false })
   const info = el('div', { className: 'note' })
   const tbody = el('tbody')
@@ -210,16 +234,28 @@ function main(): void {
   })
 
   panel.append(
-    el('h1', {}, '描画層（開発ページ、手順 6）'),
+    el('h1', {}, '描画層（開発ページ、手順 6・7）'),
     el(
       'ol',
       {},
       el('li', {}, '曲・配列・着地を選ぶ（選んだ後は落下域を一度クリックして焦点を戻す）。'),
-      el('li', {}, 'Space で開始。Escape で中止。セルが自分の鍵のセルに重なった瞬間に押す。'),
+      el(
+        'li',
+        {},
+        'Space で開始。セルが自分の鍵のセルに重なった瞬間に押す。Escape・タブの切替で一時停止、Space で再開' +
+          '（300 ms の猶予の後に判定を戻す）。一時停止中の Escape か「中止」で中止。',
+      ),
       el('li', {}, '曲が終わると表に 1 行増える。「読めた」を付け、最後に下の JSON を渡す。'),
     ),
     el('div', { className: 'row' }, songSel, layoutSel, modeSel),
-    el('div', { className: 'row' }, labelSel, el('label', {}, hintBox, '辺ヒント'), flashBtn),
+    el(
+      'div',
+      { className: 'row' },
+      labelSel,
+      el('label', {}, hintBox, '辺ヒント'),
+      flashBtn,
+      stopBtn,
+    ),
     status,
     info,
     table,
@@ -305,12 +341,39 @@ function main(): void {
     status.textContent = s
   }
 
-  const songNow = (nowPerf: number): number => (run ? nowPerf - run.startNow - LEAD_MS : -LEAD_MS)
+  /** 状態機械と時計の 1 歩を走りに写す。再アンカー（resync）では猶予内に窓が終わる音を skipped にする */
+  const applyStep = (r: Run, step: SessionStep): void => {
+    const before = r.session.play.phase
+    r.session = step.session
+    r.map = step.out.map
+    r.t = step.out.t
+    for (const ev of step.out.events) {
+      if (ev.kind !== 'resync') continue
+      r.graceUntil = ev.graceUntil
+      r.outcomes.forEach((o, i) => {
+        if (o.pressMs !== null || r.swept.has(i)) return
+        if (!skippedAt(o.tLandMs, ev.nominal, W_LATE_MS, ev.graceUntil)) return
+        r.outcomes[i] = { ...o, skipped: true }
+        r.swept.add(i)
+        r.states.set(o.index, 'done')
+      })
+    }
+    const phase = r.session.play.phase
+    if (phase === before) return
+    if (phase === 'syncing') setStatus('同期中（300 ms の猶予。判定を保留）')
+    else if (phase === 'playing') setStatus('再生中（Escape・タブの切替で一時停止）')
+    else if (phase === 'paused') setStatus('一時停止中: Space で再開、Escape か「中止」で中止')
+  }
+
+  const playInput = (ev: PlayEvent): void => {
+    if (run) applyStep(run, sessionInput(run.session, performance.now(), ev))
+  }
 
   const startRun = (): void => {
     if (!grid || notesTemplate.length === 0) return
     const g = grid
     const now = performance.now()
+    const session = initialSession({ mode: 'novideo', t0: -LEAD_MS })
     const outcomes: NoteOutcome[] = notesTemplate.map((n) => ({
       index: n.index,
       code: n.code,
@@ -321,8 +384,11 @@ function main(): void {
       pressedCode: null,
     }))
     const last = notesTemplate.reduce((m, n) => Math.max(m, n.tEndMs), 0)
-    run = {
-      startNow: now,
+    const r: Run = {
+      session,
+      map: { a: 0, b: -LEAD_MS },
+      t: -LEAD_MS,
+      graceUntil: -Infinity,
       notes: notesTemplate,
       states: new Map(),
       outcomes,
@@ -330,8 +396,9 @@ function main(): void {
       swept: new Set(),
       endMs: last + TAIL_MS,
     }
+    run = r
     effects = []
-    setStatus('再生中（Escape で中止）')
+    applyStep(r, sessionInput(session, now, { kind: 'start' }))
     canvas.focus({ preventScroll: true })
   }
 
@@ -432,8 +499,13 @@ function main(): void {
 
   const onPress = (code: KeyCode, tsPerf: number): void => {
     if (!run || !grid) return
-    const t = songNow(tsPerf)
+    // 押下の前に今の相へ進める（猶予の終わりを次のフレームまで待たない）
     const realNow = performance.now()
+    applyStep(run, sessionIdle(run.session, realNow))
+    // 判定は再生中で、押した時刻が猶予の終わり以後の押下だけ（同期中・一時停止中の押下は捨てる。§2.6 の「判定保留」を
+    // 開発用にこう読んだ仮。猶予中の押下を保留して後で判定するかは手順 8、kickoff §7-16）
+    if (run.session.play.phase !== 'playing' || tsPerf < run.graceUntil) return
+    const t = songAt(run.map, tsPerf)
     const i = matchPress(run.outcomes, code, t)
     if (i === null) return
     const o = run.outcomes[i]
@@ -476,7 +548,12 @@ function main(): void {
       else if (ev.kind === 'release') onRelease(ev.code)
       else if (ev.kind === 'role' && ev.role === 'primary') {
         if (!run) startRun()
-      } else if ((ev.kind === 'role' && ev.role === 'pause') || ev.kind === 'pause') stopRun(false)
+        else playInput({ kind: 'resume' })
+      } else if (ev.kind === 'role' && ev.role === 'pause') {
+        // 一時停止中の Escape は中止（Pause メニューの「やめる」の代わり）。他は一時停止の要求（冪等）
+        if (run?.session.play.phase === 'paused') stopRun(false)
+        else playInput({ kind: 'pause', reason: 'escape' })
+      } else if (ev.kind === 'pause') playInput({ kind: 'pause', reason: ev.reason })
     }
   }
 
@@ -509,6 +586,11 @@ function main(): void {
     canvas.focus({ preventScroll: true })
   })
 
+  stopBtn.addEventListener('click', () => {
+    stopRun(false)
+    canvas.focus({ preventScroll: true })
+  })
+
   for (const s of [songSel, layoutSel, modeSel]) s.addEventListener('change', () => void reload())
   window.addEventListener('resize', relayout)
 
@@ -518,8 +600,9 @@ function main(): void {
     if (lo.changed)
       setStatus(`低負荷: 段 ${low.level} に落としました（演出なし→殻なし→奥行きなし）`)
     const now = performance.now()
+    if (run) applyStep(run, sessionTick(run.session, now, null))
     if (sizing && grid) {
-      const t = songNow(now)
+      const t = run ? run.t : -LEAD_MS
       let notes: FrameNote[] = notesTemplate
       if (run) {
         const r = run

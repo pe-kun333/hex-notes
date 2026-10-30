@@ -98,3 +98,22 @@ describe('入れ違いは隣り合う和音の間で数える（和音の中の�
     expect(s.inversions).toBe(1)
   })
 })
+
+describe('skipped（猶予内に窓が終わった音。「疑う」a4・b10）', () => {
+  it('対応付けの候補にしない（猶予明けの押下は次の音へ）', () => {
+    const ns = [{ ...o(0, 'KeyF', 1, 5050, 0), skipped: true }, o(1, 'KeyF', 1, 5450, 1)]
+    expect(matchPress(ns, 'KeyF', 5330)).toBe(1)
+    expect(matchPress([ns[0] as NoteOutcome], 'KeyF', 5100)).toBeNull()
+  })
+  it('集計の分母・取り逃しに入れず、数だけ数える', () => {
+    const s = summarize([
+      { ...o(0, 'KeyA', 1, 1000, 0), skipped: true },
+      o(1, 'KeyS', 1, 1500, 1, 1510),
+      o(2, 'KeyD', 1, 2000, 2, 1990),
+    ])
+    expect(s.notes).toBe(2)
+    expect(s.skipped).toBe(1)
+    expect(s.missed).toBe(0)
+    expect(s.missRate).toBe(0)
+  })
+})
