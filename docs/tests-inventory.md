@@ -20,9 +20,17 @@
 | 2 | 配列表 `presets` | ableton の KeyA／KeyW | 60／61 | 設計 §2.1 | 検算済（tests/unit/layout/presets.test.ts） |
 | 2 | 配列表 `presets` | 表の総数／音域 | ableton 17・vmpk 34・genshin 21・wicki 40／60–76・48–76・48–83・48–81 | spec 草稿 §1、設計 §2.1 | 検算済（tests/unit/layout/presets.test.ts） |
 | 2 | 配列表 `presets` | vmpk の 60 の逆引き／`resolveLayoutId('constructor')` | [KeyQ, Comma]（Q 段が先）／null | 設計 §2.1「60 以上は Q 段側（仮）」 | 検算済（tests/unit/layout/presets.test.ts） |
-| 3 | 変換器 `convert-m5` | canon、ableton、octave、limit 2 | out 34、dropThin 17 | m5 `buildVariant` L324–363 | 仮 |
-| 3 | 間引き | 和音 [60, 64, 67, 72]、limit 2 | 残る 67、72（低い音から落とす） | 設計 §2.4 | 未検算 |
-| 3 | 変換後 | 同上の曲 | notes 51、id `ableton/2/octave`、keys 長 51 で null 17 | 手計算 | 仮 |
+| 3 | 変換器の入力 `m5BuildVariant` | canon、garage（ableton）、octave、limit 2 | out 34、dropThin 17（src 51、dropFold 0、moved 24） | m5 `buildVariant` L324–363。元のコードを評価した値と移植の値で検算（手計算と一致） | 検算済（tests/unit/chart/m5-port.test.ts・convert-m5.test.ts） |
+| 3 | 間引き `buildVariant` | 和音 [60, 64, 67, 72]、ableton、limit 2／3／4 | 残る 67・72／64・67・72／全部（低い音から落とす） | 設計 §2.4 | 検算済（tests/unit/chart/variants.test.ts） |
+| 3 | 変換後 `convertM5` | 同上の曲 | notes 51（原曲音高、vel 102）、variants[0].id `ableton/2/octave`、keys 長 51 で null 17（51 個を固定値で照合）、id `sha256:ee99a593…373b`（m1' の canon と同じ。keys は variants.ts の版と 24 か所違う、decisions #22） | 設計 §3.3、kickoff 手順 3。id は node:crypto で別計算。keys は元のモックの out[].orig・key と突き合わせてから固定 | 検算済（tests/unit/chart/convert-m5.test.ts） |
+| 3 | m5 の写し `m5-port` | twinkle・canon・手作りの曲・全 128 音の曲 × 5 配列 × 3 折り畳み × 上限 2〜4、fmtJSON（同期なし／計測済み） | 元のコードの戻り・文字列と全て同じ。PRESETS の map は挿入順まで同じ。m1' の 6 曲の notes も同じ | m5 L206–429、m1' mel・SONGS L244–257（行番号で切り出して評価） | 検算済（tests/unit/chart/m5-port.test.ts） |
+| 3 | m5 の JSON 出力との照合 | canon・twinkle の m5 JSON（tests/fixtures/m5-json） | 鍵のある音を拍ごとに並べると、notes[i] を畳んだ音高・keys・hand が同じ。metrics・stats も同じ | m5 `buildJSON` L417–424・`fmtJSON` L425–429 | 検算済（tests/unit/chart/convert-m5.test.ts） |
+| 3 | 折り畳み `foldPitch` | 全 128 音 × 4 配列 × 3 折り畳み | m5 の折り畳みと同じ（例: ableton octave 100 → 76、genshin nearest 61 → 62、genshin octave 61 → 落とす、wicki octave 78 → 66・80 → 68（下向き探索）） | m5 `buildVariant` L329–337。下向き探索 L334 は全音の曲で元のコードとも突き合わせた | 検算済（tests/unit/chart/variants.test.ts） |
+| 3 | 間引き・重複の比べ方 | [57, 61, 64]／[48, 60]、ableton、octave、limit 2 | 61・64 が残る／60 が残る（原曲音高で高い方。m5 は 57→69・64／48） | decisions #20（本書以外に無い） | 仮（tests/unit/chart/variants.test.ts） |
+| 3 | 同音の鍵 `defaultKeyOf` | vmpk 60〜64、wicki 58／65 | KeyQ・Digit2・KeyW・Digit3・KeyE、KeyN／Digit2 | 設計 §2.1（vmpk のみ）、decisions #21 | 仮（tests/unit/chart/variants.test.ts） |
+| 3 | 鍵と音の対応 `convertM5` | m5 の 2 曲＋m1' の 6 曲 × 4 配列 × 3 折り畳み × 上限 2〜4（288 件） | 鍵の音高 ＝ notes[i] を畳んだ音高、(tick, 原曲音高, 鍵) が m5 の out[] と同じ、同 tick の鍵は重ならず上限以下 | 設計 §3.3、decisions #22 | 検算済（tests/unit/chart/convert-m5.test.ts） |
+| 3 | 変換の規則 | vel 0.3／1／省略、同 tick 同音、fl・harmonic、範囲外の limit・fold・division、目盛りに乗らない拍で同 tick に鍵が重なる・上限超え | 38／127／省略、最初の 1 つ、vmpk・拒否、RangeError、Error | decisions #22（kickoff の「parseMidi 0–127」を訂正） | 仮（tests/unit/chart/convert-m5.test.ts） |
+| 3 | フィクスチャ `from-mel` | `--check`、`validate-charts tests/fixtures/charts` | 10 件が生成物と 1 バイトも違わない、9 件が strict で ✓ | 手順 3 の完了条件 | 検算済（tests/unit/tools/from-mel.test.ts） |
 | 4 | 六角幾何 `hexDist` | Digit1–KeyW | 2 | m0 `hexDist` L169、`ROWS` L157–162 | 未検算 |
 | 4 | 格子 `ROW_OFF` | A 段と Q 段の x 差 | 0.5 | m0 `ROW_OFF` L163 | 未検算 |
 | 4 | R と v `sizing` | 舞台高 668（1366×768@100%）／620（1280×720）／514（1093×614@125%） | R 28、v 0.30／0.27／0.20（514 は境界） | 設計 §2.5 L126 | 未検算 |

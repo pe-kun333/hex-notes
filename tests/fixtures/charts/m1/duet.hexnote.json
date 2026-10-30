@@ -1,0 +1,75 @@
+{
+  "format": "hexnote-chart/1",
+  "id": "sha256:c043b5dcf5180f9538b54b000186b3445a8c25a230dddc484e890679cb4b1311",
+  "name": "二声（旋律＋ベース）",
+  "bpm": 100,
+  "beats": 16,
+  "notes": [
+    { "midi": 48, "beat": 0, "dur": 1 },
+    { "midi": 64, "beat": 0, "dur": 1 },
+    { "midi": 62, "beat": 1, "dur": 1 },
+    { "midi": 52, "beat": 2, "dur": 1 },
+    { "midi": 60, "beat": 2, "dur": 1 },
+    { "midi": 62, "beat": 3, "dur": 1 },
+    { "midi": 53, "beat": 4, "dur": 1 },
+    { "midi": 64, "beat": 4, "dur": 1 },
+    { "midi": 65, "beat": 5, "dur": 1 },
+    { "midi": 48, "beat": 6, "dur": 1 },
+    { "midi": 67, "beat": 6, "dur": 1 },
+    { "midi": 65, "beat": 7, "dur": 1 },
+    { "midi": 57, "beat": 8, "dur": 1 },
+    { "midi": 64, "beat": 8, "dur": 1 },
+    { "midi": 62, "beat": 9, "dur": 1 },
+    { "midi": 53, "beat": 10, "dur": 1 },
+    { "midi": 60, "beat": 10, "dur": 1 },
+    { "midi": 62, "beat": 11, "dur": 1 },
+    { "midi": 55, "beat": 12, "dur": 1 },
+    { "midi": 59, "beat": 12, "dur": 1 },
+    { "midi": 62, "beat": 13, "dur": 1 },
+    { "midi": 48, "beat": 14, "dur": 2 },
+    { "midi": 60, "beat": 14, "dur": 2 }
+  ],
+  "pulse": {
+    "resolution": 240,
+    "tempo": [
+      { "beat": 0, "bpm": 100 }
+    ]
+  },
+  "sync": { "sources": [] },
+  "source": { "kind": "bundled", "rights": "own", "title": "二声（旋律＋ベース）", "origin": "docs/planning/mocks/m1-geometry.html SONGS.duet" },
+  "variants": [
+    {
+      "id": "ableton/2/octave",
+      "layout": "ableton",
+      "limit": 2,
+      "fold": "octave",
+      "keys": ["KeyA", "KeyD", "KeyS", "KeyD", "KeyA", "KeyS", "KeyF", "KeyD", "KeyF", "KeyA", "KeyG", "KeyF", "KeyH", "KeyD", "KeyS", "KeyF", "KeyA", "KeyS", "KeyG", "KeyJ", "KeyS", null, "KeyA"],
+      "stats": { "srcNotes": 23, "droppedFold": 1, "movedFold": 9, "droppedThin": 0, "chordMax": 2 }
+    },
+    {
+      "id": "ableton/3/octave",
+      "layout": "ableton",
+      "limit": 3,
+      "fold": "octave",
+      "keys": ["KeyA", "KeyD", "KeyS", "KeyD", "KeyA", "KeyS", "KeyF", "KeyD", "KeyF", "KeyA", "KeyG", "KeyF", "KeyH", "KeyD", "KeyS", "KeyF", "KeyA", "KeyS", "KeyG", "KeyJ", "KeyS", null, "KeyA"],
+      "stats": { "srcNotes": 23, "droppedFold": 1, "movedFold": 9, "droppedThin": 0, "chordMax": 2 }
+    },
+    {
+      "id": "vmpk/2/octave",
+      "layout": "vmpk",
+      "limit": 2,
+      "fold": "octave",
+      "keys": ["KeyZ", "KeyE", "KeyW", "KeyC", "KeyQ", "KeyW", "KeyV", "KeyE", "KeyR", "KeyZ", "KeyT", "KeyR", "KeyN", "KeyE", "KeyW", "KeyV", "KeyQ", "KeyW", "KeyB", "KeyM", "KeyW", "KeyZ", "KeyQ"],
+      "stats": { "srcNotes": 23, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 2 }
+    },
+    {
+      "id": "vmpk/3/octave",
+      "layout": "vmpk",
+      "limit": 3,
+      "fold": "octave",
+      "keys": ["KeyZ", "KeyE", "KeyW", "KeyC", "KeyQ", "KeyW", "KeyV", "KeyE", "KeyR", "KeyZ", "KeyT", "KeyR", "KeyN", "KeyE", "KeyW", "KeyV", "KeyQ", "KeyW", "KeyB", "KeyM", "KeyW", "KeyZ", "KeyQ"],
+      "stats": { "srcNotes": 23, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 2 }
+    }
+  ],
+  "generator": "hexnote from-mel (M0-02)"
+}

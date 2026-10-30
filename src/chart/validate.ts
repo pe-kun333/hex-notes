@@ -15,6 +15,7 @@ import {
   FOLD_IDS,
   LAYOUT_ALIASES,
   LAYOUT_IDS,
+  MAX_RESOLUTION,
   RIGHTS,
 } from '../shared/types.ts'
 
@@ -23,8 +24,7 @@ export type ChartIssue = { path: string; code: string; message: string }
 
 export type ValidateResult = { ok: true; chart: Chart } | { ok: false; issues: ChartIssue[] }
 
-/** 上限（§3.2、仮）。巨大値で丸めが効かなくなるのを防ぐ */
-const MAX_RESOLUTION = 9600
+/** 上限（§3.2、仮）。巨大値で丸めが効かなくなるのを防ぐ（MAX_RESOLUTION は types.ts） */
 const MAX_BPM = 1000
 const MAX_BEAT = 1_000_000
 /** beat が 1/resolution の倍数かを見るときの許容（拍） */

@@ -130,10 +130,11 @@ LICENSE と `content/samples/salamander/LICENSE`。README の帰属と「参照�
 
 - 元: m5 `buildVariant` L324–363（TS へ移植）、`buildJSON` L417–424（照合用）、`EXAMPLES` L252、`mel` L249。m1' `buildChart` L275–304、`mel` L244、`SONGS` L246–257。m4 L340–371（作り直し）。
 - 作る: `src/chart/convert-m5.ts`、`variants.ts`、`tools/charts/from-mel.ts`（m1' の 6 曲と m5 EXAMPLES を /1 に）、`tests/fixtures/`（6＋2 曲の /1 JSON と m5 の JSON 出力）。
-- 変換器の入力は **m5 内部表現**（song＋移植した buildVariant の戻り `out[].orig` L338–339）。m5 の JSON（L418 は midi・beat・dur・hand だけ。vel・orig 無し）は入力にせず変換結果の照合に使う。vel は mel 経路 0.8 → ×127、parseMidi 経路 0–127 → そのまま、JSON 照合は既定 80（§3.2 L159）。parseMidi は M2-01 へ（§4）。
-- 手直し: notes＝折り畳み後 → 原曲音高、折り畳みは keys（§3.1 L154）。トップレベル keys／layout／limit → variants[0]（§3.3 L166）。keys は落とした音を除く → notes と同じ長さ、null（§3.2 L161）。重複判定 round(beat×1000) → 1/240 丸め。同音選択（前音から hexDist 最小）→ keys が決める、既定「60 以上は Q 段側」（§2.1 L97、仮）。警告 w4・rect → 外す。hand → ext.hand。
-- 期待値: canon・ableton・octave・limit 2 → out 34、dropThin 17（buildVariant L324–363 の手計算）。[60,64,67,72] limit 2 → 67,72。変換後 notes 51、id `ableton/2/octave`、keys 長 51 で null 17（仮）。
+- 変換器の入力は **m5 内部表現**（song＋移植した buildVariant の戻り `out[].orig` L338–339）。m5 の JSON（L418 は midi・beat・dur・hand だけ。vel・orig 無し）は入力にせず変換結果の照合に使う。vel は mel 経路 0.8 → ×127、parseMidi 経路 0–127 → そのまま、JSON 照合は既定 80（§3.2 L159）。parseMidi は M2-01 へ（§4）。→ 2026-10-30 訂正: m5 の parseMidi も L308 で `max(0.3, v/127)` の 0..1 にしているので、変換器は両経路とも 0..1 → round(×127)（decisions #22。元の速度を残すのは M2-01、§7-22）。
+- 手直し: notes＝折り畳み後 → 原曲音高、折り畳みは keys（§3.1 L154）。トップレベル keys／layout／limit → variants[0]（§3.3 L166）。keys は落とした音を除く → notes と同じ長さ、null（§3.2 L161）。重複判定 round(beat×1000) → 1/240 丸め。同音選択（前音から hexDist 最小）→ keys が決める、既定「60 以上は Q 段側」（§2.1 L97、仮。生成器 variants.ts は全配列で「60 以上は上の段、未満は下の段」、変換器は m5 の選択をそのまま写す。decisions #21・#22）。間引き・重複は原曲音高で比べ高い方を残す（m5 は畳んだ後の音高。decisions #20）。警告 w4・rect → 外す。hand → ext.hand。
+- 期待値: canon・ableton・octave・limit 2 → out 34、dropThin 17（buildVariant L324–363 の手計算）。[60,64,67,72] limit 2 → 67,72。変換後 notes 51、id `ableton/2/octave`、keys 長 51 で null 17（仮）。→ 2026-10-30 全て検算済（out 34・dropThin 17・moved 24 は m5 の元のコードを評価した値と移植の値で一致、他は製品のコードの試験で確認。譜面 id `sha256:ee99a593…373b` は m1' の canon と同じだが、keys は m5 の規則なので variants.ts の版と 24 か所違う（decisions #22）。台帳の手順 3）。
 - 完了条件: 「m5 の出力が変換器の後に通る」（§5.1 L205）。
+- 実際に取った手順（2026-10-30、手順 3、ブランチ `m0-03-convert-m5`）: m5 の忠実な写しは製品外の `tools/charts/m5-port.ts`（buildVariant・makeClock・mel・buildJSON・fmtJSON）に置き、元のモックを行番号で切り出して評価し突き合わせる試験（`tests/unit/chart/m5-port.test.ts`、3 曲×5 配列×3 折り畳み×上限 2〜4）を付けた。曲は `tools/charts/mel-songs.ts`、生成は `mel-fixtures.ts`、CLI は `from-mel.ts [outDir] [--check]`。フィクスチャは `tests/fixtures/charts/m1/`（6 曲×同梱 4 版）・`charts/m5/`（2 曲、変換器の出力）・`m5-json/`（m5 の JSON 出力、照合用）。npm scripts に `charts:fixtures`・`charts:fixtures:check`・`charts:validate:fixtures`（手で使う）を足した。CI では `npm test` の `tests/unit/tools/from-mel.test.ts` が同じ照合と strict 検査を行う。
 
 ### 手順 4: 六角幾何（M0-03a、M）
 
@@ -217,9 +218,9 @@ LICENSE と `content/samples/salamander/LICENSE`。README の帰属と「参照�
 | 項目 | m5 内部（入力） | m5 JSON（照合、L417–424） | m1' 読込（L478–485） | /1（§3.2） | 変換器 |
 |---|---|---|---|---|---|
 | format／id | 無し | あり／無し | 見ない | 必須、/2 拒否／sha256 | 付ける・計算 |
-| notes.midi | `out[].orig` | 折り畳み後 | 原曲 | 原曲音高 | orig を採る |
+| notes.midi | `src`（原曲音高、落ちた音も含む。2026-10-30 訂正: 旧「`out[].orig`」は間引き後の 34 音だけ） | 折り畳み後 | 原曲 | 原曲音高 | src を採る。out[] は (tick, orig) で keys に対応させるだけ（decisions #22） |
 | notes の順 | 時刻順 | 時刻順 | 任意 | beat 昇順、同拍 midi 昇順 | 並べ替え |
-| vel／hand | mel 0.8（0..1）／parseMidi 0–127 | 無し／hand | 無し | 0–127 既定 80／ext | 経路で分岐、JSON は 80、ext.hand |
+| vel／hand | mel 0.8・parseMidi max(0.3, v/127)（どちらも 0..1。2026-10-30 訂正、decisions #22） | 無し／hand | 無し | 0–127 既定 80／ext | round(×127)、JSON は 80、ext.hand |
 | pulse | resolution＋tempo | 同 | bpm のみ | {resolution, tempo[], timeSig[]?} | timeSig を補う |
 | sync | 単一＋説明文 | 同 | videoId 直読み | {sources[]} | sources[0] に畳む |
 | layout／keys／limit／fold | state | トップレベル、fold は stats | layout のみ | variants[0] | 畳む。別名を正規名に |
@@ -286,5 +287,9 @@ M1 に渡す物: `src/shared/types.ts`、`src/chart/`（バリデータ・ハッ
 18. **自作値**（仮のまま注記）: 合成音の係数、コンプレッサ −18 dB／4:1、DPR 上限 2、q̂ の条件、低負荷の閾（M-7）、15 ms 量子化の傾き 0.99986。
 19. **TypeScript 7.0.2**（手順 1）: Go 実装での入力なし時の挙動と `erasableSyntaxOnly` の有無は未確認。Node 24 か 26 か、Windows の長いパスの規約。
 20. **tools の AGPL**（手順 1・13）: §4.5 L190「初版は使わない」が正。
+21. **譜面版の指標 metrics**（手順 3）: variants.ts は stats（srcNotes・droppedFold・movedFold・droppedThin・chordMax）だけ作り、難度指標（密度・跳躍・同時押し率・段またぎ率、§2.4）は作らない。変換器は m5 の値を写す。生成は M1-08（S1 の難度 4 軸）か M2-01（S5 の指標）で、六角距離は手順 4 の `src/render/hex/hex.ts` を使う。
+22. **parseMidi の vel**（手順 3 → M2-01）: m5 は `max(0.3, v/127)` で 0..1 にするので、床 0.3 で元の速度 1〜37 が 38 に潰れる（38 以上は round(×127) で元に戻る）。SMF パーサーを移すときは 0–127 の整数のまま持ち、変換器を通さない。
+23. **m1' と m5 の折り畳みの違い**（手順 6）: m1' buildChart L282–283 は ±12・±24 の後に ±1・±11・±13 で寄せる（半音寄せ）。製品は m5 の 3 種（octave／cut／nearest、決定 #12）に揃えた。手順 6 の「同じ絵」は variants.ts の譜面版（`tests/fixtures/charts/m1/`）で取る。
+24. **間引き・同音の規則の確定**（手順 3）: decisions #20（原曲音高で比べる）・#21（60 以上は上の段）・#23（同梱曲の 4 版は octave）は仮。M-10・同梱曲の譜面化（M1-01）で不自然な版が出たら見直す。
 
-閉じた物: 変換器の入力（m5 内部表現。手順 3）、並行の折り合い（§5.1 どおり 02 全体）、「同じ絵」の物差し（コマンド列スナップショット。手順 6）、M0-02 の範囲（m5 と m1' 6 曲を from-mel で同じ /1 へ。手順 3）。
+閉じた物: 変換器の入力（m5 内部表現。手順 3）、手順 3 の期待値の検算（m5 の元のコードと移植で一致）、変換器の細部（decisions #22）、並行の折り合い（§5.1 どおり 02 全体）、「同じ絵」の物差し（コマンド列スナップショット。手順 6）、M0-02 の範囲（m5 と m1' 6 曲を from-mel で同じ /1 へ。手順 3）。
