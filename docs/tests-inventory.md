@@ -101,9 +101,16 @@
 | 9 | 同音 `samePitchGroups` | vmpk・ableton・genshin・wicki、variants.ts の defaultKeyOf と 40〜90 | vmpk 60〜64 の 5 組（既定は上の段）・なし・なし・58 → KeyN・65 → Digit2、同じ | design.md §2.1、decisions #21・#44 | 検算済（tests/unit/layout/legend-same-pitch-fallback.test.ts） |
 | 9 | 幾何と退避 `recommendGeometry`・`fallbackRowDiffs`・`labelsFor` | ortholinear×ableton・ANSI×ableton・ANSI×vmpk・ortholinear×genshin、ANSI ほか 3 通りの段ずれ、退避と正六角のラベル 4 種 | 退避・正六角・正六角・正六角、Q 段 0・A 段 ＋0.25・Z 段 ＋0.25（m2 L467 の式と同じ）、キー文字を必ず出す・そのまま | decisions #2・#45、m2 `updateFallbackNote` L466–468（仮） | 検算済（tests/unit/layout/legend-same-pitch-fallback.test.ts） |
 | 9 | U-01 の合否 | 実機 2 台の段ずれ（数字–Q／Q–A／A–Z、1u 単位） | 開発ページ layout-dev で配列ごとの位相と勧める幾何 | design.md §5.1 M0-07・§6.3 M-1、kickoff §5 | 未（利用者の実測の後） |
-| 10 | 合成音 `synth` | midi 69 | 440 Hz | m5 `playNoteAt` L443 | 未検算 |
+| 10 | 合成音 `synth` | midi 69／60／81、midi 21〜108 × vel 0.3〜1 × 長さ 0.2〜2.5 s、雑音 | 440 Hz／261.63／880、m5 の明るさ・倍音・減衰・振幅と同じ、帯域 2·f（上限 12 kHz）・振幅 vel·0.08・同じ種で同じ標本 | m5 `playNoteAt` L443–447（行番号で切り出して照合） | 検算済（tests/unit/audio/audio.test.ts） |
+| 10 | メトロノーム `beatClicks` | 120 BPM 4/4、3/4・6/8・5/8、拍 4 で 3/4 とテンポ 60 へ、範囲が無限 | 500 ms ごと・4 拍ごとに強拍、3 拍・3 拍・小節の頭が整数拍のときだけ、拍 4・7 が強拍、RangeError | m5 `clickAt` L448、m1' L345、decisions #47（仮） | 検算済（tests/unit/audio/audio.test.ts） |
+| 10 | 打鍵音 `keyclickFor` | 空打ち window（音のある鍵・無い鍵）、stopped、hit、miss | −18 dB（0.1259）・300 ms の音高、短い音、鳴らさない ×3 | 設計 §2.9、m5 `tapTick` L449、decisions #48（仮） | 検算済（tests/unit/audio/audio.test.ts） |
+| 10 | 予約 `pumpSchedule`・`seekSchedule` | 写像 t ＝ perf − 1000・対応点 context 10 s ＝ perf 1000、now 1000 と 1025、遅れ 50・100・100.5・150、時計が止まる、レート 0.5、一時停止をはさむ、seek | 先読み 100 の中を context の秒へ、今の時刻で鳴らす・ちょうど 100 は鳴らす・鳴らさない、予約しない・間隔に数えない、長さと実時刻が 2 倍、同じ時刻を含む下限 | 設計 §4.1、m5 `pump` L461–462（40 ms・250 ms を直した）、decisions #47（仮） | 検算済（tests/unit/audio/audio.test.ts） |
+| 10 | 鳴らす音の列 `soundItems` | canon（m5、ableton/2/octave）＋ベース 1 音、譜面版なし | 旋律 34・クリック 36・伴奏は原曲音高、同じ時刻は click → accomp → melody、原曲音高で全部 | 設計 §4.1・§3.2、decisions #47 | 検算済（tests/unit/audio/audio.test.ts） |
+| 10 | 録音 `nearestSample`・`parseManifest` | 30 音（A0 から短三度）で 60・61・62・20・110、同じ近さ、manifest の形と今の未同梱の manifest | ±1 半音の比・端は外へ・低い方を上げる、.. と / で始まるパスと形違いは null、files 空は読む | 設計 §2.9、decisions #46（仮） | 検算済（tests/unit/audio/audio.test.ts） |
+| 10 | 間引きの道具 `thin-salamander` | 30 音の名前、ffmpeg の引数、範囲の外、manifest、ATTRIBUTION、合成した 30 個の FLAC（頭の無音 50 ms） | A0〜C8・D#1v8.flac・Ds1.opus、無音を −60 dB で切り 6 s・フェード 0.5・Opus 48 kHz 96k、RangeError、parseManifest が読む、必須 6 項目の検査を通る、30 個の Opus を書き頭の無音を 10 ms 未満に | archive.org の SalamanderGrandPianoV3・sfzinstruments の Data/region.txt、kickoff 手順 10、decisions #46（仮） | 検算済（tests/unit/tools/salamander.test.ts。ffmpeg が無い環境では通しの 1 件を飛ばす） |
 | 10 | 帰属検査 | ATTRIBUTION.md の項目欠け | `npm run licenses:files` が fail | 手順書 手順 10（手順 1 の行で検算済） | 検算済 |
-| 10 | 初回読込 | `npm run build && npm run size` | 実測を docs に記録、≤ 10 MB | 決定 #10 | 未検算 |
+| 10 | 初回読込 | `npm run build && npm run size` | 11,652 バイト（0.01 MB）≤ 10 MB。合成した Salamander を置いても変わらない（遅延読込） | 決定 #10・#49 | 検算済（2026-10-31 の実測。U-03 の後に測り直す） |
+| 10 | 伴奏付きで鳴る | 開発ページ audio.html で canon（旋律＋ベース） | 合成音と Salamander（合成した 30 音の Opus を 30/30 復号）で予約・一時停止・−5 秒 | 設計 §5.1 M0-08 | 確認済（2026-10-31、browser pane は隠れていて耳では聞いていない。実物の Salamander は配置の後） |
 | 11 | 上限の丸め | '7' | 4（2..4 に丸める） | m1' L269（2..6 を直す）、決定 #7 | 未検算 |
 | 11 | 保存の失敗 | setItem が例外 | storageFail 1 回、処理は続く | 設計 §4.1、§4.3 | 未検算 |
 | 12 | 統計 `sd` | [1, 2, 3, 4] | 1.2909944 | m3 `sd` L248 | 未検算 |

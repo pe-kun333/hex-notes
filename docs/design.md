@@ -147,9 +147,9 @@ Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W
 ### 2.9 YouTube・同梱曲・読込
 
 - プレイヤー: IFrame Player API、click-to-play、playsinline=1、disablekb=1、controls 既定。前に何も置かない。半分超が可視になるまで再生しない。再生開始は利用者の click のみ。プログラムからの pause／seek／play は Pause 再開・ループ頭出し・停止検知の 3 用途だけ。
-- 音: 動画の音だけ。打鍵音は誤打のみ −18 dB・300 ms（仮）。報酬はプレイ単位（§4.4）。
+- 音: 動画の音だけ。打鍵音は誤打のみ −18 dB・300 ms（仮）。報酬はプレイ単位（§4.4）。細部（decisions #48、2026-10-31、仮）: 誤打 ＝ 判定層の空打ち（窓の外か鍵違い）で、その鍵の音高を合成音で鳴らす（音の無い鍵は短い音）。正しい押下は鳴らさない（動画なしでは旋律を先読みで予約してあるため）。
 - 同梱曲: 初版 10 曲（チュートリアル 1 曲＋入門 9）。権利は PD（作曲者・編曲者とも没後 70 年、校訂版不可）／CC0／CC BY／自作。譜面版 Ableton×{2,3}・VMPK×{2,3} を自動生成（fold は octave。decisions #23、2026-10-30）、W–H 版は M-10 の計測用のみ。初版は動画 ID を紐づけない（後の受入基準: テンポ一定、rate 1 本で残差 SD<20 ms、ピアノカバー不可）。
-- 伴奏: 同梱・持ち込みとも accompaniment（§3.2）を Salamander で鳴らす。rendered audio は持たない。初回読込 ≤10 MB（仮、§8）。Salamander 30 音は遅延読込し合成音で先に鳴らす（寸法は測る）。
+- 伴奏: 同梱・持ち込みとも accompaniment（§3.2）を Salamander で鳴らす。rendered audio は持たない。初回読込 ≤10 MB（仮、§8）。Salamander 30 音は遅延読込し合成音で先に鳴らす（寸法は測る）。細部（decisions #46・#49、2026-10-31、仮）: V3 の 44.1 kHz・16 bit の FLAC から 30 音・速度層 v8 を取り、頭の無音を切って 6 s・Ogg Opus 96 kbps に（道具 tools/salamander/thin-salamander.ts）。最も近い録音をピッチ比で鳴らす。初回読込は生のバイト数で、殻＋チュートリアル曲だけを数える（他の同梱曲と Salamander は入れない。2026-10-31 の実測 11,652 バイト）。
 
 ## 3. 譜面形式 hexnote-chart/1
 
@@ -175,7 +175,7 @@ Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W
 
 ### 4.1 モジュールとデータフロー
 
-入力層（{code, tsPerf} に正規化。tsPerf は §2.8 の式。repeat 捨て、IME 無視＋帯、blur で全離し＋Pause 要求、役割キー）。時計層（唯一の ClockSource。performance.now 単独、動画時刻は補正源、停止検知、猶予。状態を値で持つ純関数 clockTick〔毎フレーム、動画の読み 1 つ〕と clockCommand〔入力のハンドラの now で命令〕が t・写像・事象・動画への要求を返す。停止検知の pauseVideo は要求で返し、結果は次の読みの state で受ける〔呼び出し口は抽象〕。decisions #32・#34、2026-10-31、仮）。プレイの状態機械（§4.2。時計の事象と入力の事象から、時計への命令と動画への要求を返す純関数。src/play/、#35、仮）。判定層（判定・精度・ランク・自力率。状態を値で持つ純関数 judgeClock〔時計の事象: 再アンカーの skipped・猶予の終わりに溜めた押下の判定〕・judgeSweep〔毎フレーム: MISS の確定・ホールドの終点〕・judgePress・judgeRelease〔入力のハンドラ〕が判定の事象を返す。時計の写像で実時間の窓を比べ、校正のオフセットはここで足す。decisions #38〜#41、2026-10-31、仮）。描画層（Canvas 2D・rAF 1 本。領域と予算を層で強制、低負荷の段階。描画コマンド列を返す純関数と Canvas へ流す薄い関数 flush に分け、コマンドは poly／line／rect／text に layer・region・tag の印を付けた物、色は名前でパレットは flush、時刻は引数で受ける。decisions #27、2026-10-30、仮）。譜面層（読み書き・変換器・バリデータ・ms 表・variants 生成・鍵数制限の実行時フィルタ）。練習層（待ち・ループ・テンポ段・足場外し。動画ありでは待ちを出さない）。音源層（ガイド音＋accompaniment を 25 ms 周期・100 ms 先読みで予約。合成音→Salamander 遅延読込）。保存層（§4.3。try/catch、失敗はメモリ内で続行し S7d と storageFail）。YouTube 連携層（IFrame の生成・状態・onError・規約。pause／seek／play の 3 用途）。計測層（§4.6）。
+入力層（{code, tsPerf} に正規化。tsPerf は §2.8 の式。repeat 捨て、IME 無視＋帯、blur で全離し＋Pause 要求、役割キー）。時計層（唯一の ClockSource。performance.now 単独、動画時刻は補正源、停止検知、猶予。状態を値で持つ純関数 clockTick〔毎フレーム、動画の読み 1 つ〕と clockCommand〔入力のハンドラの now で命令〕が t・写像・事象・動画への要求を返す。停止検知の pauseVideo は要求で返し、結果は次の読みの state で受ける〔呼び出し口は抽象〕。decisions #32・#34、2026-10-31、仮）。プレイの状態機械（§4.2。時計の事象と入力の事象から、時計への命令と動画への要求を返す純関数。src/play/、#35、仮）。判定層（判定・精度・ランク・自力率。状態を値で持つ純関数 judgeClock〔時計の事象: 再アンカーの skipped・猶予の終わりに溜めた押下の判定〕・judgeSweep〔毎フレーム: MISS の確定・ホールドの終点〕・judgePress・judgeRelease〔入力のハンドラ〕が判定の事象を返す。時計の写像で実時間の窓を比べ、校正のオフセットはここで足す。decisions #38〜#41、2026-10-31、仮）。描画層（Canvas 2D・rAF 1 本。領域と予算を層で強制、低負荷の段階。描画コマンド列を返す純関数と Canvas へ流す薄い関数 flush に分け、コマンドは poly／line／rect／text に layer・region・tag の印を付けた物、色は名前でパレットは flush、時刻は引数で受ける。decisions #27、2026-10-30、仮）。譜面層（読み書き・変換器・バリデータ・ms 表・variants 生成・鍵数制限の実行時フィルタ）。練習層（待ち・ループ・テンポ段・足場外し。動画ありでは待ちを出さない）。音源層（ガイド音＋accompaniment を 25 ms 周期・100 ms 先読みで予約。合成音→Salamander 遅延読込。曲の ms を時計の写像 perfAt と audio-bridge で context の秒にし、実時刻を過ぎた音は今鳴らし 100 ms を超えて遅れた音は鳴らさない。再アンカーと一時停止で先の予約を止めて数え直す。予約の遅れの最大を計測し 20 ms 超で帯。decisions #47、2026-10-31、仮）。保存層（§4.3。try/catch、失敗はメモリ内で続行し S7d と storageFail）。YouTube 連携層（IFrame の生成・状態・onError・規約。pause／seek／play の 3 用途）。計測層（§4.6）。
 
 流れ: 起動（保存層→設定・校正・上限・透明度。失敗なら既定値＋S7d）→選曲（ms 表、端末に合う variant を選ぶか生成）→プレイ（入力→時計→判定→描画・音源・計測）→結果（対象プレイなら称号・ストリーク）→保存（results、校正の提案、telemetry）。
 
@@ -199,7 +199,7 @@ Canvas 2D・rAF 1 本（PixiJS 8 MIT は 300 セル超で 60 fps を割ったら
 
 ### 4.6 計測の仕組み
 
-初版は送信しない。計測層が `telemetry` に貯め、S6 の計測盤で見て JSON で書き出す。送信は M4 の後、同意制・匿名、動画 ID と視聴時間は送らない。行: play（chartId、variantId、profile、clock、mode、UR、早遅ヒストグラム、精度、NEAR 率、再同期回数、動画なし切替、入力遅延中央値（押下の now − timeStamp の中央値。OS かブラウザが時刻を付けてからハンドラまでで、中身は OS とブラウザで違う。標本が無ければ null。decisions #25）、フレーム間隔 SD、時計残差 SD）、calib（SD、採否、提案値）、onboard／quit（段ごとの到達・秒・離脱、止めた位置）、device（UA 大分類、画面 px、拡大率、上限、getLayoutMap 可否、timeStamp の刻み tsResolution）、storageFail、embedError。
+初版は送信しない。計測層が `telemetry` に貯め、S6 の計測盤で見て JSON で書き出す。送信は M4 の後、同意制・匿名、動画 ID と視聴時間は送らない。行: play（chartId、variantId、profile、clock、mode、UR、早遅ヒストグラム、精度、NEAR 率、再同期回数、動画なし切替、入力遅延中央値（押下の now − timeStamp の中央値。OS かブラウザが時刻を付けてからハンドラまでで、中身は OS とブラウザで違う。標本が無ければ null。decisions #25）、フレーム間隔 SD、時計残差 SD、発音の予約の遅れの最大 audioLateMaxMs〔音を予約しない回は null。decisions #47〕）、calib（SD、採否、提案値）、onboard／quit（段ごとの到達・秒・離脱、止めた位置）、device（UA 大分類、画面 px、拡大率、上限、getLayoutMap 可否、timeStamp の刻み tsResolution）、storageFail、embedError。
 
 ## 5. 作業表
 

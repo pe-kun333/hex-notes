@@ -13,7 +13,7 @@
 | `clock/`         | 時計層（ClockSource、写像、停止検知、audio-bridge、ダミー動画）      | 手順 7    |
 | `play/`          | プレイの状態機械（design.md §4.2）と時計をつなぐ session             | 手順 7    |
 | `judge/`         | 判定・採点層（窓・NEAR・ホールド・精度・自力率・校正のオフセット）   | 手順 8    |
-| `audio/`         | 音源層（予約再生、合成音、Salamander）                               | 手順 10   |
+| `audio/`         | 音源層（予約、合成音、メトロノーム、打鍵音、Salamander の遅延読込）  | 手順 10   |
 | `storage/`       | 保存層                                                               | 手順 11   |
 | `telemetry/`     | 計測層                                                               | 手順 12   |
 | `sw/`            | Service Worker（vite-plugin-pwa が生成。自前にするときはここ）       | 手順 1    |
