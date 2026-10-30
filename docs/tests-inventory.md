@@ -31,10 +31,14 @@
 | 3 | 鍵と音の対応 `convertM5` | m5 の 2 曲＋m1' の 6 曲 × 4 配列 × 3 折り畳み × 上限 2〜4（288 件） | 鍵の音高 ＝ notes[i] を畳んだ音高、(tick, 原曲音高, 鍵) が m5 の out[] と同じ、同 tick の鍵は重ならず上限以下 | 設計 §3.3、decisions #22 | 検算済（tests/unit/chart/convert-m5.test.ts） |
 | 3 | 変換の規則 | vel 0.3／1／省略、同 tick 同音、fl・harmonic、範囲外の limit・fold・division、目盛りに乗らない拍で同 tick に鍵が重なる・上限超え | 38／127／省略、最初の 1 つ、vmpk・拒否、RangeError、Error | decisions #22（kickoff の「parseMidi 0–127」を訂正） | 仮（tests/unit/chart/convert-m5.test.ts） |
 | 3 | フィクスチャ `from-mel` | `--check`、`validate-charts tests/fixtures/charts` | 10 件が生成物と 1 バイトも違わない、9 件が strict で ✓ | 手順 3 の完了条件 | 検算済（tests/unit/tools/from-mel.test.ts） |
-| 4 | 六角幾何 `hexDist` | Digit1–KeyW | 2 | m0 `hexDist` L169、`ROWS` L157–162 | 未検算 |
-| 4 | 格子 `ROW_OFF` | A 段と Q 段の x 差 | 0.5 | m0 `ROW_OFF` L163 | 未検算 |
-| 4 | R と v `sizing` | 舞台高 668（1366×768@100%）／620（1280×720）／514（1093×614@125%） | R 28、v 0.30／0.27／0.20（514 は境界） | 設計 §2.5 L126 | 未検算 |
-| 4 | 奥行き `rowScale` | Q 段（最下段から 2 段上） | 0.96²＝0.9216 | 設計 §2.2 L101、m1' `DEPTH_SCALE` L211 | 未検算 |
+| 4 | 六角幾何 `hexDist` | Digit1–KeyW／KeyW–KeyA・KeyS／KeyQ–KeyS／Digit1–Slash | 2／1・1／2／12。40×40 の全組で対称・整数・三角不等式、tools/charts/m5-port.ts の写し（m5 L223）と同じ | m0 `hexDist` L169、`ROWS` L157–162 | 検算済（tests/unit/render/hex/hex.test.ts） |
+| 4 | 6 方向 `HEX_DIRS` | KeyS の 右・右下・左下・左・左上・右上 | KeyD・KeyX・KeyZ・KeyA・KeyW・KeyE | m2 `DIRS` L231–238 | 検算済（tests/unit/render/hex/hex.test.ts） |
+| 4 | 格子 `ROW_OFF` | A 段と Q 段の x 差／Slash の gx | 0.5／10.5 | m0 `ROW_OFF` L163 | 検算済（tests/unit/render/hex/hex.test.ts） |
+| 4 | 鍵盤図 `grid` | ableton [1,2]／vmpk [0..3]／genshin [1,2,3] の幅・高さの係数。vmpk・R 28・左上 (100, 200) の Digit1・Slash の中心 | 10.5／3.5、11.5／6.5、11／5。(100 + hexW/2, 228)、(100 + 11·hexW, 354) | m0 `computeGeom` L220・L236、設計 §2.5 | 検算済（tests/unit/render/hex/grid.test.ts） |
+| 4 | R と v `sizing` | 右列の箱 850×644（内側 1366×668）／764×596（1280×620）／577×490（1093×514@125%）× ableton・vmpk × T 1500／1000 | 係数 10.5/3.5・11.5/6.5。R 28 ×5、1093×vmpk は 27（R_w 27.36）。D 538／454／490／406／384／306.5。v(1500) 0.3587／0.3027／0.3267／0.2707／0.2560／0.2043、v(1000) ＝ D/1000。可視時間 上段／最下段（1.5 s）1578/1695・1593/2009・1586/1714・1603/2069・1609/1773・1632/2227、全段 ≥ T | 設計 §2.5（改訂）、decisions #24、m0 `computeGeom` L215–239、m1' layout L370–375。相談 A の表を node で別計算 | 検算済（tests/unit/render/hex/sizing.test.ts） |
+| 4 | 境界と退避 `sizing` | vmpk・1.5 s。内側の高さ 514／513／488／487／470／189／188、幅 1000／900（高さ 668）、幅 900×高さ 470、プレイヤー 300×150（幅 900） | 514: R 28・D 300・v 0.2。513: R 27・D 305.5。488: R 24・D 300・limited なし。487: R 24・D 299・limited height・v 0.2・T 1495・可視 上段 1615、プレイヤーは 480×270 のまま。470: D 282・v 0.2・T 1410・可視 1530／2070（1.0 s は v 0.282・T 1000）。189（箱 165）: D 1・T 5。188（箱 164）: RangeError。幅 1000: プレイヤー 356×200・R_w 28.92・R 28。幅 900: R_w 23.90・R 24・limited width・溝 <16。両方不足: limited height・箱 508・D 282・T 1410。300×150 は素通しで箱 564・R 26 | decisions #24（仮） | 検算済（tests/unit/render/hex/sizing.test.ts） |
+| 4 | 奥行き `depthScale` | R 28 で最下段から 0〜3 段上／R 27 の 3 段上／R 24 | 1・0.96・0.9216・0.884736／24/27 ＝ 0.8889 に切り上げ／全段 1（奥行きが消える） | 設計 §2.2 L101、m1' `DEPTH_SCALE` L211 | 検算済（tests/unit/render/hex/landing.test.ts） |
+| 4 | 着地 `landing` | vmpk・1366×668: 着地 1500 ms 前の数字段の y／一本線の y | 箱の上端 + R／鍵盤図の上端 − 0.8·R | 設計 §2.5、m0 `yLine` L238、m1' `targetY` L376 | 検算済（tests/unit/render/hex/landing.test.ts） |
 | 5 | 入力 `keyboard` | 同じ code の 2 度目の keydown | 無視 | m1' L524–533、設計 §2.8 | 未検算 |
 | 5 | 入力 `focus` | blur | 押下集合が空＋Pause 要求 | m1' L524–533、設計 §2.8 | 未検算 |
 | 5 | 入力 `ime` | keyCode 229 | 入力列に入らず帯 1 件 | 設計 §2.8 L141、§5.1 M0-04 | 未検算 |
