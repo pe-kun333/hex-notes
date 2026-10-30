@@ -19,8 +19,8 @@ export const NOTE_SCALE = 0.97
 export const CORNER_AID_MIN_R = 26
 /** 接近の光り（着地の何 ms 前から鍵盤図のセルを明るくするか。m1' APPROACH L264） */
 export const APPROACH_MS = 700
-/** ホールドの最短の音価（§2.3「音価 ≥500 ms」） */
-export const HOLD_MIN_MS = 500
+/** ホールドの最短の音価（§2.3「音価 ≥500 ms」）。判定層の値をそのまま使う（手順 8） */
+export { HOLD_MIN_MS } from '../../judge/hold.ts'
 /** ホールドの尾の幅（セル幅に対する比）と角の丸み px（m1' drawNotes L409） */
 export const TAIL_WIDTH = 0.4
 export const TAIL_RADIUS = 6
