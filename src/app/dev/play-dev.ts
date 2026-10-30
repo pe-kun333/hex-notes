@@ -245,7 +245,16 @@ function main(): void {
     const vw = window.innerWidth
     const vh = window.innerHeight
     const rows = LAYOUTS[layoutId()].rowsUsed
-    const outer = sizeForViewport({ w: vw, h: vh }, rows, TRAVEL_MS.beginner)
+    let outer: Sizing
+    try {
+      outer = sizeForViewport({ w: vw, h: vh }, rows, TRAVEL_MS.beginner)
+    } catch (e) {
+      // 箱が R 24 の鍵盤図より低い（decisions #24 (e) の RangeError）。描かずに知らせ、resize で組み直す
+      sizing = null
+      grid = null
+      info.textContent = `視口 ${vw}×${vh} では鍵盤図が入りません（${e instanceof Error ? e.message : String(e)}）。窓を広げてください`
+      return
+    }
     const box = outer.box
     const p = outer.player
     Object.assign(playerBox.style, {
