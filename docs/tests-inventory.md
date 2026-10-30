@@ -60,7 +60,7 @@
 | 6 | 状態の分岐 `placeNote`・`tailCommand`・`approachGlow` | pending の着地 500 ms 前・着地後、holding・done、尾 t 1500／2500／3000、接近 −1／0／350／700／701 ms | 着地 y − v·500・着地 y、着地 y・null、高さ v·1500／v·500／null、なし／1／0.5／なし／なし。holding は縁 3 px で殻・塊・光りに入らない | 設計 §2.3・§2.5、m1' L405–418・APPROACH L264（「疑う」b5） | 検算済（tests/unit/render/canvas/cells.test.ts） |
 | 6 | 入れ違い `summarize` | 和音 {A, W}@1000 と S@1200 を A 1250・W 1000・S 1200（添字の順 2 通り）／単音 5 つ | どちらも 1／1 | ADR 0006（「疑う」a2・b4） | 検算済（tests/unit/app/readability.test.ts） |
 | 6 | 角の補助・明度 | R 25 の鍵盤図／ableton・vmpk の白鍵 | ♯ なし（黒鍵は 30° のまま）／A 段 shade2、vmpk は Q 段 shade1・Z 段 shade3 | 設計 §2.5 L129、decisions #30（仮） | 検算済（tests/unit/render/canvas/commands.test.ts） |
-| 6 | 「位置で読めるか」 | 6 曲×2 配列（＋負荷譜面）を段別と一本線で手弾き（play-dev） | 5 観点の 2 つ以上で「読めない」なら一本線へ戻す提案 | 設計 §5.7、相談 B、ADR 0006 | 利用者の手弾き待ち |
+| 6 | 「位置で読めるか」 | 6 曲×2 配列（＋負荷譜面）を段別と一本線で手弾き（play-dev） | 5 観点の 2 つ以上で「読めない」なら一本線へ戻す提案 | 設計 §5.7、相談 B、ADR 0006 | 確認済（2026-10-31、利用者の手弾きで「読めた」。主観のみ、数値なし。段別を保つ） |
 | 7 | 時計 `lsq` | 15 ms 量子化の 121 点 | 傾き 0.99986 | 手計算（本書以外に根拠なし。§7-18） | 仮 |
 | 7 | 飛び `jump` | 残差 +300 ms／+200 ms | 飛び／0（飛びでない） | m3 `clk.feed` L324–350 | 未検算 |
 | 7 | 停止検知 `stall` | 可視・PLAYING・3 秒凍結 | 2,000 ms で停止検知→pauseVideo 要求→500 ms 以内に PAUSED で動画なしへ切替 | 設計 §2.6 L131、決定 #11、m3 `frame` L599–610 | 未検算 |
