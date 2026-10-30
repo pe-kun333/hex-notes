@@ -20,6 +20,6 @@
 
 決まり:
 
-- グローバル状態を持たない。DOM と Canvas は層の外。時刻は ms。`performance.now` の直呼びは `clock/` と `app/` だけ（他は `NowFn` を受け取る）。
+- グローバル状態を持たない。DOM と Canvas は層の外。時刻は ms。`performance.now` の直呼びは `clock/` と `app/` だけ（他は `NowFn` を受け取る。入力層は `app/` がハンドラの冒頭で 1 回読んだ now を値で受ける。decisions #25）。
 - 相対 import は必ず `.ts` 拡張子を付ける（`tools/` は Node が型剥がしで直接実行し、拡張子なし・パス別名は解決しない）。`tools/` から import する `src/` の部品は DOM と `vite/client` に触れない。
 - tsconfig は 1 つで `DOM` と `node` の両方の型を見る。`setTimeout` の戻りは `ReturnType<typeof setTimeout>` で受ける（`number` に入れない）。

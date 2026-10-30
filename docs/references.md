@@ -21,5 +21,6 @@
 | ピアノ音源 | Salamander Grand Piano V3、CC BY 3.0 | Alexander Holm | 30 音の間引き版を同梱（M0-08） |
 | 膜式キーボードの同時押し | 同時 2 キーが安全圏。3〜4 は端末次第 | 下調べ（ロールオーバー・ゴースト） | 上限既定 2、診断 10 組で 3〜4（decisions #7） |
 | 離し窓 | 離し窓 ×1.5 | Quaver（MPL-2.0。仕様のみ） | ホールドの離し窓 1.5×GOOD（§2.3、decisions の既定値） |
+| ブラウザの時刻の刻み | Event.timeStamp・performance.now の丸め: Chromium 0.1 ms（隔離時 0.005）、Firefox 1 ms（隔離時 0.02、resistFingerprinting で 16.667 ms、以前は 100 ms）、Safari 1 ms。Chromium・Firefox の丸めは区間ごとの擬似乱数の閾。Windows の入力時刻（GetMessageTime）と不変 TSC の無い CPU の時計は 15.625 ms ごと | MDN Event.timeStamp、Chromium（BSD）time_clamper.h／.cc・performance.cc・ui/events/win/events_win_utils.cc・base/time/time_win.cc、Firefox（MPL）nsRFPService.cpp・Performance.cpp・Event.cpp・widget/windows/nsWindow.cpp、Mozilla bug 1692609・1431455・1202119、W3C Event Timing、research/judgment-ux.md L35・L196。2026-10-30 確認（相談 E、docs/planning/consult/E-tsperf.md） | tsPerf は timeStamp（decisions #25）。刻みの梯子 100／16.667／15.625／1／0.1／0.02／0.005（src/input/resolution.ts） |
 
 追加するとき: 行を足し、research のファイル名を書く。数値をコードに書きたくなったら、定数名を `docs/` へのコメント付きで置き、この表の行番号を添える。

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>入力層（開発）</title>
+    <style>
+      :root {
+        --bg: #111318;
+        --fg: #e8e9ec;
+        --dim: #8a8f99;
+        --line: #2a2e37;
+        --key: #1c1f26;
+        --on: #e8e9ec;
+        --on-fg: #111318;
+        --band: #3a2f12;
+        --band-fg: #f3d27a;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          15px/1.5 system-ui,
+          sans-serif;
+      }
+      main {
+        padding: 16px;
+        max-width: 960px;
+        outline: none;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      p.note {
+        color: var(--dim);
+        margin: 0 0 12px;
+      }
+      #band {
+        background: var(--band);
+        color: var(--band-fg);
+        padding: 8px 12px;
+        border-radius: 6px;
+        margin-bottom: 12px;
+      }
+      #band[hidden] {
+        display: none;
+      }
+      .row {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 4px;
+      }
+      .key {
+        width: 44px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        background: var(--key);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        font-weight: 700;
+      }
+      .key.down {
+        background: var(--on);
+        color: var(--on-fg);
+      }
+      dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 2px 12px;
+        margin: 12px 0;
+      }
+      dt {
+        color: var(--dim);
+      }
+      dd {
+        margin: 0;
+        font-variant-numeric: tabular-nums;
+      }
+      #log {
+        font:
+          13px/1.45 ui-monospace,
+          monospace;
+        background: var(--key);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px;
+        height: 240px;
+        overflow: auto;
+        white-space: pre;
+      }
+      .tests {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        margin: 12px 0;
+      }
+      iframe {
+        width: 260px;
+        height: 64px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="dev" tabindex="-1"></main>
+    <script type="module" src="./input-dev.ts"></script>
+  </body>
+</html>

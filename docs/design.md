@@ -140,7 +140,7 @@ Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W
 
 閃光 1 秒 3 回以下、同時に光る面積 25% 以下。ヒットの光はセル内のみ。節目の演出（コンボ 50 の倍数・完走時）も落下域と鍵盤図の領域内だけ、10 秒に 1 回まで。判定文字は鍵盤図の上に 600 ms。低負荷モード: rAF 間隔の 95 パーセンタイルが 20 ms 超を 10 秒続けたら「演出なし→殻なし→奥行きなし」の順に自動で落とし帯で知らせる（仮、M-7）。
 
-入力: code で判定、押下集合で keyup と対応付け、e.repeat か既にある code は捨てる。IME（keyCode 229／isComposing）の打鍵は無視して帯、曲は止めない（S0 を含む全画面）。役割キー: Space＝開始・再開・校正タップ・見本切替、Enter＝ボタン決定、Escape＝一時停止。禁止 code: Backquote, KanaMode, Convert, NonConvert, CapsLock, Lang1/2, Meta, F1〜F12。iframe に焦点が移ったら戻す。blur／visibilitychange で Pause。修飾キーは使わない。
+入力: code で判定、押下集合で keyup と対応付け、e.repeat か既にある code は捨てる。IME（keyCode 229／isComposing）の打鍵は無視して帯、曲は止めない（S0 を含む全画面）。役割キー: Space＝開始・再開・校正タップ・見本切替、Enter＝ボタン決定、Escape＝一時停止。禁止 code: Backquote, KanaMode, Convert, NonConvert, CapsLock, Lang1/2, Meta, F1〜F12。iframe に焦点が移ったら戻す。blur／visibilitychange で Pause。修飾キーは使わない。細部（keydown の見る順、IME の検知 ime と帯の点け消し、Ctrl・Alt・Meta 付きは素通し、Meta の keyup とコンテキストメニューで全離し、文字の欄は通さず select は通して焦点を外す、Pause 要求は冪等で再生中だけ効く）は decisions #26（2026-10-30、仮）。時刻: tsPerf は Event.timeStamp（主スレッドの待ちを含まない）。非有限・0 以下・now より後なら now（ハンドラの冒頭の performance.now）、1000 ms より古くても ts を保つ。keyup・校正タップも同じ式、blur・非表示などの全離しは now（Meta の keyup による全離しはその keyup の式）。刻みの補正（+q/2）はしない。刻みは実際の keydown・keyup の timeStamp で推定し、8 ms 以上は「判定が粗い環境」の注記だけ（decisions #25、2026-10-30、仮。実装 src/input/timestamp.ts・resolution.ts）。
 
 ### 2.9 YouTube・同梱曲・読込
 
@@ -173,7 +173,7 @@ Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W
 
 ### 4.1 モジュールとデータフロー
 
-入力層（{code, tsPerf} に正規化。repeat 捨て、IME 無視＋帯、blur で全離し、役割キー）。時計層（唯一の ClockSource。performance.now 単独、動画時刻は補正源、停止検知、猶予）。判定層（判定・精度・ランク・自力率）。描画層（Canvas 2D・rAF 1 本。領域と予算を層で強制、低負荷の段階）。譜面層（読み書き・変換器・バリデータ・ms 表・variants 生成・鍵数制限の実行時フィルタ）。練習層（待ち・ループ・テンポ段・足場外し。動画ありでは待ちを出さない）。音源層（ガイド音＋accompaniment を 25 ms 周期・100 ms 先読みで予約。合成音→Salamander 遅延読込）。保存層（§4.3。try/catch、失敗はメモリ内で続行し S7d と storageFail）。YouTube 連携層（IFrame の生成・状態・onError・規約。pause／seek／play の 3 用途）。計測層（§4.6）。
+入力層（{code, tsPerf} に正規化。tsPerf は §2.8 の式。repeat 捨て、IME 無視＋帯、blur で全離し＋Pause 要求、役割キー）。時計層（唯一の ClockSource。performance.now 単独、動画時刻は補正源、停止検知、猶予）。判定層（判定・精度・ランク・自力率）。描画層（Canvas 2D・rAF 1 本。領域と予算を層で強制、低負荷の段階）。譜面層（読み書き・変換器・バリデータ・ms 表・variants 生成・鍵数制限の実行時フィルタ）。練習層（待ち・ループ・テンポ段・足場外し。動画ありでは待ちを出さない）。音源層（ガイド音＋accompaniment を 25 ms 周期・100 ms 先読みで予約。合成音→Salamander 遅延読込）。保存層（§4.3。try/catch、失敗はメモリ内で続行し S7d と storageFail）。YouTube 連携層（IFrame の生成・状態・onError・規約。pause／seek／play の 3 用途）。計測層（§4.6）。
 
 流れ: 起動（保存層→設定・校正・上限・透明度。失敗なら既定値＋S7d）→選曲（ms 表、端末に合う variant を選ぶか生成）→プレイ（入力→時計→判定→描画・音源・計測）→結果（対象プレイなら称号・ストリーク）→保存（results、校正の提案、telemetry）。
 
@@ -183,7 +183,7 @@ Ableton 型（既定）: A 段白鍵 A〜; ＝ 60〜76 の白鍵、Q 段黒鍵 W
 
 ### 4.3 保存
 
-localStorage: `hexnote.settings`（v:1）、`hexnote.calibration`（音源種別ごと）、`hexnote.device`（{limit, at, layoutMapOk, tsResolution}）、`hexnote.fade`。sessionStorage: `hexnote.booted`（失敗時の導線ループ防止）。IndexedDB: `charts`（主キー id、索引 rights）、`results`（{id, chartId, variantId, profile, clock "video"|"novideo", mode "fixed"|"note"|"phrase", rate, keyset, at, acc, rank, counts{perfect,great,good,near,miss}, selfRate{solo,hinted,near,miss}, syncUsed{kind, videoId?, fallbackAt?}, offsetUsed}）、`telemetry`（リング 1,000 行）。ファイル `*.hexnote.json`（書き出し／取り込み）。Service Worker キャッシュ（同梱曲・音源。YouTube はオフライン再生しない）。自己ベストの単位は (chartId, variantId, profile, clock) で、mode＝fixed・rate＝1.0・keyset＝all の回だけ。他は練習記録。Safari ITP の 7 日消去に備え書き出しを勧める。
+localStorage: `hexnote.settings`（v:1）、`hexnote.calibration`（音源種別ごと）、`hexnote.device`（{limit, at, layoutMapOk, tsResolution}。tsResolution は実際の keydown・keyup の timeStamp から推定した刻み ms で、推定できない間は書かない。decisions #25）、`hexnote.fade`。sessionStorage: `hexnote.booted`（失敗時の導線ループ防止）。IndexedDB: `charts`（主キー id、索引 rights）、`results`（{id, chartId, variantId, profile, clock "video"|"novideo", mode "fixed"|"note"|"phrase", rate, keyset, at, acc, rank, counts{perfect,great,good,near,miss}, selfRate{solo,hinted,near,miss}, syncUsed{kind, videoId?, fallbackAt?}, offsetUsed}）、`telemetry`（リング 1,000 行）。ファイル `*.hexnote.json`（書き出し／取り込み）。Service Worker キャッシュ（同梱曲・音源。YouTube はオフライン再生しない）。自己ベストの単位は (chartId, variantId, profile, clock) で、mode＝fixed・rate＝1.0・keyset＝all の回だけ。他は練習記録。Safari ITP の 7 日消去に備え書き出しを勧める。
 
 ### 4.4 報酬の切り分け（decisions #5）
 
@@ -195,7 +195,7 @@ Canvas 2D・rAF 1 本（PixiJS 8 MIT は 300 セル超で 60 fps を割ったら
 
 ### 4.6 計測の仕組み
 
-初版は送信しない。計測層が `telemetry` に貯め、S6 の計測盤で見て JSON で書き出す。送信は M4 の後、同意制・匿名、動画 ID と視聴時間は送らない。行: play（chartId、variantId、profile、clock、mode、UR、早遅ヒストグラム、精度、NEAR 率、再同期回数、動画なし切替、入力遅延中央値、フレーム間隔 SD、時計残差 SD）、calib（SD、採否、提案値）、onboard／quit（段ごとの到達・秒・離脱、止めた位置）、device（UA 大分類、画面 px、拡大率、上限、getLayoutMap 可否、timeStamp の刻み）、storageFail、embedError。
+初版は送信しない。計測層が `telemetry` に貯め、S6 の計測盤で見て JSON で書き出す。送信は M4 の後、同意制・匿名、動画 ID と視聴時間は送らない。行: play（chartId、variantId、profile、clock、mode、UR、早遅ヒストグラム、精度、NEAR 率、再同期回数、動画なし切替、入力遅延中央値（押下の now − timeStamp の中央値。OS かブラウザが時刻を付けてからハンドラまでで、中身は OS とブラウザで違う。標本が無ければ null。decisions #25）、フレーム間隔 SD、時計残差 SD）、calib（SD、採否、提案値）、onboard／quit（段ごとの到達・秒・離脱、止めた位置）、device（UA 大分類、画面 px、拡大率、上限、getLayoutMap 可否、timeStamp の刻み tsResolution）、storageFail、embedError。
 
 ## 5. 作業表
 
@@ -302,7 +302,7 @@ M4 の後: ローカルリプレイ（social-01、L、依存 M0-09・M0-05）、
 | T-1 | 動画時刻 15 ms 刻み・逆行・seek 後 210〜260 ms | §2.6 の時計（M-2） |
 | T-2 | 広告・Firefox・Safari 未測定。広告中は PLAYING のまま凍結し得る | 停止検知は pauseVideo の成功を条件に（U-06） |
 | T-3 | 膜式のゴースト | 既定 2。上限 3〜4 の版に「保証なし」印（M-3） |
-| T-4〜8 | 入力遅延の個体差、ジッタ・125% の縦予算、timeStamp 16.7 ms・getLayoutMap 不可、背景タブ、譜面版の組合せ爆発 | 二段校正、§2.5 の式と低負荷（M-7）、刻印の選択 UI、非表示中は停止検知しない、版は自動生成 |
+| T-4〜8 | 入力遅延の個体差、ジッタ・125% の縦予算、timeStamp の刻み（Firefox の resistFingerprinting で 16.667 ms、以前は 100 ms。Firefox 既定の Windows の入力時刻と不変 TSC の無い CPU の Chromium で約 15.6 ms。2026-10-30 訂正: 「16.7 ms」は Chromium でない）・getLayoutMap 不可、背景タブ、譜面版の組合せ爆発 | 二段校正、§2.5 の式と低負荷（M-7）、刻みを推定し 8 ms 以上は注記（decisions #25）、刻印の選択 UI、非表示中は停止検知しない、版は自動生成 |
 | T-9 | 保存失敗（プライベート、容量、ITP、ブロック） | try/catch、メモリ内続行、sessionStorage、書き出し（M-11） |
 | L-1〜4 | RMF、III.F.3.c 報酬禁止、スコア表示が報酬か（未解決）、III.E.1.a／I.7／I.9 | 帯・演出・HUD を矩形の外（M3-01）、§4.4 のガードを単体テスト（M3-06）、「YouTube にも報酬」フラグを持たない、採譜なし・音を重ねない・矩形は一時停止のまま残す |
 | L-5 | III.F.3.b と pause→seek→play の反復、半分超可視の自動再生 | 動画ありで待ちを出さない。再生は click のみ。プログラム操作は 3 用途に限る（M3-09） |
@@ -319,7 +319,7 @@ plan §2 の見送り 14 件はそのまま。初版に入れないもの: W–H
 | id | 計測（方法） | 閾値 |
 |---|---|---|
 | M-1 | 実機の段ずれ（U-01、m2） | 1 台でも退避が要れば初回に退避導線 |
-| M-2 | 実 IFrame の残差と timeStamp の刻み（U-02、2 ブラウザ 3 走） | 残差 SD<5 ms |
+| M-2 | 実 IFrame の残差と timeStamp の刻み（U-02、2 ブラウザ 3 走）。Firefox 既定・Windows 11 の keydown の刻みと入力遅延の分布、resistFingerprinting の ON/OFF（U-05） | 残差 SD<5 ms。tick の切り捨てが確かめられたら補正の候補（decisions #25）を見直す |
 | M-3 | 同時押し上限の分布（診断結果） | 3 以上が 70% 超なら §8-6 |
 | M-4 | 初回導線の離脱（段ごとの到達・完了・「あとで」） | 到達 70% 未満で順序見直し（仮） |
 | M-5 | 読めない・押せない内訳（白黒・段またぎ・視口別） | 黒鍵 MISS が 1.5 倍超で H-4 見直し |
