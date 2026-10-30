@@ -47,9 +47,16 @@
 | 5 | 時刻 `toTsPerf` | (1000, 1003.5)・(2000, 3000)／(1999, 3000)／(1010, 1000)・(1.7e12, 1000)／0・−5／NaN・Infinity | ok 1000 lag 3.5・ok 2000 lag 1000／stale 1999 lag null／future → now／nonpositive → now／nonfinite → now | decisions #25（仮、相談 E の起草役と批判役が node で別計算） | 検算済（tests/unit/input/timestamp.test.ts） |
 | 5 | 入力遅延中央値 | keydown (1000, 1001.5)・(1200, 1200)・(1400, 1403)・(1610, 1600)・(NaN, 1800)・(0, 2000)・repeat・229 | 標本 [1.5, 0, 3]、中央値 1.5 | decisions #25（仮） | 検算済（tests/unit/input/timestamp.test.ts） |
 | 5 | 刻み `estimateTsResolution` | T_i ＝ 10000 + 157.3·i + 41.9·((5i) mod 7) + √2·√(i+1)（i ＝ 0..19）を丸めない／100・16.667・50/3・1・0.1・0.02・0.005 で切り捨て／16.667 の確率的丸め／1 ms に外れ値 2・3 個／19 値／tick（floor(floor(T/15.625)·15.625)）／密な 1000 点 | 0／各 q（50/3 は 16.667）／16.667／1（fit 0.9）・0／null／15.625／16.667・1・0.1・null（n 4）・0.005。限界: 2・5・10 ms 格子は 1、端の外れ値 2 個で 0.1 | decisions #25（仮。相談 E の起草役・批判役が node で別計算） | 検算済（tests/unit/input/timestamp.test.ts） |
-| 6 | 和音 `isConnected` | [A, S, D] | true | m1' `drawNotes` L406–427、m2 `components` L327–328 | 未検算 |
-| 6 | 描画コマンド列 | 6 曲×2 配列の初期フレーム | 全図形が落下域＋鍵盤図の矩形内 | 設計 §2.8 L139、§5.1 M0-03b | 未検算 |
-| 6 | 「同じ絵」 | 6 曲×2 配列の初期フレーム | コマンド列スナップショット一致 | 手順書 手順 6 | 未検算 |
+| 6 | 和音 `isConnected` | [A, S, D]／[A, D]／[A, W] | true／false／true | m1' `drawNotes` L406–427・`isConnected` L273、m2 `components` L327–328、相談 B | 検算済（tests/unit/render/canvas/chords-hints.test.ts） |
+| 6 | 描画コマンド列 | 6 曲×2 配列×2 着地×5 箱（3 視口の箱・高さ不足・幅不足）×5 時刻×演出（縁・滑り・閃光 full／degraded・判定文字）と押下あり×文字 3 種 | 外接矩形（線の幅の半分を含む）が region（fall／keys／stage の T 字形）の外に出るコマンド 0（10 万超を検査） | 設計 §2.8 L141、§5.1 M0-03b、decisions #27 | 検算済（tests/unit/render/canvas/commands.test.ts） |
+| 6 | 「同じ絵」 | 6 曲×ableton/2/octave・vmpk/2/octave の初期フレーム（箱 850×644、t 0、入門者、文字 both、辺ヒントあり、段別着地） | 先に R 28・v 0.3587／0.3027 を断定し、tests/fixtures/render/frames/ の 12 本と一致 | 手順書 手順 6、decisions #24・#28 | 検算済（tests/unit/render/canvas/frames.test.ts） |
+| 6 | 面積 `polyArea` | 六角 R 28（rot 0・30） | 3√3/2·R² ＝ 2036.89（相談 B の 2037.08 は計算違い） | 相談 B、手計算 2.5980762 × 784 | 検算済（tests/unit/render/canvas/primitives.test.ts） |
+| 6 | 縁の返し `edgeReturnWidth` | 経過 0／60／120／121 ms | 2／4／6／なし（セルの中、外へ張り出さない） | 設計 §1.3 S2、相談 B | 検算済（tests/unit/render/canvas/feedback-budget-lowload.test.ts） |
+| 6 | 予算 `admitFlash` | 同じ秒の 5 件／0・1・2・999・1000 ms／面積 25%・25%＋1／15% を 100 ms・200 ms 空けて 2 件 | full 3・degraded 2／4 件目だけ degraded／full・degraded／degraded・full | 設計 §2.8、相談 B、decisions #29（仮） | 検算済（tests/unit/render/canvas/feedback-budget-lowload.test.ts） |
+| 6 | 低負荷 `feedFrame` | 25 ms 間隔で 9,975 ms／10,000 ms／50,000 ms、16.7 ms で 30 s、1,500 ms の途切れ | 段 0／1／3、0、数え直し（段は保つ） | 設計 §2.8、相談 B、decisions #29（仮） | 検算済（tests/unit/render/canvas/feedback-budget-lowload.test.ts） |
+| 6 | 辺ヒント `hintTargets`・`hintPairs` | 着地 1,500／1,501 ms 前、A→A→G、A→S・A→G、和音 {A, D} → {S, F, H} | 出す／出さない、A→G、数字なし・「4」、D→H・D→S（D→F は D→H と同じ辺） | 設計 §2.2、m1' nextTargets、decisions #31（仮） | 検算済（tests/unit/render/canvas/chords-hints.test.ts） |
+| 6 | 角の補助・明度 | R 25 の鍵盤図／ableton・vmpk の白鍵 | ♯ なし（黒鍵は 30° のまま）／A 段 shade2、vmpk は Q 段 shade1・Z 段 shade3 | 設計 §2.5 L129、decisions #30（仮） | 検算済（tests/unit/render/canvas/commands.test.ts） |
+| 6 | 「位置で読めるか」 | 6 曲×2 配列（＋負荷譜面）を段別と一本線で手弾き（play-dev） | 5 観点の 2 つ以上で「読めない」なら一本線へ戻す提案 | 設計 §5.7、相談 B、ADR 0006 | 利用者の手弾き待ち |
 | 7 | 時計 `lsq` | 15 ms 量子化の 121 点 | 傾き 0.99986 | 手計算（本書以外に根拠なし。§7-18） | 仮 |
 | 7 | 飛び `jump` | 残差 +300 ms／+200 ms | 飛び／0（飛びでない） | m3 `clk.feed` L324–350 | 未検算 |
 | 7 | 停止検知 `stall` | 可視・PLAYING・3 秒凍結 | 2,000 ms で停止検知→pauseVideo 要求→500 ms 以内に PAUSED で動画なしへ切替 | 設計 §2.6 L131、決定 #11、m3 `frame` L599–610 | 未検算 |

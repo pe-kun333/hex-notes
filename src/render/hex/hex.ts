@@ -63,3 +63,43 @@ export function isBlackKey(midi: number): boolean {
 export function rotationOf(midi: number | null): 0 | 30 {
   return midi !== null && isBlackKey(midi) ? 30 : 0
 }
+
+/** 画面上の点（CSS px）。描画層のコマンドも同じ形を使う */
+export type Pt = readonly [number, number]
+
+/**
+ * 六角の頂点 6 つ（m1' hexVerts L380）。頂点 i は角度 60·i − 30 + rot 度（画面座標、y は下向き）。
+ * rot 0 の辺 i（頂点 i と i+1）は HEX_DIRS[i] の隣を向く。黒鍵（rot 30）は頂点が隣を向く。
+ */
+export function hexVertices(cx: number, cy: number, r: number, rotDeg: number = 0): Pt[] {
+  const v: Pt[] = []
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 180) * (60 * i - 30 + rotDeg)
+    v.push([cx + r * Math.cos(a), cy + r * Math.sin(a)])
+  }
+  return v
+}
+
+/**
+ * (cx, cy) から (tx, ty) へ最も向いた辺の添字（m1' edgeToward L381）。辺 i の中点は角度 60·i + rot 度。
+ * off はその辺の向きと目標の向きの角度差（度、0〜30）。差が等しいときは添字の小さい辺。
+ */
+export function edgeToward(
+  cx: number,
+  cy: number,
+  tx: number,
+  ty: number,
+  rotDeg: number = 0,
+): { i: number; off: number } {
+  const a = (Math.atan2(ty - cy, tx - cx) * 180) / Math.PI
+  let best = 0
+  let bd = Number.POSITIVE_INFINITY
+  for (let i = 0; i < 6; i++) {
+    const d = Math.abs(((((a - (60 * i + rotDeg)) % 360) + 540) % 360) - 180)
+    if (d < bd) {
+      bd = d
+      best = i
+    }
+  }
+  return { i: best, off: bd }
+}
