@@ -9,6 +9,7 @@ if (import.meta.env.DEV) {
     { href: '/src/app/dev/clock.html', label: '時計層（手順 7）' },
     { href: '/src/app/dev/layout.html', label: '配列層（手順 9、U-01 の記録）' },
     { href: '/src/app/dev/audio.html', label: '音源層（手順 10）' },
+    { href: '/src/app/dev/storage.html', label: '保存層（手順 11）' },
   ]
   const app = document.getElementById('app')
   if (app !== null) {
