@@ -260,6 +260,11 @@ export interface PlayTelemetry extends TelemetryBase {
    * （decisions #32 (f)）
    */
   clockResidualSd: number | null
+  /**
+   * 発音の予約の遅れの最大 ms（音の実時刻を過ぎてから予約した分。src/audio/scheduler.ts の lateMaxMs。主スレッドの停止で
+   * 音が遅れた・抜けたのを見つける）。音を予約しない回（動画の音だけ）は null（decisions #47）
+   */
+  audioLateMaxMs: number | null
 }
 
 export interface CalibTelemetry extends TelemetryBase {
