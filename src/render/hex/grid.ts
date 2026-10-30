@@ -3,6 +3,7 @@
 // 配列プリセット（src/layout/presets.ts）の rowsUsed から、鍵盤図の幅・高さと各鍵のセル中心を出す。
 // グローバル状態を持たない。DOM・Canvas に触れない。単位は CSS px。
 
+import { QWERTY_LEGEND, type Legend } from '../../layout/legend.ts'
 import { KEY_ROWS, LAYOUTS, midiOf } from '../../layout/presets.ts'
 import type { KeyCode, LayoutId } from '../../shared/types.ts'
 import { ROW_OFF, SQ3, gridX } from './hex.ts'
@@ -22,6 +23,8 @@ export type GridCell = {
   readonly stepsAboveBottom: number
   /** その配列での MIDI。空のキーは null */
   readonly midi: number | null
+  /** 刻印（セルに出すキー文字。既定は QWERTY、getLayoutMap があればその文字。src/layout/legend.ts） */
+  readonly label: string
   /** セル中心（CSS px） */
   readonly cx: number
   readonly cy: number
@@ -77,6 +80,7 @@ export function buildKeyboardGrid(
   layout: LayoutId,
   R: number,
   origin: { readonly left: number; readonly top: number },
+  legend: Legend = QWERTY_LEGEND,
 ): KeyboardGrid {
   if (!(R > 0)) throw new RangeError(`grid: R ${R} は正の数でない`)
   const preset = LAYOUTS[layout]
@@ -98,6 +102,7 @@ export function buildKeyboardGrid(
         rowIndex,
         stepsAboveBottom: rowsUsed.length - 1 - rowIndex,
         midi: midiOf(layout, code),
+        label: legend.get(code) ?? QWERTY_LEGEND.get(code) ?? code,
         cx: origin.left + hexW * (gx - minGx + 0.5),
         cy: origin.top + R + 1.5 * R * rowIndex,
       })

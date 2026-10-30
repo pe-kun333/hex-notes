@@ -3,6 +3,7 @@
 // 音名 0.62·R、R<26 で角の補助を消す）、decisions #30（段の記号・角の補助の中身、仮）。
 // 純関数。描画コマンドを返すだけで Canvas に触れない。時刻は ms（song ＝ 譜面の時刻）。
 
+import { qwertyLabel } from '../../layout/legend.ts'
 import type { KeyCode } from '../../shared/types.ts'
 import type { GridCell, KeyboardGrid } from '../hex/grid.ts'
 import { SQ3, hexVertices, isBlackKey, rotationOf } from '../hex/hex.ts'
@@ -28,16 +29,9 @@ export const TAIL_RADIUS = 6
 /** ラベルの出し方（m1' labels。入門者の既定は both） */
 export type LabelMode = 'key' | 'note' | 'both' | 'none'
 
-const GLYPH: Readonly<Record<string, string>> = {
-  Semicolon: ';',
-  Comma: ',',
-  Period: '.',
-  Slash: '/',
-}
-
-/** 鍵の刻印（QWERTY。m1' KEYS の label） */
+/** 鍵の刻印（QWERTY。m1' KEYS の label）。表は src/layout/legend.ts（手順 9）。セルの文字は GridCell.label を使う */
 export function keyLabel(code: KeyCode): string {
-  return GLYPH[code] ?? code.replace(/^(Key|Digit)/, '')
+  return qwertyLabel(code)
 }
 
 const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'] as const
@@ -93,19 +87,20 @@ function text(
 /**
  * セルの中の文字（m1' drawLabel L384–388 を手直し）。r は描く径。key: キー文字 0.95·r 太字、note: 音名 0.62·r、
  * both: キー文字を上に 0.24·r、音名を下に 0.52·r ずらす。角の補助（黒鍵の ♯ 0.4·r、右上の角）は gridR ≥ 26 のときだけ。
+ * label はキー文字（GridCell.label。刻印、手順 9）。
  */
 export function labelCommands(
   base: TextBase,
   x: number,
   y: number,
   r: number,
-  code: KeyCode,
+  label: string,
   midi: number | null,
   mode: LabelMode,
   gridR: number,
 ): TextCmd[] {
   const out: TextCmd[] = []
-  const k = keyLabel(code)
+  const k = label
   if (mode === 'key' || (mode !== 'none' && midi === null)) {
     out.push(text(base, 'label', x, y + 0.04 * r, k, 0.95 * r, 700))
   } else if (mode === 'note' && midi !== null) {
@@ -189,7 +184,7 @@ export function keyboardCommands(
           c.cx,
           c.cy,
           r,
-          c.code,
+          c.label,
           null,
           'key',
           grid.R,
@@ -215,7 +210,7 @@ export function keyboardCommands(
         c.cx,
         c.cy,
         r,
-        c.code,
+        c.label,
         c.midi,
         mode,
         grid.R,
@@ -359,7 +354,7 @@ export function noteLabelCommands(
     region: 'stage',
     paint: inkOn(shadeOf(p.cell.row, p.note.midi)),
   } as const
-  return labelCommands(base, p.x, p.y, p.r, p.note.code, p.note.midi, mode, gridR).filter(
+  return labelCommands(base, p.x, p.y, p.r, p.cell.label, p.note.midi, mode, gridR).filter(
     (t) => bboxOf(t).y0 >= fallTop,
   )
 }

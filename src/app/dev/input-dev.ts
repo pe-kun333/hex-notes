@@ -8,19 +8,13 @@ import type { InputEvent, InputState } from '../../input/keyboard.ts'
 import { IME_BAND_TEXT } from '../../input/ime.ts'
 import { estimateTsResolution, isCoarse } from '../../input/resolution.ts'
 import { median } from '../../input/timestamp.ts'
+import { qwertyLabel } from '../../layout/legend.ts'
 import { KEY_ROWS } from '../../layout/presets.ts'
 import { attachKeyboard } from './dom-input.ts'
 
 const LOG_MAX = 200
 /** 刻みの推定に使う直近の timeStamp の数 */
 const TS_SAMPLES_MAX = 200
-/** 記号の鍵の表示（US／JIS 共通の刻印） */
-const GLYPH: Readonly<Record<string, string>> = {
-  Semicolon: ';',
-  Comma: ',',
-  Period: '.',
-  Slash: '/',
-}
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -48,11 +42,7 @@ function main(): void {
     const row = el('div', { className: 'row' })
     row.style.marginLeft = `${[0, 0.5, 0.75, 1.25][r] ?? 0}em`
     for (const code of codes) {
-      const k = el(
-        'div',
-        { className: 'key', title: code },
-        GLYPH[code] ?? code.replace(/^(Key|Digit)/, ''),
-      )
+      const k = el('div', { className: 'key', title: code }, qwertyLabel(code))
       keys.set(code, k)
       row.append(k)
     }

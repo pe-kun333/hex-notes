@@ -93,8 +93,14 @@
 | 8 | まとめ `summarizeJudge` | dt 10・40・−50 と NEAR 1、sd [1,2,3,4] | 平均 0・SD √2100・UR ×10・ヒストグラム 10 ms の階級・NEAR 率 0.25（NEAR は時刻の標本に入れない）、1.2909944 | 設計 §4.6、m3 `sd` L248、decisions #39 (e)（仮） | 検算済（tests/unit/judge/windows-score.test.ts、tests/unit/judge/judge.test.ts） |
 | 8 | 校正のオフセット | 段 1: 24 打の遅れ 20（±5）・23 打・SD ≥30・2 回続けて、段 2: dt 平均 15 で used 0／−10、7 件、平均 9／9.9／10、SD 大、used 110、平均 −125 | −20・count・sd・どちらも −20（前のオフセットに依らない）、−15／−25・count・small／small／−10・sd・95・120 | 設計 §2.7、m3 `finishCal` L456・`onEnd` L396、decisions #40（仮） | 検算済（tests/unit/judge/self-rate-calibration.test.ts） |
 | 8 | 精度% | 人工ジッタ SD 0→5→10→20→40→80 ms（種 7、4 鍵 200 音。手順 13 で本測） | 入門者 100／100／99.85／94.00／85.60／71.20%、音ゲー向け 100／100／99.70／95.20／85.75／70.15%（10 ms からは真に下がる） | 設計 §5.1 M0-06、手順書 手順 13、decisions #38 | 下見の検算済（tests/unit/judge/judge.test.ts。本測は手順 13） |
-| 9 | 段ずれ `physOffFor` | [0.5, 0.25, 0.5] | [0, 0.5, 0.75, 1.25] | m2 `physOffFor` L208、ADR 0001 | 未検算 |
-| 9 | 位相 `phase` | ANSI×ableton／ANSI×vmpk | mid／ok | m2 `updatePhase` L455、`gaps` L212・L214（閾 0.125／0.375 は仮、§7-13） | 未検算 |
+| 9 | 段ずれ `physOffFor` | [0.5, 0.25, 0.5] と 8 通りの段ずれ | [0, 0.5, 0.75, 1.25]、m2 と同じ | m2 `physOffFor` L208（行番号で切り出して照合）、ADR 0001 | 検算済（tests/unit/layout/stagger-phase.test.ts） |
+| 9 | 位相 `layoutPhase`・`phaseLevel` | ANSI×ableton／ANSI×vmpk、0〜2 u の 0.005 刻み、境界 0.375・0.374・0.875・0.876、1/4u 刻み 0・1/4・1/2・3/4、ortholinear × 4 配列、vmpk の Q–A 0 | mid／ok、m2 の段と同じ、ok・mid・mid・ng、ng・mid・ok・mid、genshin だけ null で他は ng、継ぎ目を見ず ok | m2 `updatePhase` L455、`gaps` L212–219（閾 0.125／0.375、decisions #42、仮） | 検算済（tests/unit/layout/stagger-phase.test.ts） |
+| 9 | 赤い組 `redPairs`・`gapDevs` | 8 通りの段ずれ、ANSI、均等 1/2u | m2 と同じ組・ずれ・格子との差、Q–A の 19 組（ずれ 1/4u）、0 組 | m2 `redPairs` L264–265・`gapDevs` L266–267（conv qw。線 0.2u は m2 の写し、仮） | 検算済（tests/unit/layout/stagger-phase.test.ts） |
+| 9 | 段ずれの受け入れ `parseStagger` | [0.5,0.25,0.5]・U-01 の小数・[0,0,1]、長さ違い・文字・NaN・負・1 超・null | 受ける、null | design.md §1.3 S6、decisions #42 (a)（仮） | 検算済（tests/unit/layout/stagger-phase.test.ts） |
+| 9 | 刻印 `legendOf` | getLayoutMap なし（JIS・US）、言語 ja・ja-JP・jav・en-US、AZERTY の 10 鍵（Dead・空を含む）、鍵盤図のセル | QWERTY の文字、JIS・JIS・US・US、大文字にして 7 鍵を変える・1 文字でない値は QWERTY、label が刻印 | design.md §2.1、m4 getLayoutMap L668–669、decisions #43（仮） | 検算済（tests/unit/layout/legend-same-pitch-fallback.test.ts） |
+| 9 | 同音 `samePitchGroups` | vmpk・ableton・genshin・wicki、variants.ts の defaultKeyOf と 40〜90 | vmpk 60〜64 の 5 組（既定は上の段）・なし・なし・58 → KeyN・65 → Digit2、同じ | design.md §2.1、decisions #21・#44 | 検算済（tests/unit/layout/legend-same-pitch-fallback.test.ts） |
+| 9 | 幾何と退避 `recommendGeometry`・`fallbackRowDiffs`・`labelsFor` | ortholinear×ableton・ANSI×ableton・ANSI×vmpk・ortholinear×genshin、ANSI ほか 3 通りの段ずれ、退避と正六角のラベル 4 種 | 退避・正六角・正六角・正六角、Q 段 0・A 段 ＋0.25・Z 段 ＋0.25（m2 L467 の式と同じ）、キー文字を必ず出す・そのまま | decisions #2・#45、m2 `updateFallbackNote` L466–468（仮） | 検算済（tests/unit/layout/legend-same-pitch-fallback.test.ts） |
+| 9 | U-01 の合否 | 実機 2 台の段ずれ（数字–Q／Q–A／A–Z、1u 単位） | 開発ページ layout-dev で配列ごとの位相と勧める幾何 | design.md §5.1 M0-07・§6.3 M-1、kickoff §5 | 未（利用者の実測の後） |
 | 10 | 合成音 `synth` | midi 69 | 440 Hz | m5 `playNoteAt` L443 | 未検算 |
 | 10 | 帰属検査 | ATTRIBUTION.md の項目欠け | `npm run licenses:files` が fail | 手順書 手順 10（手順 1 の行で検算済） | 検算済 |
 | 10 | 初回読込 | `npm run build && npm run size` | 実測を docs に記録、≤ 10 MB | 決定 #10 | 未検算 |
