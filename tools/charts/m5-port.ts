@@ -48,7 +48,8 @@ function rowCodes(r: number): readonly string[] {
   return KEY_ROWS[r] ?? []
 }
 
-function hexDist(a: M5Key, b: M5Key): number {
+/** m5 hexDist L223（手順 4 の src/render/hex/hex.ts の hexDist と同じ式。試験で突き合わせる） */
+export function m5HexDist(a: M5Key, b: M5Key): number {
   const dq = a.col - b.col
   const dr = a.row - b.row
   return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2
@@ -321,7 +322,7 @@ export function m5BuildVariant(
       const p: M5PortKey | null = prev
       const k: M5PortKey =
         p !== null
-          ? cands.reduce((a, b) => (hexDist(a, p) <= hexDist(b, p) ? a : b))
+          ? cands.reduce((a, b) => (m5HexDist(a, p) <= m5HexDist(b, p) ? a : b))
           : (cands[Math.floor(cands.length / 2)] as M5PortKey)
       n.key = k
       prev = k
@@ -360,7 +361,7 @@ export function m5BuildVariant(
     let bp: [M5PortOut, M5PortOut] | null = null
     for (const a of ga)
       for (const b of gb) {
-        const d = hexDist(a.key, b.key)
+        const d = m5HexDist(a.key, b.key)
         if (d < bd) {
           bd = d
           bp = [a, b]
