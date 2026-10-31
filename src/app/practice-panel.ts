@@ -3,11 +3,15 @@
 // （純関数）。部品は選んだ値を onChange で返すだけで、回への効かせ方（待機なら作り直し、走っていれば runSetPractice）は
 // screens/play.ts が持つ。足場外しの 9 マスは手順 8、鍵数制限の箱は手順 7。
 
+import type { KeysetId } from '../chart/keyset.ts'
 import type { LoopRange } from '../practice/loop.ts'
 import type { WaitMode } from '../practice/wait.ts'
-import type { SelfRate } from '../shared/types.ts'
+import type { LayoutId, SelfRate } from '../shared/types.ts'
 import type { PracticeOptions } from './play-runner.ts'
 import {
+  KEYSET_CHOICES,
+  KEYSET_NOTE,
+  keysetLayoutNote,
   LOOP_NOTE,
   TEMPO_CHOICES,
   TEMPO_NOTE,
@@ -30,6 +34,11 @@ export interface PanelState {
   readonly bars: number
   readonly nowBar: number
   readonly self: SelfRate
+  /** 鍵数制限（M2-07）。shown 偽（音ゲー向け）なら箱を隠す。idle 偽（回の途中）なら替えられない */
+  readonly keyset: KeysetId
+  readonly keysetShown: boolean
+  readonly layout: LayoutId
+  readonly idle: boolean
 }
 
 export interface PracticePanel {
@@ -41,6 +50,7 @@ export function practicePanel(
   doc: Document,
   on: {
     readonly change: (patch: Partial<PracticeOptions>) => void
+    readonly keyset: (k: KeysetId) => void
     readonly fullPlay: () => void
     readonly home: () => void
   },
@@ -63,6 +73,12 @@ export function practicePanel(
   autoLoop.type = 'checkbox'
   autoLoop.addEventListener('change', () => on.change({ autoLoop: autoLoop.checked }))
   const selfText = h(doc, 'b')
+  // 鍵数制限（入門者だけ。1 行に収め、説明は title）
+  const keysetSeg = seg('keyset')
+  const keysetHead = h(doc, 'span', { className: 'label', text: '鍵数制限' })
+  keysetHead.title = KEYSET_NOTE
+  const keysetRow = h(doc, 'div', { className: 'btnrow keysetrow' }, keysetHead, keysetSeg)
+  keysetRow.title = KEYSET_NOTE
 
   const draw = (s: PanelState): void => {
     waitSeg.replaceChildren(...WAIT_CHOICES.map((c) => {
@@ -91,17 +107,26 @@ export function practicePanel(
     loopLine.textContent = loopStatus(s.range, s.laps, s.opts.autoLoop)
     autoLoop.checked = s.opts.autoLoop
     selfText.textContent = selfLine(s.self)
+    keysetRow.hidden = !s.keysetShown
+    keysetSeg.replaceChildren(...KEYSET_CHOICES.map((c) => {
+      const b = button(doc, c.label, () => on.keyset(c.value), 'small')
+      b.setAttribute('aria-pressed', String(c.value === s.keyset))
+      b.disabled = !s.idle && c.value !== s.keyset
+      return b
+    }))
+    const ln = keysetLayoutNote(s.layout)
+    keysetRow.title = ln === null ? KEYSET_NOTE : `${KEYSET_NOTE} ${ln}`
   } // prettier-ignore
 
   // 狭い視口でも左列に縦スクロールなしで入るよう、テンポ段とループの説明は見出しと帯の title に置く（手順 6、3 視口）
-  const tempoHead = h(doc, 'h3', { text: 'テンポ段' })
+  const tempoHead = h(doc, 'span', { className: 'label', text: 'テンポ段' })
   tempoHead.title = TEMPO_NOTE
   const loopHead = h(doc, 'h3', { text: 'ループ' })
   loopHead.title = LOOP_NOTE
   band.title = LOOP_NOTE
   const el = h(doc, 'div', { className: 'practice-panel' },
-    h(doc, 'section', {}, h(doc, 'h3', { text: '待ち方' }), waitSeg, waitNote),
-    h(doc, 'section', {}, tempoHead, h(doc, 'div', { className: 'btnrow' }, tempoSeg, h(doc, 'label', { className: 'note' }, autoTempo, ' 自動昇降'))),
+    h(doc, 'section', {}, h(doc, 'div', { className: 'btnrow' }, h(doc, 'span', { className: 'label', text: '待ち方' }), waitSeg), waitNote),
+    h(doc, 'section', {}, h(doc, 'div', { className: 'btnrow' }, tempoHead, tempoSeg, h(doc, 'label', { className: 'note' }, autoTempo, ' 自動昇降'))),
     h(doc, 'section', {}, loopHead, band, loopLine,
       h(doc, 'div', { className: 'btnrow' },
         button(doc, '今の小節から 2 小節', () => cur !== null && on.change({ loop: rangeFrom(cur.nowBar, cur.bars) }), 'small'),
@@ -110,6 +135,7 @@ export function practicePanel(
           on.change({ loop: null })
         }, 'small'),
         h(doc, 'label', { className: 'note' }, autoLoop, ' 自動ループ'))),
+    keysetRow,
     h(doc, 'p', { className: 'self' }, '自力率 ', selfText),
     h(doc, 'div', { className: 'btnrow' },
       button(doc, '通しで弾く → プレイ', () => on.fullPlay(), 'primary'),
@@ -129,6 +155,10 @@ export function practicePanel(
         s.bars,
         s.nowBar,
         s.self,
+        s.keyset,
+        s.keysetShown,
+        s.layout,
+        s.idle,
         pending,
       ])
       if (key === last) return

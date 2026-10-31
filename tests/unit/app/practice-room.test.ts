@@ -20,7 +20,10 @@ import {
   type RunSong,
 } from '../../../src/app/play-runner.ts'
 import {
+  KEYSET_CHOICES,
   WAIT_CHOICES,
+  keysetLayoutNote,
+  keysetShown,
   bandClick,
   isPracticeRun,
   loopBand,
@@ -209,5 +212,35 @@ describe('途切れたフレーム（browser pane で見つけた）', () => {
     // 助走 2,000 ms の後、拍 0・1・2（0・625・1,250 ms）を越えた所まで 1 フレームで飛ぶ
     r = runFrame(r, START_NOW + 400 + 3500, START_NOW + 400 + 3500).run
     expect([runPhase(r), r.practice?.wait.group?.landMs, r.judge.score.counts.miss]).toEqual(['waiting', 0, 0])
+  }) // prettier-ignore
+})
+
+describe('鍵数制限の S4 からの選択（M2-07、§7-22）', () => {
+  const song = songOf(TWINKLE)
+
+  it('3 択（D F J K・8 鍵・全部。1 音は S0d だけ）、入門者だけ（音ゲー向けは箱ごと隠す）、VMPK 型は注記', () => {
+    expect(KEYSET_CHOICES.map((c) => [c.value, c.label])).toEqual([['dfjk', 'D F J K'], ['8', '8 鍵'], ['all', '全部']])
+    expect([keysetShown('beginner'), keysetShown('gamer')]).toEqual([true, false])
+    expect([keysetLayoutNote('ableton'), keysetLayoutNote('vmpk')?.startsWith('VMPK 型')]).toEqual([null, true])
+  }) // prettier-ignore
+
+  it('きらきら星（ableton/2/octave、42 音）で 8 鍵: ソ（KeyG）10 音とラ（KeyH）4 音の 14 音が消え 28 音。消えた音は MISS にならない', () => {
+    const r = room(song, { ...DEFAULT_PRACTICE, mode: 'fixed', autoLoop: false, autoTempo: false }, '8')
+    expect(r.notes).toHaveLength(28)
+    expect(r.notes.some((n) => n.code === 'KeyG' || n.code === 'KeyH')).toBe(false)
+    const all = room(song, DEFAULT_PRACTICE)
+    expect([all.notes.filter((n) => n.code === 'KeyG').length, all.notes.filter((n) => n.code === 'KeyH').length]).toEqual([10, 4])
+    const d = drive(started(r), (x) => runPhase(x) === 'ended')
+    const f = finishedPlay(d.run, { id: 'x', at: '2026-11-01T00:00:00.000Z', profile: 'beginner' })
+    expect([f.judge.counts.perfect + f.judge.counts.great + f.judge.counts.good, f.judge.counts.miss]).toEqual([28, 0])
+    // 制限中の回は練習記録: keyset 8・完走の対象外・条件「8 鍵」・校正の提案の母集団の外
+    expect([f.record.keyset, isFinished(f.record), f.calibEligible, resultView(f).title]).toEqual(['8', false, false, '練習の結果'])
+    expect(conditionText(f.record)).toBe('固定テンポ・1.0 倍・8 鍵（A S D F J K L ;）')
+  }) // prettier-ignore
+
+  it('全部 → 通常（固定・1.0 で完走の対象）', () => {
+    const d = drive(started(room(song, { ...DEFAULT_PRACTICE, mode: 'fixed', autoLoop: false, autoTempo: false }, 'all')), (x) => runPhase(x) === 'ended')
+    const f = finishedPlay(d.run, { id: 'x', at: '2026-11-01T00:00:00.000Z', profile: 'beginner' })
+    expect([f.record.keyset, isFinished(f.record)]).toEqual(['all', true])
   }) // prettier-ignore
 })
