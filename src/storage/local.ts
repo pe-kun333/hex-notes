@@ -118,6 +118,8 @@ export interface Settings {
   readonly fx: FxSettings
   /** IME 検知時に曲を止める（§1.3 S6、既定 OFF） */
   readonly imeStop: boolean
+  /** 色の確認（§1.3 S6「グレースケール確認」。S2 の落下域と鍵盤図を灰色で描き、色に頼らず読めるかを見る。既定 OFF） */
+  readonly grayscale: boolean
 }
 
 /**
@@ -141,6 +143,7 @@ export function defaultSettings(): Settings {
     audio: { guide: true, metronome: false, keyclick: true, accompVolume: 1 },
     fx: { budget: 'standard', lowload: 'auto' },
     imeStop: false,
+    grayscale: false,
   }
 }
 
@@ -211,6 +214,7 @@ export function parseSettings(raw: unknown): Settings {
     audio: parseAudio(raw['audio'], d.audio),
     fx: parseFx(raw['fx'], d.fx),
     imeStop: parseBool(raw['imeStop'], d.imeStop),
+    grayscale: parseBool(raw['grayscale'], d.grayscale),
   }
 }
 

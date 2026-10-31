@@ -22,7 +22,10 @@ import { perfNow } from '../../clock/clock-source.ts'
 import type { InputEvent } from '../../input/keyboard.ts'
 import { neighborOf, rulesOf, summarizeJudge } from '../../judge/judge.ts'
 import { defaultLegendKind, legendOf, type Legend } from '../../layout/legend.ts'
+import { labelsFor } from '../../layout/fallback.ts'
 import { LAYOUTS } from '../../layout/presets.ts'
+import { physOffFor } from '../../layout/stagger.ts'
+import { ROW_OFF } from '../../render/hex/hex.ts'
 import type { PlayPhase } from '../../play/state.ts'
 import { buildFrame } from '../../render/canvas/commands.ts'
 import { pruneEffects, type FxIntent } from '../../render/canvas/feedback.ts'
@@ -85,6 +88,12 @@ export function playScreen(ctx: ScreenContext): ScreenView {
   const prof = profileOf(settings.profile)
   const entry = ctx.song()
   const keyset = ctx.keyset()
+  // 幾何（S6、decisions #45）: 物理せん断は段ずれの物理座標で鍵盤図の x をずらす。退避はキー文字を必ず出す
+  const rowOff = settings.geometry === 'physical' ? physOffFor(settings.stagger) : ROW_OFF
+  const shownLabels = {
+    kb: labelsFor(settings.geometry, settings.labels.kb),
+    note: labelsFor(settings.geometry, settings.labels.note),
+  }
   // 鍵盤図の配列は演奏する譜面版の配列（読むまでは設定の配列。チュートリアル曲は Ableton 型だけ、songs.ts の variantFor）
   let layoutId: LayoutId = settings.layout
 
@@ -169,6 +178,8 @@ export function playScreen(ctx: ScreenContext): ScreenView {
   // 右列: 落下域＋鍵盤図の canvas と Pause の覆い（右列だけを覆う）
   const canvas = h(doc, 'canvas')
   canvas.setAttribute('aria-label', '落ちる六角セルと鍵盤図')
+  // 色の確認（S6「グレースケール確認」）: 色に頼らず読めるかを見る
+  if (settings.grayscale) canvas.style.filter = 'grayscale(1)'
   const g2d = canvas.getContext('2d')
   const pause = pauseOverlay(doc, (choice) => control({ kind: 'choice', choice }))
   const stage = h(doc, 'div', { className: 'stage' }, canvas, pause.el)
@@ -201,7 +212,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     canvas.width = Math.round(box.width * dpr)
     canvas.height = Math.round(box.height * dpr)
     sizing = st.sizing
-    grid = buildKeyboardGrid(layoutId, sizing.R, { left: sizing.kbLeft, top: sizing.kbTop }, legend)
+    grid = buildKeyboardGrid(layoutId, sizing.R, { left: sizing.kbLeft, top: sizing.kbTop }, legend, rowOff)
     show()
   } // prettier-ignore
 
@@ -356,7 +367,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
       t: { song: run.t, real: now },
       pressed,
       effects,
-      labels: settings.labels,
+      labels: shownLabels,
       hints: settings.hints,
       level: low.level,
     })
@@ -431,7 +442,8 @@ export function playScreen(ctx: ScreenContext): ScreenView {
       rules: rulesOf(prof.rules, {
         neighbor: neighborOf(byCode),
         offsetMs: offsetFor(ctx.calibration(), 'audio'),
-        labels: settings.labels,
+        // 自力率は見えているラベルで数える（退避はキー文字を必ず出す）
+        labels: shownLabels,
       }),
       fade: ctx.booted.fade,
       sound: { melody: settings.audio.guide, accomp: true, click: settings.audio.metronome },
