@@ -12,6 +12,10 @@ import { keyPosition, midiOf } from '../layout/presets.ts'
 import { hexDist } from '../render/hex/hex.ts'
 import type { Chart, KeyCode, Metrics, Variant } from '../shared/types.ts'
 
+/** 注意の目安（§2.4、仮）。S1 のカード（app/home-view.ts）と S5 の注意（chart/import.ts の cautions）が共有する */
+export const DENSITY_CAUTION = 3.5
+export const LEAP_CAUTION = 6
+
 const round3 = (x: number): number => Math.round(x * 1000) / 1000
 
 /** 鍵のある tick の最上声（tick の昇順） */

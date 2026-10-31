@@ -188,6 +188,40 @@ export function buildVariant(chart: Pick<Chart, 'notes' | 'pulse'>, spec: Varian
   }
 }
 
+/**
+ * 折り畳みと重複の後・間引きの前の塊（tick ごと、音高の昇順の既定の鍵）。運指の警告の矩形 4 隅が見る（M2-01、
+ * m2-kickoff §7-5。保存する版は上限 2・3 で 4 音の塊が残らないため、間引く前で見る）。落とす・重複の規則は buildVariant と
+ * 同じ。notes は正規化済み（buildVariant と違い順は検めない。buildVariant を通った譜面に掛ける）
+ */
+export function foldedChords(
+  chart: Pick<Chart, 'notes' | 'pulse'>,
+  spec: Pick<VariantSpec, 'layout' | 'fold'>,
+): { tick: number; keys: KeyCode[] }[] {
+  const pitches = pitchesOf(spec.layout)
+  const has = new Set(pitches)
+  const range = midiRange(spec.layout)
+  const byPitch = candidatesOf(spec.layout)
+  const byTick = new Map<number, Set<number>>()
+  for (const n of chart.notes) {
+    const f = foldIn(n.midi, has, pitches, range, spec.fold)
+    if (f === null) continue
+    const tick = Math.round(n.beat * chart.pulse.resolution)
+    // 同じ音高へ畳まれた音は 1 つ（鍵は音高で決まるので、どれを残しても同じ）
+    byTick.set(tick, (byTick.get(tick) ?? new Set<number>()).add(f.midi))
+  }
+  return [...byTick.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([tick, m]) => ({
+      tick,
+      keys: [...m]
+        .sort((a, b) => a - b)
+        .flatMap((midi) => {
+          const k = pickKey(byPitch.get(midi), midi)
+          return k === null ? [] : [k]
+        }),
+    }))
+}
+
 /** 譜面版を並べて作る（既定は同梱曲の 4 版）。同じ id が 2 度出たら RangeError */
 export function buildVariants(
   chart: Pick<Chart, 'notes' | 'pulse'>,

@@ -25,6 +25,7 @@
     "check": "npm run licenses && npm run licenses:files && npm run charts:rights && npm run typecheck && npm test && npm run charts:bundle:check && npm run charts:validate && npm run harness:check",
     "charts:bundle": "node tools/charts/bundle-run.ts",
     "charts:bundle:check": "node tools/charts/bundle-run.ts --check",
+    "charts:smf": "node tools/charts/smf-import.ts",
     "charts:fixtures": "node tools/charts/from-mel.ts",
     "charts:fixtures:check": "node tools/charts/from-mel.ts --check",
     "charts:validate:fixtures": "node tools/charts/validate-charts.ts tests/fixtures/charts",
