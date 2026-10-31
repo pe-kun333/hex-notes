@@ -29,6 +29,9 @@ export const TAIL_RADIUS = 6
 /** ラベルの出し方（m1' labels。入門者の既定は both） */
 export type LabelMode = 'key' | 'note' | 'both' | 'none'
 
+/** 鍵盤図（kb）と落ちるセル（note）のラベル（hexnote.settings.labels と同じ形。decisions #60） */
+export type FrameLabels = { readonly kb: LabelMode; readonly note: LabelMode }
+
 /** 鍵の刻印（QWERTY。m1' KEYS の label）。表は src/layout/legend.ts（手順 9）。セルの文字は GridCell.label を使う */
 export function keyLabel(code: KeyCode): string {
   return qwertyLabel(code)

@@ -208,6 +208,31 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
+.play .hud dd.big {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+/* 進行の棒（m6 .bar） */
+.play .hud .bar {
+  display: inline-block;
+  width: 60%;
+  height: 8px;
+  margin-right: 8px;
+  vertical-align: middle;
+  background: var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.play .hud .bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+}
+
 .play .status {
   margin: 0;
   color: var(--muted);
@@ -251,11 +276,10 @@ a {
   flex: 0 0 auto;
 }
 
+/* 箱の寸法 ＝ canvas の寸法（R・v は箱で決める。縁を付けると canvas が 2 px 縮むので付けない） */
 .play .stage {
   position: absolute;
-  box-sizing: border-box;
   background: #0b0c10;
-  border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
 }

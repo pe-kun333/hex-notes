@@ -1,11 +1,18 @@
-// S3 結果の骨組み（M1 の手順 2。中身は手順 5、M1-06）。出どころ: design.md §1.2（S3 → もう一度・S1）、m6 S3 L360–393。
+// S3 結果の骨組み（M1 の手順 2。中身は手順 5、M1-06。手順 3 で S2 の回の曲名と精度だけ出す）。出どころ: design.md §1.2（S3 → もう一度・S1）、m6 S3 L360–393。
 
+import { accuracyText } from '../hud.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { button, frame, h } from './frame.ts'
 
 export function resultScreen(ctx: ScreenContext): ScreenView {
   const { doc } = ctx
   const f = frame(ctx, '結果', { gear: true })
+  // 手順 3 は S2 から受けた回の曲名と精度だけ（内訳・提案・保存は手順 5）
+  const last = ctx.lastPlay()
+  if (last !== null)
+    f.body.append(
+      h(doc, 'p', {}, h(doc, 'b', { text: last.name }), `　精度 ${accuracyText(last.judge)}`),
+    )
   f.body.append(
     h(doc, 'p', { className: 'note', text: '結果の画面は準備中です。' }),
     h(
