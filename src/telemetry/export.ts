@@ -42,6 +42,7 @@ export function countByKind(rows: readonly TelemetryRow[]): Record<TelemetryRow[
     device: 0,
     storageFail: 0,
     embedError: 0,
+    sync: 0,
   }
   for (const r of rows) c[r.kind]++
   return c

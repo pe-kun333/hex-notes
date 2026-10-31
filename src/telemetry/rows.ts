@@ -1,8 +1,9 @@
-// play 以外の行（M0-12、手順 12）。出どころ: design.md §4.6（calib・onboard／quit・device・storageFail・embedError）・
+// play 以外の行（M0-12、手順 12。sync は M2 の手順 3）。出どころ: design.md §4.6（calib・onboard／quit・device・storageFail・embedError）・
 // §6.3 M-2・M-3・M-4、decisions #25（tsResolution）・#40（校正の段 1・段 2）・#54（仮）。行の型は src/shared/types.ts
 // （手順 2）。storageFail の行は保存層の storageFailRow（src/storage/fallback.ts、decisions #50）。
 // 行の時刻 at は app/ が Date で作る ISO 8601 を受ける（performance.now は持ち込まない）。UA は大分類だけ（版・機種は持たない）。
 
+import type { SyncTapResult } from '../clock/sync-tap.ts'
 import type { OffsetVerdict } from '../judge/calibration-offset.ts'
 import type {
   CalibTelemetry,
@@ -10,6 +11,7 @@ import type {
   DeviceTelemetry,
   EmbedErrorTelemetry,
   OnboardTelemetry,
+  SyncTelemetry,
 } from '../shared/types.ts'
 
 /** ブラウザの大分類（順に見る。Edge・Opera は Chrome を名乗るので先、Chrome は Safari を名乗るので Safari が最後） */
@@ -108,4 +110,28 @@ export function quitRow(
 /** embedError 行（YouTube の onError のコード。動画 ID は入れない） */
 export function embedErrorRow(code: number, at: string): EmbedErrorTelemetry {
   return { kind: 'embedError', at, code }
+}
+
+/**
+ * sync 行（同期タップの 8 拍がそろった回。M2-02、m2-kickoff §7-12）。残差 SD・秒は小数 1 桁、offset（秒）・rate は 4 桁。
+ * 動画 ID は入れない
+ */
+export function syncRow(
+  chartId: string,
+  r: SyncTapResult,
+  attempts: number,
+  at: string,
+): SyncTelemetry {
+  const r1 = (x: number): number => Math.round(x * 10) / 10
+  const r4 = (x: number): number => Math.round(x * 10000) / 10000
+  return {
+    kind: 'sync',
+    at,
+    chartId,
+    residualSd: r1(r.fit.residualSd),
+    elapsedS: r1(r.elapsedS),
+    attempts,
+    offset: r4(r.fit.offset),
+    rate: r4(r.fit.rate),
+  }
 }

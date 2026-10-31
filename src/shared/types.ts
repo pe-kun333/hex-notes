@@ -329,6 +329,20 @@ export interface EmbedErrorTelemetry extends TelemetryBase {
   code: number
 }
 
+/**
+ * 同期タップの 1 回（M2-02。8 拍そろった回だけ。M3-07 の実動画の計測で使う、m2-kickoff §7-12・§7-20）。
+ * offset・rate は当てはめの値（SyncSource と同じ単位）、residualSd は残差の SD ms（n − 1）
+ */
+export interface SyncTelemetry extends TelemetryBase {
+  kind: 'sync'
+  chartId: string
+  residualSd: number
+  elapsedS: number
+  attempts: number
+  offset: number
+  rate: number
+}
+
 export type TelemetryRow =
   | PlayTelemetry
   | CalibTelemetry
@@ -336,6 +350,7 @@ export type TelemetryRow =
   | DeviceTelemetry
   | StorageFailTelemetry
   | EmbedErrorTelemetry
+  | SyncTelemetry
 
 /** telemetry リングの上限（§4.3） */
 export const TELEMETRY_RING_SIZE = 1000
