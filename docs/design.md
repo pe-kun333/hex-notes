@@ -195,7 +195,7 @@ localStorage: `hexnote.settings`（v:1）、`hexnote.calibration`（音源種別
 
 ### 4.5 技術選定とライセンス
 
-Canvas 2D・rAF 1 本（PixiJS 8 MIT は 300 セル超で 60 fps を割ったら。Worker 描画は M0-11 の結果次第）。音は合成音→Salamander V3 30 音（CC BY 3.0）を smplr（MIT）か自前 Sampler。code＋getLayoutMap（Web MIDI は後）。PWA（Tauri 2 は後）。TypeScript、依存最小、core（MIT）／assets（CC BY・PD）。線引き: 配布物に AGPL／GPL を入れない。開発用 tools も初版は AGPL を使わない。仕様だけ参照（Falling Nikochan・Bemuse・Specy・beatoraja・WebAudioFont）は数値と出典を設計書に書き、コードには書かない。PR の「参照元」欄と license-checker、レビュー項目「AGPL／GPL の実装を開いて書いたか」。Salamander の帰属は S6 と README。
+Canvas 2D・rAF 1 本（PixiJS 8 MIT は 300 セル超で 60 fps を割ったら。Worker 描画は M0-11 の結果次第 → 2026-10-31 decisions #57: COEP の要る経路〔SharedArrayBuffer で入力を渡す〕は見送り。COEP の要らない OffscreenCanvas の Worker 描画は M-7 で長いタスクが問題になったら）。音は合成音→Salamander V3 30 音（CC BY 3.0）を smplr（MIT）か自前 Sampler。code＋getLayoutMap（Web MIDI は後）。PWA（Tauri 2 は後）。TypeScript、依存最小、core（MIT）／assets（CC BY・PD）。線引き: 配布物に AGPL／GPL を入れない。開発用 tools も初版は AGPL を使わない。仕様だけ参照（Falling Nikochan・Bemuse・Specy・beatoraja・WebAudioFont）は数値と出典を設計書に書き、コードには書かない。PR の「参照元」欄と license-checker、レビュー項目「AGPL／GPL の実装を開いて書いたか」。Salamander の帰属は S6 と README。
 
 ### 4.6 計測の仕組み
 
@@ -316,7 +316,7 @@ M4 の後: ローカルリプレイ（social-01、L、依存 M0-09・M0-05）、
 
 ### 6.2 見送り台帳
 
-plan §2 の見送り 14 件はそのまま。初版に入れないもの: W–H の本格化（#4）、六角実績・縄張り（#0'）、隣接三角和音（上限 3 の端末が過半になったら）、ランキング（L-3 整理後）、配信連携（Tauri 後）、物販・六角 MIDI、タッチ鍵盤、歌詞、採譜・分離（#0 の改訂があるときだけ。M0-11 は tech-08 の箱だけ決める）、許諾曲庫。再検討の条件は risks 草稿 §2。
+plan §2 の見送り 14 件はそのまま。初版に入れないもの: W–H の本格化（#4）、六角実績・縄張り（#0'）、隣接三角和音（上限 3 の端末が過半になったら）、ランキング（L-3 整理後）、配信連携（Tauri 後）、物販・六角 MIDI、タッチ鍵盤、歌詞、採譜・分離（#0 の改訂があるときだけ。M0-11 は tech-08 の箱だけ決める → 2026-10-31 decisions #57: YouTube の埋め込みと COEP が両立するのは Chromium の `<iframe credentialless>` だけなので、tech-08 を見送りに確定。製品は COEP を足さない）、許諾曲庫。再検討の条件は risks 草稿 §2。
 
 ### 6.3 計測計画
 

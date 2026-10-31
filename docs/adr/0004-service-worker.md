@@ -11,7 +11,7 @@ PWA の殻（§1.4）に SW が要る。自前（`src/sw/sw.ts` を手で書く�
 - vite-plugin-pwa 2.0.0 の `generateSW`（workbox）。`injectRegister: 'script-defer'`、`manifest: false`（`public/manifest.webmanifest` を手書き）、`devOptions.enabled: false`（dev では SW 無効）。
 - `registerType: 'prompt'`。更新は S6（設定）か結果画面で利用者が押したときだけ適用し、プレイ中に入れ替えない。
 - precache ＝ `**/*.{js,css,html,svg,webmanifest}` ＋ チュートリアル曲（ADR 0003）。runtime ＝ `/content/charts/*.json` と `*.opus|mp3|ogg` は CacheFirst。YouTube の規則（NetworkOnly）は親ページが読む `iframe_api`・`www-widgetapi.js` にだけ効く。iframe の中の要求は親の SW を通らないので、規則が無くても挙動は同じ（意図の記録として残す）。
-- COEP は足さない（M0-11 で可否を見る）。
+- COEP は足さない（M0-11 で可否を見る）。→ 2026-10-31 M0-11 の結果で確定（decisions #57。YouTube の埋め込みは COEP を report-only でしか付けず、COEP のページでは Chromium の `<iframe credentialless>` でしか読めない。spikes/coep-youtube/RESULT.md）。
 
 ## 帰結
 
