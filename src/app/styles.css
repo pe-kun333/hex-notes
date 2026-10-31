@@ -848,3 +848,9 @@ table.tracks th {
 .play .loopnote span {
   color: var(--muted);
 }
+
+/* S4 の行の見出し（待ち方・テンポ段・鍵数制限。見出しと釦を 1 行に、M2-07 で詰めた） */
+.practice-panel .btnrow > .label {
+  font-weight: 600;
+  font-size: 14px;
+}

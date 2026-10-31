@@ -64,7 +64,8 @@ import {
   type RunStep,
 } from '../play-runner.ts'
 import { practicePanel, type PracticePanel } from '../practice-panel.ts'
-import { loopBandText, practiceNote } from '../practice-view.ts'
+import { keysetShown, loopBandText, practiceNote } from '../practice-view.ts'
+import type { KeysetId } from '../../chart/keyset.ts'
 import { profileOf } from '../profile.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { songOf } from '../songs.ts'
@@ -97,7 +98,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   const settings = ctx.settings()
   const prof = profileOf(settings.profile)
   const entry = ctx.song()
-  const keyset = ctx.keyset()
+  // 鍵数制限（S4 は入門者だけ選べる。音ゲー向けは全鍵、M2-07）
+  const keyset = room && !keysetShown(settings.profile) ? 'all' : ctx.keyset()
   // 幾何（S6、decisions #45）: 物理せん断は段ずれの物理座標で鍵盤図の x をずらす。退避はキー文字を必ず出す
   const rowOff = settings.geometry === 'physical' ? physOffFor(settings.stagger) : ROW_OFF
   const shownLabels = {
@@ -153,6 +155,7 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   if (room) {
     panel = practicePanel(doc, {
       change: (patch) => changePractice(patch),
+      keyset: (k) => changeKeyset(k),
       fullPlay: () => {
         // 通しで弾く ＝ 同じ曲・同じ譜面版の通常プレイ（固定テンポ・1.0・全鍵、§1.2）
         ctx.setPractice(null)
@@ -296,8 +299,21 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       loopNote.replaceChildren(...(b === null ? [] : [h(doc, 'b', { text: b.title }), h(doc, 'span', { text: b.detail })]))
       loopNote.hidden = b === null
     }
-    panel.update({ opts: { ...p.opts, mode: p.mode }, rate: p.pendingRate ?? p.rate, range, laps: p.loop.laps, bars: runBars(r), nowBar: runBar(r), self: r.judge.selfRate })
+    panel.update({ opts: { ...p.opts, mode: p.mode }, rate: p.pendingRate ?? p.rate, range, laps: p.loop.laps, bars: runBars(r), nowBar: runBar(r), self: r.judge.selfRate, keyset: r.opts.keyset ?? 'all', keysetShown: keysetShown(settings.profile), layout: r.song.variant.layout, idle: runPhase(r) === 'idle' })
   } // prettier-ignore
+
+  /**
+   * 鍵数制限を替えた（S4。判定する音の集合が変わるので、替えられるのは待機中だけ ＝ 回を作り直す。殻に覚えて S3 の
+   * 「もう一度」でも同じ制限、M2-07）
+   */
+  function changeKeyset(k: KeysetId): void {
+    if (!alive || run === null || runPhase(run) !== 'idle') return
+    const e = ctx.song()
+    if (e !== null) ctx.pickSong(e, k, ctx.variantSpec() ?? undefined)
+    run = newRun(run.song, { ...run.opts, keyset: k })
+    showHud(run)
+    show()
+  }
 
   /** パネルで設定を替えた: 殻に覚え、待機中の回は作り直し（区間なら始点の 1 小節前から）、走っている回には途中から効かせる */
   function changePractice(patch: Partial<PracticeOptions>): void {

@@ -11,7 +11,7 @@ import { selfRatio } from '../judge/self-rate.ts'
 import type { LoopRange } from '../practice/loop.ts'
 import { TEMPO_NOVIDEO } from '../practice/tempo.ts'
 import type { WaitMode } from '../practice/wait.ts'
-import type { SelfRate } from '../shared/types.ts'
+import type { LayoutId, Profile, SelfRate } from '../shared/types.ts'
 import type { PracticeOptions } from './play-runner.ts'
 
 export interface WaitChoice {
@@ -138,6 +138,28 @@ export function weakRange(
   weak: { readonly from: number; readonly to: number } | null,
 ): LoopRange | null {
   return weak === null ? null : { startBar: weak.from, endBar: weak.to }
+}
+
+/** S4 の鍵数制限の 3 択（m6 L427–430。d ＝ 1 音は S0d だけ、m2-kickoff §7-22） */
+export const KEYSET_CHOICES: readonly { readonly value: KeysetId; readonly label: string }[] = [
+  { value: 'dfjk', label: 'D F J K' },
+  { value: '8', label: '8 鍵' },
+  { value: 'all', label: '全部' },
+]
+
+export const KEYSET_NOTE =
+  '譜面版は増やさず、実行時に絞ります。制限中の回は練習記録。替えられるのは回を始める前だけ。'
+
+/** 鍵数制限の箱を出すか（入門者だけ。音ゲー向けは箱ごと隠し全鍵、m6 L888） */
+export function keysetShown(profile: Profile): boolean {
+  return profile === 'beginner'
+}
+
+/** VMPK 型の注記（集合は Ableton 型の刻印の code なので、VMPK 型では残る音高が変わる。仮） */
+export function keysetLayoutNote(layout: LayoutId): string | null {
+  return layout === 'vmpk'
+    ? 'VMPK 型では同じキーでも鳴る音が Ableton 型と違います（鍵の位置で絞ります）。'
+    : null
 }
 
 /** S3 の「練習室で弾く」の文（苦手区間があればその 2 小節をループに。m6 L387） */
