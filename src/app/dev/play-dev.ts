@@ -770,7 +770,7 @@ function main(): void {
         t: { song: t, real: now },
         pressed,
         effects,
-        labels: labelSel.value as LabelMode,
+        labels: { kb: labelSel.value as LabelMode, note: labelSel.value as LabelMode },
         hints: hintBox.checked,
         level: low.level,
       })

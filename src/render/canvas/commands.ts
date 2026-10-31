@@ -13,7 +13,7 @@ import type { HexPos, Pt } from '../hex/hex.ts'
 import type { LandingMode } from '../hex/landing.ts'
 import { lineY } from '../hex/landing.ts'
 import type { Sizing } from '../hex/sizing.ts'
-import type { FrameNote, LabelMode, NotePlace } from './cells.ts'
+import type { FrameLabels, FrameNote, NotePlace } from './cells.ts'
 import {
   HOLD_MIN_MS,
   approachGlow,
@@ -78,7 +78,8 @@ export type FrameInput = {
   readonly t: { readonly song: number; readonly real: number }
   readonly pressed: ReadonlySet<KeyCode>
   readonly effects: readonly FxIntent[]
-  readonly labels: LabelMode
+  /** 鍵盤図は kb、落ちるセルは note（decisions #60） */
+  readonly labels: FrameLabels
   /** 辺ヒント（入門者だけ） */
   readonly hints: boolean
   readonly level: LowLoadLevel
@@ -177,7 +178,7 @@ export function buildFrame(input: FrameInput): DrawCommand[] {
     mode,
     pressed: input.pressed,
     glow: approachGlow(input.notes, t.song),
-    labels: input.labels,
+    labels: input.labels.kb,
     depth: fx.depth,
   })
 
@@ -195,7 +196,7 @@ export function buildFrame(input: FrameInput): DrawCommand[] {
   const chords = chordShapes(places, codeAt(grid), fallTop, fx.shells)
   const tails = places.flatMap((p) => tailCommand(p, grid, s.v, t.song, fallTop) ?? [])
   const cells = places.flatMap((p) => noteCommand(p, fallTop, chords.edges.get(p.note.index)) ?? [])
-  const texts = places.flatMap((p) => noteLabelCommands(p, input.labels, grid.R, fallTop))
+  const texts = places.flatMap((p) => noteLabelCommands(p, input.labels.note, grid.R, fallTop))
 
   const effects = feedbackCommands(input.effects, {
     grid,

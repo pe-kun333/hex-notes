@@ -64,7 +64,7 @@ export function initialInput(s: Setup, over: Partial<FrameInput> = {}): FrameInp
     t: { song: 0, real: 0 },
     pressed: new Set(),
     effects: [],
-    labels: 'both',
+    labels: { kb: 'both', note: 'both' },
     hints: true,
     level: 0,
     ...over,

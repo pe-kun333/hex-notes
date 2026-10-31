@@ -11,6 +11,7 @@ import { playScreen } from './app/screens/play.ts'
 import { resultScreen } from './app/screens/result.ts'
 import { settingsScreen } from './app/screens/settings.ts'
 import { startShell, type DevPage, type ScreenFactory, type Shell } from './app/shell.ts'
+import { FIXTURE_SONGS, type SongEntry } from './app/songs.ts'
 import type { StorageFailure } from './storage/fallback.ts'
 import { openIdb } from './storage/idb.ts'
 
@@ -25,6 +26,9 @@ const DEV_PAGES: readonly DevPage[] = import.meta.env.DEV
       { href: '/src/app/dev/telemetry.html', label: '計測層（手順 12）' },
     ]
   : []
+
+// 手順 3 の曲はフィクスチャ 6 曲（vite dev が tests/ を配る）。build では空（同梱曲は M1 の手順 6・8）
+const SONGS: readonly SongEntry[] = import.meta.env.DEV ? FIXTURE_SONGS : []
 
 const SCREENS: Readonly<Record<ScreenId, ScreenFactory>> = {
   S0: onboardScreen,
@@ -50,5 +54,12 @@ const booted = boot({
 
 const host = document.getElementById('app')
 if (host === null) throw new Error('#app が無い')
-shell = startShell({ doc: document, host, booted, screens: SCREENS, devPages: DEV_PAGES })
+shell = startShell({
+  doc: document,
+  host,
+  booted,
+  screens: SCREENS,
+  devPages: DEV_PAGES,
+  songs: SONGS,
+})
 for (const f of early) shell.band({ kind: 'storageFail', area: f.area })

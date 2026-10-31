@@ -74,7 +74,7 @@ describe('領域（全図形が落下域＋鍵盤図の矩形内）', () => {
                 const cmds = buildFrame(
                   initialInput(s, {
                     mode,
-                    labels,
+                    labels: { kb: labels, note: labels },
                     t: { song: t, real: 60 },
                     pressed: new Set([a, b]),
                     effects: fx(a, b),
@@ -229,14 +229,33 @@ describe('鍵盤図（§2.2・§2.5、decisions #30）', () => {
   it('文字「音名」でも鍵盤図はキー文字を残す（note → both）、「なし」はキー文字だけ（m1 drawCell L401、decisions #30(d)）', () => {
     const keysTags = (labels: 'note' | 'none') =>
       tags(
-        buildFrame(initialInput(s, { labels, t: { song: -5000, real: 0 } })).filter(
-          (c) => c.layer === 'keys',
-        ),
+        buildFrame(
+          initialInput(s, { labels: { kb: labels, note: 'both' }, t: { song: -5000, real: 0 } }),
+        ).filter((c) => c.layer === 'keys'),
       )
     // ableton: 音のある 17 鍵＋空の 3 鍵
     expect(keysTags('note')).toMatchObject({ label: 20, noteName: 17 })
     expect(keysTags('none').label).toBe(20)
     expect(keysTags('none').noteName).toBeUndefined()
+  })
+
+  it('鍵盤図は kb、落ちるセルは note のラベルで別に描く（入門者の既定 kb key・note both、decisions #60）', () => {
+    const byLayer = (labels: { kb: 'key' | 'both' | 'none'; note: 'key' | 'both' | 'none' }) => {
+      const cmds = buildFrame(initialInput(s, { labels, t: { song: 500, real: 0 } }))
+      return {
+        keys: tags(cmds.filter((c) => c.layer === 'keys')),
+        notes: tags(cmds.filter((c) => c.layer === 'notes')),
+      }
+    }
+    const beginner = byLayer({ kb: 'key', note: 'both' })
+    expect(beginner.keys.noteName).toBeUndefined()
+    expect(beginner.keys.label).toBe(20)
+    expect(beginner.notes.noteName).toBeGreaterThan(0)
+    expect(beginner.notes.label).toBe(beginner.notes.noteName)
+    const swapped = byLayer({ kb: 'both', note: 'none' })
+    expect(swapped.keys.noteName).toBe(17)
+    expect(swapped.notes.label).toBeUndefined()
+    expect(swapped.notes.noteName).toBeUndefined()
   })
 })
 
@@ -296,7 +315,9 @@ describe('上端で切る（箱の上端にかかるセル）', () => {
     // 着地 1,500 ms 前 − 少しのとき、最上段（Q）のセルは上端にかかる。scale は白鍵だけなので A 段で確かめる
     let found = false
     for (let t = -2000; t <= 3000 && !found; t += 10) {
-      const cmds = buildFrame(initialInput(s, { t: { song: t, real: 0 }, labels: 'key' }))
+      const cmds = buildFrame(
+        initialInput(s, { t: { song: t, real: 0 }, labels: { kb: 'key', note: 'key' } }),
+      )
       const cut = cmds.find((c) => c.tag === 'note' && c.kind === 'poly' && c.edges !== undefined)
       if (cut && cut.kind === 'poly') {
         found = true
@@ -335,7 +356,7 @@ describe('全配列の鍵盤図（譜面なし。全鍵を押下・全鍵に縁�
               t: { song: 0, real: 120 },
               pressed: new Set(codes),
               effects,
-              labels: 'both',
+              labels: { kb: 'both', note: 'both' },
               hints: true,
               level,
             })

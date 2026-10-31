@@ -3,6 +3,7 @@
 // （演奏・役割の鍵は preventDefault するので、Enter で焦点のボタンを押すのはここ）・#65（帯の置き場、仮）、m6 `render` L946–950
 // （状態 → 描く）。状態は startShell の閉包に持つ（グローバルに置かない）。試験の外（DOM）なので手で確かめる（M1 の手順 14）。
 
+import { createAudioOut, type AudioOut } from '../audio/context.ts'
 import type { InputEvent } from '../input/keyboard.ts'
 import type { Settings } from '../storage/local.ts'
 import {
@@ -16,7 +17,9 @@ import {
 } from './bands.ts'
 import type { Booted } from './boot.ts'
 import { attachKeyboard } from './dom-input.ts'
+import type { PlayResult } from './play-runner.ts'
 import { navigate, type Route, type ScreenId } from './router.ts'
+import type { SongEntry } from './songs.ts'
 
 /** 開発ページへの導線（dev のときだけ S1 に出す。build では空） */
 export interface DevPage {
@@ -34,6 +37,16 @@ export interface ScreenContext {
   /** 帯への知らせ（低負荷・予約の遅れなど。IME と保存の失敗は殻が受ける） */
   band(ev: BandEvent): void
   readonly devPages: readonly DevPage[]
+  /** 選べる曲（手順 3 は dev のフィクスチャ 6 曲。同梱曲は手順 6・8） */
+  readonly songs: readonly SongEntry[]
+  /** 選んだ曲（S1 で選び S2 が読む。S3 の「もう一度」も同じ曲） */
+  song(): SongEntry | null
+  pickSong(s: SongEntry): void
+  /** 終わった回（S2 が書き S3 が読む。中身の画面は手順 5） */
+  lastPlay(): PlayResult | null
+  setLastPlay(r: PlayResult): void
+  /** 音の出力（最初の呼び出しで作る。自動再生の制限があるので利用者の操作の中で呼ぶ。画面をまたいで 1 つ） */
+  audio(): AudioOut
 }
 
 /** 画面の DOM と受け口 */
@@ -59,6 +72,7 @@ export interface ShellOptions {
   readonly booted: Booted
   readonly screens: Readonly<Record<ScreenId, ScreenFactory>>
   readonly devPages?: readonly DevPage[]
+  readonly songs?: readonly SongEntry[]
 }
 
 export interface Shell {
@@ -106,6 +120,9 @@ export function startShell(opts: ShellOptions): Shell {
   let bands: BandsState = initialBands()
   const settings = booted.settings
   let view: ScreenView | null = null
+  let song: SongEntry | null = null
+  let lastPlay: PlayResult | null = null
+  let audio: AudioOut | null = null
 
   const renderBands = (): void => {
     if (view === null) return
@@ -142,6 +159,16 @@ export function startShell(opts: ShellOptions): Shell {
     go: (to) => go(to),
     band,
     devPages: opts.devPages ?? [],
+    songs: opts.songs ?? [],
+    song: () => song,
+    pickSong: (s) => {
+      song = s
+    },
+    lastPlay: () => lastPlay,
+    setLastPlay: (r) => {
+      lastPlay = r
+    },
+    audio: () => (audio ??= createAudioOut()),
   }
 
   const mount = (): void => {

@@ -1,4 +1,4 @@
-// S1 ホームの骨組み（M1 の手順 2。曲一覧と譜面版の選択は手順 8、M1-08）。出どころ: design.md §1.3 S1（上帯: プロファイル
+// S1 ホームの骨組み（M1 の手順 2。曲一覧と譜面版の選択は手順 8、M1-08。手順 3 で曲を選んで S2 へ入る口だけ足した）。出どころ: design.md §1.3 S1（上帯: プロファイル
 // 〔M1 では隠す〕・端末の上限・校正の有無）、m6 S1 L298–307（上帯）、m1-kickoff 手順 8 の手直し（device が無ければ
 // 「未診断（2）」）。開発ページへの導線は dev のときだけ（src/main.ts が渡す）。
 
@@ -43,15 +43,23 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
     ),
   )
   f.root.insertBefore(top, f.bandSlot)
-  f.body.append(
-    h(doc, 'p', { className: 'note', text: '曲の一覧は準備中です。' }),
-    h(
-      doc,
-      'div',
-      { className: 'btnrow' },
-      button(doc, 'プレイ画面を試す（曲なし）', () => ctx.go('S2'), 'primary'),
-    ),
-  )
+  // 曲の一覧（手順 3 は dev のフィクスチャ 6 曲。曲カード・譜面版・難度は手順 8）
+  if (ctx.songs.length === 0)
+    f.body.append(h(doc, 'p', { className: 'note', text: '曲の一覧は準備中です。' }))
+  else
+    f.body.append(
+      h(
+        doc,
+        'div',
+        { className: 'btnrow songs' },
+        ...ctx.songs.map((s) =>
+          button(doc, s.name, () => {
+            ctx.pickSong(s)
+            ctx.go('S2')
+          }),
+        ),
+      ),
+    )
   if (ctx.devPages.length > 0)
     f.body.append(
       h(
