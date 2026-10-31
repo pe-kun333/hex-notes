@@ -41,6 +41,8 @@ export const FOLD_IDS: readonly FoldId[] = ['octave', 'cut', 'nearest']
 /** 同時押し上限（decisions #7: 既定 2、診断通過で 3〜4） */
 export type ChordLimit = 2 | 3 | 4
 export const CHORD_LIMITS: readonly ChordLimit[] = [2, 3, 4]
+/** 譜面版の上限の既定（decisions #7。端末の上限が 3〜4 でも選ぶのは 2、#15 の改訂まで） */
+export const DEFAULT_CHORD_LIMIT: ChordLimit = 2
 
 /** KeyboardEvent.code。使うのは src/layout/presets.ts の KEY_CODES（40 個） */
 export type KeyCode = string
