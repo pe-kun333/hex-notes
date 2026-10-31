@@ -96,6 +96,7 @@ describe('計測盤 telemetryPanelView', () => {
       device: 0,
       storageFail: 0,
       embedError: 1,
+      sync: 0,
     })
     expect(v.recent.map((r) => [r.kind, r.text])).toEqual([
       ['動画の埋め込みの失敗', 'エラー 5'],

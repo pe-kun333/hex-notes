@@ -26,6 +26,7 @@ export const KIND_NAMES: Readonly<Record<Kind, string>> = {
   device: '端末',
   storageFail: '保存の失敗',
   embedError: '動画の埋め込みの失敗',
+  sync: '同期タップ',
 }
 
 export interface KindCount {
@@ -94,6 +95,11 @@ export function rowBrief(r: TelemetryRow): string {
       return `${r.where}: ${r.message}`
     case 'embedError':
       return `エラー ${r.code}`
+    case 'sync':
+      return (
+        `${r.chartId.replace(/^sha256:/, '').slice(0, 8)}…・残差 SD ${fix(r.residualSd)} ms・offset ${r.offset.toFixed(3)} s・` +
+        `rate ${r.rate.toFixed(4)}・${fix(r.elapsedS)} 秒・${r.attempts} 回目`
+      )
   }
 }
 

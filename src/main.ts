@@ -26,6 +26,7 @@ const DEV_PAGES: readonly DevPage[] = import.meta.env.DEV
       { href: '/src/app/dev/audio.html', label: '音源層（手順 10）' },
       { href: '/src/app/dev/storage.html', label: '保存層（手順 11）' },
       { href: '/src/app/dev/telemetry.html', label: '計測層（手順 12）' },
+      { href: '/src/app/dev/sync.html', label: '同期タップ（M2 手順 3）' },
     ]
   : []
 

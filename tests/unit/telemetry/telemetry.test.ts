@@ -509,6 +509,7 @@ describe('書き出し export.ts', () => {
       device: 0,
       storageFail: 0,
       embedError: 1,
+      sync: 0,
     })
   })
 })

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>同期タップ（開発）</title>
+  </head>
+  <body>
+    <main id="app" tabindex="-1" class="screen" style="max-width: 900px; padding: 16px">
+      <h1>同期タップ（M2-02、手順 3）</h1>
+      <p class="note">
+        ダミー動画（刻み 15 ms・種 7）を再生し、メトロノームのクリックを動画の拍 0
+        から鳴らします。クリックに合わせて Space を 8
+        回押すと、時計層の写像でタップを動画の時刻にし、offset と rate
+        を当てはめます。真値はこのページだけに出します（製品の S5 段 4 は M3-03）。
+      </p>
+      <div id="truth" class="card soft"></div>
+      <div id="panel"></div>
+      <div id="video" class="card soft"></div>
+      <h2>回の記録</h2>
+      <ol id="attempts"></ol>
+      <h2>sync 行（telemetry に書く形。このページは保存しない）</h2>
+      <pre id="row" class="note"></pre>
+    </main>
+    <script type="module" src="./sync-dev.ts"></script>
+  </body>
+</html>
