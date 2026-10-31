@@ -6,6 +6,8 @@
 // L805–831、play-dev L177–791（DOM の配線。ループの中身は src/app/play-runner.ts の純関数）。
 // 曲・配列・着地・文字・辺ヒント・音は設定（hexnote.settings）とプロファイルから（開発用の切替は出さない）。Salamander が
 // 未同梱の間は合成音で鳴る（audio/context.ts）。
+// M2 の手順 6: S4 練習室は同じ画面に練習のパネル（practice-panel.ts）を左列のプレイヤー矩形の場所に置いた物（room 真。
+// m2-kickoff §7-9）。練習の設定は殻の practice()（S4 に入るたびに既定、§7-7）。S0d の段階は音待ちで流す（decisions #61・#82）。
 
 import {
   PART_GAINS,
@@ -40,7 +42,12 @@ import { playRow } from '../../telemetry/collect.ts'
 import { hudOf } from '../hud.ts'
 import type { ControlInput } from '../play-control.ts'
 import {
+  DEFAULT_PRACTICE,
+  TUTORIAL_PRACTICE,
   newRun,
+  runBar,
+  runBars,
+  runSetPractice,
   runControl,
   runFrame,
   runInput,
@@ -52,9 +59,12 @@ import {
   runRelease,
   type Run,
   type RunEffect,
+  type PracticeOptions,
   type RunOptions,
   type RunStep,
 } from '../play-runner.ts'
+import { practicePanel, type PracticePanel } from '../practice-panel.ts'
+import { loopBandText, practiceNote } from '../practice-view.ts'
 import { profileOf } from '../profile.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { songOf } from '../songs.ts'
@@ -74,7 +84,7 @@ export const PHASE_TEXT: Readonly<Record<PlayPhase, string>> = {
   idle: 'Space で開始',
   syncing: '同期中（300 ms は判定を猶予します）',
   playing: '再生中（Esc で一時停止）',
-  waiting: '待ち',
+  waiting: '待ち（正しいキーを押すと進みます。Esc で一時停止）',
   paused: '一時停止中',
   ended: '終わりました',
 }
@@ -82,7 +92,7 @@ export const PHASE_TEXT: Readonly<Record<PlayPhase, string>> = {
 /** 低負荷の段の初め（S6「自動／ON／OFF」。on は段 3 固定、off は段 0 固定、auto は 0 から自動で落とす。#29） */
 const LOWLOAD_START = { auto: 0, on: 3, off: 0 } as const
 
-export function playScreen(ctx: ScreenContext): ScreenView {
+export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   const { doc } = ctx
   const settings = ctx.settings()
   const prof = profileOf(settings.profile)
@@ -129,6 +139,35 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     ),
   )
   player.id = 'player'
+  // S4: 練習の設定（無ければ既定）。S0d の段階は音待ち（自動ループ・自動昇降なし）。通常の S2 は練習なし
+  const practiceOf = (): PracticeOptions | undefined =>
+    room
+      ? (ctx.practice() ?? DEFAULT_PRACTICE)
+      : ctx.tutorial() !== null
+        ? TUTORIAL_PRACTICE
+        : undefined
+  // S4 のパネル（左列のプレイヤー矩形の場所。ループ中の帯と練習記録の注記もここ）
+  const loopNote = h(doc, 'div', { className: 'loopnote' })
+  const practiceLine = h(doc, 'p', { className: 'note' })
+  let panel: PracticePanel | null = null
+  if (room) {
+    panel = practicePanel(doc, {
+      change: (patch) => changePractice(patch),
+      fullPlay: () => {
+        // 通しで弾く ＝ 同じ曲・同じ譜面版の通常プレイ（固定テンポ・1.0・全鍵、§1.2）
+        ctx.setPractice(null)
+        const e = ctx.song()
+        if (e !== null) ctx.pickSong(e, 'all', ctx.variantSpec() ?? undefined)
+        ctx.go('S2')
+      },
+      home: () => {
+        ctx.setPractice(null)
+        goHome()
+      },
+    })
+    player.className = 'player room'
+    player.replaceChildren(loopNote, panel.el)
+  }
   const hud = h(doc, 'dl', { className: 'hud' })
   const hudRow = (label: string, ...dd: Node[]): HTMLElement => {
     const v = h(doc, 'dd', {}, ...dd)
@@ -170,6 +209,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     player,
     hud,
     status,
+    practiceLine,
     tutorialBox,
     h(doc, 'div', { className: 'btnrow' }, home),
     bandSlot,
@@ -201,7 +241,9 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     }
     const { box, player: p } = st
     left.style.width = `${p.w}px`
-    player.style.height = `${p.h}px`
+    // S4 はパネルがプレイヤー矩形の場所を使う（高さはパネルの中身、左列の中で縦に流す）
+    if (room) player.style.minHeight = `${p.h}px`
+    else player.style.height = `${p.h}px`
     Object.assign(stage.style, {
       left: `${box.left}px`,
       top: `${box.top}px`,
@@ -226,12 +268,46 @@ export function playScreen(ctx: ScreenContext): ScreenView {
         t !== null && phase === 'idle'
           ? `段階 ${t.stage + 1}／${TUTORIAL_KEYSETS.length}: ${KEYSET_NAMES[tutorialKeyset(t)]} ― Space で開始`
           : PHASE_TEXT[phase]
-    home.hidden = phase !== 'idle'
+    home.hidden = room || phase !== 'idle'
+    showPractice()
     if (phase === 'paused') pause.show()
     else if (!pause.el.hidden) {
       pause.hide()
       root.focus({ preventScroll: true })
     }
+  }
+
+  /** S4 のパネル・ループ中の帯・練習記録の注記を今の回から描く（変わった所だけ。毎フレーム） */
+  const initialRange = ctx.practice()?.loop ?? null
+  const weak = ctx.lastPlay()?.weak ?? null
+  function showPractice(): void {
+    const r = run
+    if (r === null) return
+    const p = r.practice
+    const note = p === null || ctx.tutorial() !== null ? null : practiceNote({ mode: p.mode, rate: p.rate }, r.opts.keyset ?? 'all')
+    if (practiceLine.textContent !== (note ?? '')) practiceLine.textContent = note ?? ''
+    if (panel === null || p === null) return
+    const range = p.loop.range
+    // 区間が S3 の苦手区間のままなら「引き継ぎました」
+    const inherited = range !== null && initialRange !== null && weak !== null && range.startBar === weak.from && range.endBar === weak.to
+    const b = loopBandText(range, inherited)
+    const text = b === null ? '' : `${b.title}。${b.detail}`
+    if (loopNote.textContent !== text) {
+      loopNote.replaceChildren(...(b === null ? [] : [h(doc, 'b', { text: b.title }), h(doc, 'span', { text: b.detail })]))
+      loopNote.hidden = b === null
+    }
+    panel.update({ opts: { ...p.opts, mode: p.mode }, rate: p.pendingRate ?? p.rate, range, laps: p.loop.laps, bars: runBars(r), nowBar: runBar(r), self: r.judge.selfRate })
+  } // prettier-ignore
+
+  /** パネルで設定を替えた: 殻に覚え、待機中の回は作り直し（区間なら始点の 1 小節前から）、走っている回には途中から効かせる */
+  function changePractice(patch: Partial<PracticeOptions>): void {
+    const next: PracticeOptions = { ...(ctx.practice() ?? DEFAULT_PRACTICE), ...patch }
+    ctx.setPractice(next)
+    if (!alive || run === null) return
+    if (runPhase(run) === 'idle') run = newRun(run.song, { ...run.opts, practice: next })
+    else apply(runSetPractice(run, perfNow(), patch))
+    showHud(run)
+    show()
   }
 
   // HUD は変わった所だけ書く（毎フレーム同じ文字を入れ直すと text node が替わり、レイアウトが走る）
@@ -397,6 +473,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
         if (!alive) return
       }
       showHud(run)
+      showPractice()
     }
     draw(now)
     raf = requestAnimationFrame(frame)
@@ -447,6 +524,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
       sound: { melody: settings.audio.guide, accomp: true, click: settings.audio.metronome },
       keyclick: settings.audio.keyclick,
       keyset,
+      ...(practiceOf() === undefined ? {} : { practice: practiceOf() }),
     }
     run = newRun(song, opts)
     if (song.variant.layout !== layoutId) {
@@ -472,6 +550,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
   } // prettier-ignore
 
   home.hidden = true
+  if (room) loopNote.hidden = true
   layout()
   void load().then(() => {
     if (alive && run === null) home.hidden = false

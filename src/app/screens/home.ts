@@ -42,6 +42,7 @@ import {
   withVariant,
   type SongFilter,
 } from '../library-view.ts'
+import { DEFAULT_PRACTICE } from '../play-runner.ts'
 import { TUTORIAL_SONG_ID, localSong, type SongEntry } from '../songs.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { button, frame, h } from './frame.ts'
@@ -203,9 +204,18 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
     const play = button(doc, 'この譜面版で遊ぶ → プレイ', () => {
       if (limit === null || missing) return
       ctx.pickSong(l.entry, 'all', { layout, limit, fold: foldOf(l.chart) })
+      ctx.setPractice(null)
       ctx.go('S2')
     }, 'primary')
     play.disabled = limit === null || missing
+    // 練習室で弾く（区間なし。練習の設定は既定から、m6 L321・L967、M2 の手順 6）
+    const room = button(doc, '練習室で弾く', () => {
+      if (limit === null || missing) return
+      ctx.pickSong(l.entry, 'all', { layout, limit, fold: foldOf(l.chart) })
+      ctx.setPractice(DEFAULT_PRACTICE)
+      ctx.go('S4')
+    })
+    room.disabled = play.disabled
     const note = limit === null ? '' : limit > DEFAULT_CHORD_LIMIT ? LIMIT_NOTE : '既定。'
     const make = !missing || limit === null ? [] : [h(doc, 'p', { className: 'note' }, MAKE_MISSING, ' ',
       button(doc, MAKE_BUTTON, () => void makeVariant(l, layout, limit), 'small make-variant'),
@@ -216,7 +226,7 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
       h(doc, 'div', { className: 'row' }, h(doc, 'span', { text: '同時押し上限' }), lim, h(doc, 'span', { className: 'note', text: note })),
       ...(limit === null ? [h(doc, 'p', { className: 'note', text: missingText(layout, DEFAULT_CHORD_LIMIT, l.card.tutorial) })] : []),
       ...make,
-      h(doc, 'div', { className: 'btnrow' }, play, h(doc, 'span', { className: 'note', text: '成績の比較は同じ譜面版の中だけ。' })),
+      h(doc, 'div', { className: 'btnrow' }, play, room, h(doc, 'span', { className: 'note', text: '成績の比較は同じ譜面版の中だけ。' })),
     )
   }
 

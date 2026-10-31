@@ -760,3 +760,91 @@ table.tracks th {
     padding-right: 8px;
   }
 }
+
+/* S4 練習室のパネル（M2 の手順 6。左列のプレイヤー矩形の場所に置く。右列は全高を落下域に使う、m2-kickoff §7-9） */
+.play .left:has(.player.room) {
+  overflow-y: auto;
+}
+
+.play .player.room {
+  display: block;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.practice-panel section {
+  margin: 0 0 4px;
+}
+
+.practice-panel .self {
+  margin: 2px 0;
+}
+
+.play .player.room + .hud {
+  font-size: 13px;
+}
+
+.play .player.room ~ .note {
+  margin: 0;
+  font-size: 12px;
+}
+
+.practice-panel h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.practice-panel .note {
+  margin: 2px 0;
+  font-size: 12px;
+}
+
+.practice-panel .btnrow {
+  margin: 2px 0;
+  gap: 6px;
+}
+
+.practice-panel .seg button.small {
+  padding: 2px 6px;
+}
+
+/* ループの帯（1 小節 1 目盛。区間・始点・今の小節） */
+.loopband {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  margin: 2px 0;
+}
+
+.loopband .cell {
+  flex: 1 0 6px;
+  min-width: 6px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 1px;
+  background: var(--line);
+}
+
+.loopband .cell.in {
+  background: var(--accent);
+}
+
+.loopband .cell.start {
+  outline: 2px solid var(--accent);
+}
+
+.loopband .cell.now {
+  box-shadow: inset 0 -3px 0 var(--fg, currentColor);
+}
+
+.play .loopnote {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.play .loopnote span {
+  color: var(--muted);
+}

@@ -5,7 +5,8 @@
 // （screens/play.ts）。称号・ストリークは手順 11、「練習室で弾く」は M2-03。
 
 import { proposalFor, proposalText, signedMs } from '../calibration.ts'
-import type { PlayResult } from '../play-runner.ts'
+import { DEFAULT_PRACTICE, type PlayResult } from '../play-runner.ts'
+import { practiceEntryText, weakRange } from '../practice-view.ts'
 import { resultView, rewardView } from '../result-view.ts'
 import { awardsFor, localDay } from '../../results/awards.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
@@ -122,9 +123,17 @@ export function resultScreen(ctx: ScreenContext): ScreenView {
       doc,
       'div',
       { className: 'btnrow' },
-      // もう一度 ＝ 同じ曲・同じ設定（同じ譜面版）で S2
-      button(doc, 'もう一度', () => ctx.go('S2'), 'primary'),
-      button(doc, 'ホームへ', () => ctx.go('S1')),
+      // もう一度 ＝ 同じ曲・同じ設定（同じ譜面版）で S2。練習室の回なら S4 へ（同じ練習の設定、M2 の手順 6）
+      button(doc, 'もう一度', () => ctx.go(ctx.practice() !== null ? 'S4' : 'S2'), 'primary'),
+      // 練習室で弾く（初回導線の S3 では出さない。苦手 2 小節があればループ区間に、m6 L387・L858・L987）
+      ...(last === null || last.onboardEnd === true ? [] : [button(doc, practiceEntryText(weakRange(last.weak)), () => {
+        ctx.setPractice({ ...DEFAULT_PRACTICE, loop: weakRange(last.weak) })
+        ctx.go('S4')
+      })]),
+      button(doc, 'ホームへ', () => {
+        ctx.setPractice(null)
+        ctx.go('S1')
+      }),
     ),
   )
   // 何もせず S3 を離れたら見送りとして 1 回書く（S6 へ行って戻ったときも片付いたものとする）
