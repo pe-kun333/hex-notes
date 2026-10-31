@@ -465,6 +465,112 @@ table.t td {
   background: #e06c75;
 }
 
+/* S1 の曲カードと譜面版の箱（m6 .songs・.song・.axes・.variant・.seg） */
+.songs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+
+button.song {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+button.song.sel {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.song .t {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.song .name {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.song .m {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pill {
+  display: inline-block;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pill.good {
+  color: #62d4a0;
+  border-color: #62d4a0;
+}
+
+.axes {
+  display: grid;
+  grid-template-columns: auto 60px 1fr;
+  gap: 2px 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.axes .bar {
+  display: block;
+  height: 6px;
+  background: var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.axes .bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.axes .caution {
+  color: #e0b458;
+  font-weight: 700;
+}
+
+.song .best {
+  font-variant-numeric: tabular-nums;
+}
+
+.card.variant .row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 6px 0;
+}
+
+.seg {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.seg button[aria-pressed='true'] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
 .steps {
   padding-left: 1.5em;
 }

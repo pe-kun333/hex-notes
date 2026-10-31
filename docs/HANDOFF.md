@@ -1,12 +1,12 @@
 # 引き継ぎ（次のセッションが最初に読む）
 
-2026-11-01、M1 の手順 7（ブランチ m1-07-keyset）の PR を出した時点で更新。読む順は docs/decisions.md → design.md → planning/m1-kickoff.md（M1 の手順書。M0 の記録は planning/m0-kickoff.md）→ tests-inventory.md → src/README.md → planning/consult/README.md。
+2026-11-01、M1 の手順 8（ブランチ m1-08-home）の PR を出した時点で更新。読む順は docs/decisions.md → design.md → planning/m1-kickoff.md（M1 の手順書。M0 の記録は planning/m0-kickoff.md）→ tests-inventory.md → src/README.md → planning/consult/README.md。
 
-- 済んだ手順: M0 の 1〜14 全て、M1 の手順 1〜6（PR #23〜#28 で main）。手順 7 は PR を出して取り込み待ち（最初に main に入ったかを確かめる）。試験 962 件、初回読込 126,017 バイト。
-- 手順 7（M1-10 鍵数制限）: src/chart/keyset.ts（d・dfjk・8・all）。RunOptions.keyset で描画と判定の音を外し（終わり・進行・ガイド音は曲全体）、記録の keyset と calibEligible、S3 の「練習の結果」。チュートリアル曲は Ableton 型の 1 版だけを使う（variantFor）。入口は殻の pickSong(song, keyset) で、今は dev の S1 にだけ 3 段階のボタン。裁定は decisions #70。手順 6（同梱曲は U-03 の代替の 3 曲、道具、難度 4 軸）は #69、手順 5 は #68、手順 4 は #67、手順 3 は #66。
+- 済んだ手順: M0 の 1〜14 全て、M1 の手順 1〜7（PR #23〜#29 で main）。手順 8 は PR を出して取り込み待ち（最初に main に入ったかを確かめる）。試験 973 件、初回読込 135,042 バイト。
+- 手順 8（M1-08 選曲 S1）: 自己ベストと完走は src/results/best.ts、曲カード・並び・端末に合う版は src/app/home-view.ts、S1 は曲カードと譜面版の箱。S1 で選んだ版は殻の pickSong(song, keyset, spec) で S2 へ。裁定は decisions #71。手順 7（鍵数制限、keyset.ts）は #70、手順 6（同梱曲は U-03 の代替の 3 曲）は #69、手順 5 は #68、手順 4 は #67、手順 3 は #66。
 - S2 のループは src/app/play-runner.ts（ハーネスと一致を試験で固定）。殻の lastPlay は FinishedPlay。記録は S2 の終わりに results へ。S2 の鍵盤図は演奏する版の配列で組む。
-- 次: 手順 8（M1-08 選曲 S1、m1-kickoff.md §2）。曲カード（難度 4 軸は Variant.metrics にある）・並び（密度の低い順）・端末に合う版の自動選択（§7-10）・src/results/best.ts（自己ベストと完走、keyset all・skipped 0 だけ）。dev の S1 の「開発ページ」の 3 段階のボタンは手順 9 で S0d に置き換えるまで残す。U-03 の入門 9 曲は手順 14 の前に bundle-songs.ts と rights.json に足し、37 版と初回読込を測り直す。§7 の残りは各手順の着手時に裁定し decisions #71 以降に書く。手順の型は M0 と同じ。
-- 相談（docs/planning/consult/）: A → #24、B → #27〜#31、C → #32〜#37、D は確定、E → #25。M0 の手順 8〜14 は相談なしで主担当が裁定した。M1 で相談に値する論点は今のところ無い（§7 は主担当の裁定で足りる見込み）。次の決定の行は #71 以降。
+- 次: 手順 9（M1-04 初回導線 S0a〜S0d、m1-kickoff.md §2。M）。S0a 配列の確認（layout の legend）、S0b 同時押しテスト（src/input/chord-test.ts を新しく。§7-13）と端末プロファイルの保存（device 行もここで、decisions #55 (b)）、S0c 校正（手順 4 の calibration-panel をそのまま置く）、S0d チュートリアル曲の 3 段階（手順 7 の pickSong(tutorial, keyset)。dev の S1 の 3 段階のボタンは S0d ができたら消す）、onboard 行（§7-14）。U-04（同時押しテストの実機）は利用者の手元作業。§7 の残りは各手順の着手時に裁定し decisions #72 以降に書く。手順の型は M0 と同じ。
+- 相談（docs/planning/consult/）: A → #24、B → #27〜#31、C → #32〜#37、D は確定、E → #25。M0 の手順 8〜14 は相談なしで主担当が裁定した。M1 で相談に値する論点は今のところ無い（§7 は主担当の裁定で足りる見込み）。次の決定の行は #72 以降。
 - 回帰ハーネス: 判定・時計・譜面・配列・play/session を変えて `npm run harness:check` が落ちたら、tests/harness/out/diff.md で差分を見る。意図した変化なら `npm run harness` で期待の表を作り直し、PR の差分で見せる（decisions #56）。M1 の手順 5（ResultRecord の skipped）・7（鍵数制限）はここに効きうる。
 - Salamander の実物はまだ置いていない（manifest の files は空、合成音だけで鳴る）。利用者の許しを得てから、archive.org の SalamanderGrandPianoV3_44.1khz16bit.tar.bz2（466.1 MB）を一時ディレクトリに落として展開し、`node tools/salamander/thin-salamander.ts --src <展開先>` で 30 音の Opus・manifest・ATTRIBUTION を書き、聞いて速度層・長さ・ビットレートを見直し、初回読込と合わせて記録する（元の FLAC はリポジトリに入れない）。
 - 手で確かめていない物（M1 の手順 14 で拾う）: M1 手順 3 の 6 曲の手弾きと音を耳で聞くこと、手順 4 の校正のクリックを耳で聞き実際の Space で 24 打つこと、手順 5 の S3 の見た目（窓が隠れて撮れなかった）（browser pane は窓が隠れて rAF が止まり、通しは rAF をタイマーに差し替えた 1 曲だけ）、手順 8 の曲の終わりの行・ホールドの早離し・ゲージ 0、手順 10 の音を耳で聞くこと・主スレッドの 75 ms 停止、U-01 の位相の合否、手順 11 の本物の容量超過とプライベートウィンドウ、手順 12 の書き出しの実際のダウンロード、手順 14 の Firefox 列（`node spikes/coep-youtube/serve.ts`）。
