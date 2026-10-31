@@ -357,7 +357,8 @@ export function playScreen(ctx: ScreenContext): ScreenView {
       return
     }
     if (!alive) return
-    const song = songOf(json, { layout: settings.layout, limit: prof.limit, fold: settings.fold })
+    // S1 で選んだ版、無ければ設定の配列・プロファイルの上限（手順 8）
+    const song = songOf(json, ctx.variantSpec() ?? { layout: settings.layout, limit: prof.limit, fold: settings.fold })
     if (typeof song === 'string') {
       status.textContent = song
       return

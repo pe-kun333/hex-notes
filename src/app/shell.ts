@@ -5,6 +5,7 @@
 
 import { createAudioOut, type AudioOut } from '../audio/context.ts'
 import type { KeysetId } from '../chart/keyset.ts'
+import type { VariantSpec } from '../chart/variants.ts'
 import type { InputEvent } from '../input/keyboard.ts'
 import type { SyncKind } from '../shared/types.ts'
 import {
@@ -55,7 +56,9 @@ export interface ScreenContext {
   song(): SongEntry | null
   /** 選んだ鍵数制限（既定 all。S0d の段階 1・2 は d・dfjk、手順 7・9） */
   keyset(): KeysetId
-  pickSong(s: SongEntry, keyset?: KeysetId): void
+  /** S1 で選んだ譜面版（無ければ設定の配列とプロファイルの上限、手順 8） */
+  variantSpec(): VariantSpec | null
+  pickSong(s: SongEntry, keyset?: KeysetId, spec?: VariantSpec): void
   /** 終わった回（S2 が書き S3 が読む。中身の画面は手順 5） */
   lastPlay(): FinishedPlay | null
   setLastPlay(r: FinishedPlay): void
@@ -140,6 +143,7 @@ export function startShell(opts: ShellOptions): Shell {
   let view: ScreenView | null = null
   let song: SongEntry | null = null
   let keyset: KeysetId = 'all'
+  let spec: VariantSpec | null = null
   let lastPlay: FinishedPlay | null = null
   let proposalOpen = false
   let audio: AudioOut | null = null
@@ -188,9 +192,11 @@ export function startShell(opts: ShellOptions): Shell {
     songs: opts.songs ?? [],
     song: () => song,
     keyset: () => keyset,
-    pickSong: (s, k = 'all') => {
+    variantSpec: () => spec,
+    pickSong: (s, k = 'all', v) => {
       song = s
       keyset = k
+      spec = v ?? null
     },
     lastPlay: () => lastPlay,
     setLastPlay: (r) => {
