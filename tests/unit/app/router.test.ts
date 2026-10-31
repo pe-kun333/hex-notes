@@ -12,7 +12,13 @@ import {
 // （全画面の歯車）、m6 `go` L627–642、decisions #65（S2 は歯車を出さない、仮）。
 
 const at = (screen: ScreenId, back: ScreenId | null = null): Route => ({ screen, back })
-const walk = (r: Route, ...to: (ScreenId | 'back')[]): Route => to.reduce(navigate, r)
+/** 1 歩ずつ移る。行けない先（同じ route が返る）があれば投げる（途中で止まったのに終わりの画面だけ合う、を通さない） */
+const walk = (r: Route, ...to: (ScreenId | 'back')[]): Route =>
+  to.reduce((cur, t) => {
+    const next = navigate(cur, t)
+    if (next === cur) throw new Error(`${cur.screen} から ${t} へ行けない`)
+    return next
+  }, r)
 
 describe('起動の行き先（§1.2「初回?」）', () => {
   it('初回なら S0、でなければ S1', () => {
@@ -29,6 +35,20 @@ describe('§1.2 の遷移（M1 の部分）', () => {
 
   it('2 回目以降: S1 → S2 → S3 →（もう一度）S2 →（やめる）S1', () => {
     expect(walk(at('S1'), 'S2', 'S3', 'S2', 'S1')).toEqual(at('S1'))
+  })
+
+  it('§1.2 の主な矢印は全て行ける（S0 → S1・S2・S3、S1 → S2、S2 → S1・S3、S3 → S1・S2）', () => {
+    for (const [from, to] of [
+      ['S0', 'S1'],
+      ['S0', 'S2'],
+      ['S0', 'S3'],
+      ['S1', 'S2'],
+      ['S2', 'S1'],
+      ['S2', 'S3'],
+      ['S3', 'S1'],
+      ['S3', 'S2'],
+    ] as const)
+      expect(canGo(from, to)).toBe(true)
   })
 
   it('S3・S6 から S1 へ戻れる', () => {

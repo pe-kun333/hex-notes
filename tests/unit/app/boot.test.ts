@@ -53,6 +53,23 @@ describe('起動の行き先（初回の判定）', () => {
     expect(b.device).toEqual({ limit: 3, at: AT, layoutMapOk: true })
   })
 
+  it('保存してある設定・校正・α を読む（§4.1「設定・校正・上限・透明度」）', () => {
+    const local = memoryStorage()
+    local.setItem(LOCAL_KEYS.settings, JSON.stringify({ v: 1, layout: 'vmpk', imeStop: true }))
+    local.setItem(
+      LOCAL_KEYS.calibration,
+      JSON.stringify({ v: 1, audio: { offsetMs: 12, at: AT, via: 'tap' } }),
+    )
+    local.setItem(
+      LOCAL_KEYS.fade,
+      JSON.stringify({ v: 1, mode: 'manual', manual: 0.5, alpha: { 60: 0.25 } }),
+    )
+    const b = boot(deps({ openLocal: () => local }))
+    expect(b.settings).toEqual({ ...defaultSettings(), layout: 'vmpk', imeStop: true })
+    expect(b.calibration).toEqual({ v: 1, audio: { offsetMs: 12, at: AT, via: 'tap' } })
+    expect(b.fade).toEqual({ mode: 'manual', manual: 0.5, alpha: { 60: 0.25 } })
+  })
+
   it('このタブで導線を通した（booted）なら端末プロファイルが無くても S1', () => {
     const session = memoryStorage()
     session.setItem(BOOTED_KEY, '1')

@@ -111,8 +111,10 @@ export function playScreen(ctx: ScreenContext): ScreenView {
   }
 
   const frame = (): void => {
+    if (!alive) return
     apply(sessionTick(session, perfNow(), null))
-    raf = requestAnimationFrame(frame)
+    // フレームの中で画面を移った（手順 3 の曲末 → S3）なら次を取らない（unmount の cancel は走っている回に効かない）
+    if (alive) raf = requestAnimationFrame(frame)
   }
 
   layout()

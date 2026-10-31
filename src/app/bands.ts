@@ -112,17 +112,23 @@ const LOWLOAD_DETAIL: Readonly<Record<Exclude<LowLoadLevel, 0>, string>> = {
   3: '動きが重いので、光る演出・和音の殻・奥行きを止めました。設定で戻せます。',
 }
 
-function bandOf(s: BandsState, kind: BandKind): Band | null {
+/** 文言を変える設定 */
+export interface BandsOptions {
+  /** S6「IME 検知時に曲を止める」（既定 OFF。OFF なら m6 L800 の「曲は止めません。」、ON なら止める旨） */
+  readonly imeStop: boolean
+}
+
+/** IME の帯の本文（m6 bandsHtml L800。imeStop が ON のときは事実に合わせて書き換える、#65） */
+export function imeDetail(imeStop: boolean): string {
+  return `日本語入力中の打鍵は無視します。${imeStop ? '曲は一時停止します。' : '曲は止めません。'}`
+}
+
+function bandOf(s: BandsState, kind: BandKind, opts: BandsOptions): Band | null {
   const open = !s.closed.includes(kind)
   switch (kind) {
     case 'ime':
       return s.ime
-        ? {
-            kind,
-            title: IME_BAND_TEXT,
-            detail: '日本語入力中の打鍵は無視します。',
-            dismissible: false,
-          }
+        ? { kind, title: IME_BAND_TEXT, detail: imeDetail(opts.imeStop), dismissible: false }
         : null
     case 'autoplayBlocked':
       return s.autoplayBlocked && open
@@ -164,8 +170,8 @@ function bandOf(s: BandsState, kind: BandKind): Band | null {
 }
 
 /** 今出す帯の列（BAND_ORDER の順） */
-export function bandsOf(s: BandsState): Band[] {
-  return BAND_ORDER.map((k) => bandOf(s, k)).filter((b): b is Band => b !== null)
+export function bandsOf(s: BandsState, opts: BandsOptions): Band[] {
+  return BAND_ORDER.map((k) => bandOf(s, k, opts)).filter((b): b is Band => b !== null)
 }
 
 /** 画面の矩形（getBoundingClientRect の形。CSS px） */

@@ -221,6 +221,34 @@ a {
   margin: 0;
 }
 
+/*
+ * S2 の帯は 1 行に詰める（見出しと「閉じる」を残し、本文は省いて title に全文。内側 1093×514 では帯の場所が約 90 px
+ * しかなく、本文を折り返すと 2 件目が隠れるため。decisions #65）
+ */
+.play .band {
+  flex-wrap: nowrap;
+}
+
+.play .band b {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.play .band span {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.play .band button {
+  flex: 0 0 auto;
+}
+
 .play .stage {
   position: absolute;
   box-sizing: border-box;

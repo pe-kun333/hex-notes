@@ -70,6 +70,8 @@ function bandElement(doc: Document, b: Band, onDismiss: () => void): HTMLElement
   const el = doc.createElement('div')
   el.className = `band band-${b.kind}`
   el.dataset['band'] = b.kind
+  // S2 は帯を 1 行に詰めて本文を省くので、全文は title でも読めるようにする（#65）
+  el.title = `${b.title}。${b.detail}`
   const title = doc.createElement('b')
   title.textContent = b.title
   const detail = doc.createElement('span')
@@ -109,7 +111,7 @@ export function startShell(opts: ShellOptions): Shell {
     if (view === null) return
     const slot = view.bandSlot
     slot.replaceChildren(
-      ...bandsOf(bands).map((b) =>
+      ...bandsOf(bands, { imeStop: settings.imeStop }).map((b) =>
         bandElement(doc, b, () => band({ kind: 'dismiss', band: b.kind })),
       ),
     )

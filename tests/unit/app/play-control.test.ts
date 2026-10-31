@@ -64,14 +64,23 @@ describe('Space（開始・再開）と Escape（一時停止）', () => {
     expect(phases([ESC, ESC, ESC], OFF, playing())).toEqual(['paused', 'paused', 'paused'])
   })
 
-  it('Enter・押下・離し・帯は扱わない（Enter は殻が焦点のボタンを押す）', () => {
-    for (const i of [
-      ENTER,
-      key({ kind: 'press', code: 'KeyA', tsPerf: 0, lag: null }),
-      key({ kind: 'release', code: 'KeyA', tsPerf: 0, forced: false }),
-      key({ kind: 'imeBand', on: true, code: 'KeyA', tsPerf: 0 }),
-    ])
-      expect(controlOf('playing', i, OFF)).toBe(null)
+  it('Escape は理由 escape の Pause 要求（効くかは状態機械）', () => {
+    for (const p of ['idle', 'syncing', 'playing', 'paused'] as const)
+      expect(controlOf(p, ESC, OFF)).toEqual({
+        kind: 'play',
+        event: { kind: 'pause', reason: 'escape' },
+      })
+  })
+
+  it('Enter・押下・離し・帯はどの相でも扱わない（Enter は殻が焦点のボタンを押す。ここで再開・開始にすると 1 打鍵が 2 つの行いになる）', () => {
+    for (const p of ['idle', 'syncing', 'playing', 'paused'] as const)
+      for (const i of [
+        ENTER,
+        key({ kind: 'press', code: 'KeyA', tsPerf: 0, lag: null }),
+        key({ kind: 'release', code: 'KeyA', tsPerf: 0, forced: false }),
+        key({ kind: 'imeBand', on: true, code: 'KeyA', tsPerf: 0 }),
+      ])
+        expect(controlOf(p, i, OFF)).toBe(null)
   })
 })
 
@@ -87,10 +96,11 @@ describe('blur・非表示・iframe の Pause 要求（#35、手順 7 で検算�
     ])
   })
 
-  it('同期中の hidden は一時停止へ（iframe だけ無視）', () => {
+  it('同期中の hidden・Escape は一時停止へ（iframe だけ無視。#35 (d)）', () => {
     const syncing = restartSession(T0, 1000).session
     expect(phases([pauseOf('iframe')], OFF, syncing)).toEqual(['syncing'])
     expect(phases([pauseOf('hidden')], OFF, syncing)).toEqual(['paused'])
+    expect(phases([ESC], OFF, syncing)).toEqual(['paused'])
   })
 })
 
