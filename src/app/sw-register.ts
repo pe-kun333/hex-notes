@@ -38,6 +38,14 @@ export function registerUpdates(onChange: (s: UpdateState) => void): Updates {
     })
   return {
     state: () => state,
-    apply: () => void update(true),
+    apply: () =>
+      void (async () => {
+        // 待っている SW があり、このページがその前の版の制御下にあるときだけ skipWaiting で入れ替える（controlling で
+        // 読み直す）。初めて開いた回はページが制御下に無く、新しい版は待たずに有効になっているので、送る先が無く
+        // 何も起きなかった（M1 の手順 14 で見つけた、decisions #77）。そのときは読み直すだけで新しい版になる
+        const reg = await navigator.serviceWorker.getRegistration().catch(() => undefined)
+        if (reg?.waiting && navigator.serviceWorker.controller) await update(true)
+        else location.reload()
+      })(),
   }
 }

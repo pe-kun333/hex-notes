@@ -32,7 +32,7 @@ function proposalBand(ctx: ScreenContext, last: PlayResult): { el: HTMLElement |
     return none
   }
   const { doc } = ctx
-  const t = proposalText(v, n)
+  const t = proposalText(v, n, last.offsetUsed)
   const el = h(doc, 'div', { className: 'band offer' }, h(doc, 'b', { text: t.title }), h(doc, 'span', { text: t.detail }))
   el.dataset['band'] = 'offer'
   const done = (msg: string): void => {

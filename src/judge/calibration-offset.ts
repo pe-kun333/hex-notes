@@ -51,6 +51,8 @@ export function tapOffset(errs: readonly number[]): OffsetVerdict {
  * 段 2（プレイ後の提案）。dts は 正しい鍵で当てた音の 判定に使った実時刻 − 着地の実時刻（used を足した後、正が遅れ）。
  * ヒット ≥8・|平均| ≥10・SD < 30 の全てで、提案 ＝ used − 平均（1 ms 丸め、±120。m3 onEnd L396 の offset ＋ m と同じ。
  * m3 の m は −dt の平均）。母集団（通常プレイだけ）と音源種別ごとの保存は呼ぶ側。
+ * ±120 で切った提案が今のオフセットと同じ（もう上限にいて動かせない）なら提案しない（reason small。M1 の手順 14 で
+ * 見つけた。今と同じ値を「にしますか」と聞いていた。decisions #77）。
  */
 export function proposeOffset(dts: readonly number[], used: number): OffsetVerdict {
   const m = mean(dts)
@@ -59,5 +61,12 @@ export function proposeOffset(dts: readonly number[], used: number): OffsetVerdi
     return { ok: false, reason: 'count', mean: m, sd }
   if (!(sd < SD_LIMIT_MS)) return { ok: false, reason: 'sd', mean: m, sd }
   if (Math.abs(m) < PROPOSE_MIN_MEAN_MS) return { ok: false, reason: 'small', mean: m, sd }
-  return { ok: true, offset: clampOffset(used - m), mean: m, sd }
+  const offset = clampOffset(used - m)
+  if (offset === clampOffset(used)) return { ok: false, reason: 'small', mean: m, sd }
+  return { ok: true, offset, mean: m, sd }
+}
+
+/** ±120 で切った値か（平均をそのまま打ち消せず、それ以上のずれが残る） */
+export function atLimit(offset: number, unclamped: number): boolean {
+  return Math.abs(offset) === OFFSET_LIMIT_MS && Math.abs(unclamped) > OFFSET_LIMIT_MS
 }
