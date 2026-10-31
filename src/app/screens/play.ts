@@ -362,7 +362,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     const opts: RunOptions = {
       rules: rulesOf(prof.rules, {
         neighbor: neighborOf(byCode),
-        offsetMs: offsetFor(ctx.booted.calibration, 'audio'),
+        offsetMs: offsetFor(ctx.calibration(), 'audio'),
         labels: settings.labels,
       }),
       fade: ctx.booted.fade,
