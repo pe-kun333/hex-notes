@@ -370,6 +370,101 @@ a {
   font-size: 18px;
 }
 
+/* S3 結果（m6 .grid2・.card・.big・.rank・.t・.stack・.legend） */
+.scope {
+  margin: 0 0 4px;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 0 0 12px;
+}
+
+.card h3 {
+  margin: 4px 0;
+  font-size: 16px;
+}
+
+.big {
+  font-size: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rank {
+  font-size: 32px;
+  font-weight: 700;
+  margin-left: 16px;
+}
+
+table.t {
+  border-collapse: collapse;
+}
+
+table.t td {
+  padding: 2px 16px 2px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 自力率の帯（色に頼らないよう凡例に % を書く） */
+.stack {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.stack i,
+.legend i {
+  display: block;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 6px 0;
+  color: var(--muted);
+}
+
+.legend span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.self-solo {
+  background: #62d4a0;
+}
+
+.self-hinted {
+  background: #6aa9ff;
+}
+
+.self-near {
+  background: #c9b458;
+}
+
+.self-miss {
+  background: #e06c75;
+}
+
 .steps {
   padding-left: 1.5em;
 }

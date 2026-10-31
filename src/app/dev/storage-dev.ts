@@ -301,6 +301,7 @@ function result(id: string, chartId: string): ResultRecord {
     selfRate: { solo: 2, hinted: 5, near: 1, miss: 2 },
     syncUsed: { kind: 'audio' },
     offsetUsed: 0,
+    skipped: 0,
   }
 }
 

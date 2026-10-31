@@ -20,7 +20,7 @@ import { PUMP_MS, lateBand } from '../../audio/scheduler.ts'
 import { bridgeOf } from '../../clock/audio-bridge.ts'
 import { perfNow } from '../../clock/clock-source.ts'
 import type { InputEvent } from '../../input/keyboard.ts'
-import { neighborOf, rulesOf } from '../../judge/judge.ts'
+import { neighborOf, rulesOf, summarizeJudge } from '../../judge/judge.ts'
 import { defaultLegendKind, legendOf, type Legend } from '../../layout/legend.ts'
 import { LAYOUTS } from '../../layout/presets.ts'
 import type { PlayPhase } from '../../play/state.ts'
@@ -42,7 +42,7 @@ import {
   runFrame,
   runInput,
   runNotes,
-  runOutcome,
+  finishedPlay,
   runPhase,
   runPress,
   runPump,
@@ -56,6 +56,7 @@ import { profileOf } from '../profile.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { songOf } from '../songs.ts'
 import { stageOf, type Stage } from '../stage.ts'
+import { newRecordId } from '../../results/record.ts'
 import { button, h } from './frame.ts'
 import { pauseOverlay } from './pause.ts'
 
@@ -198,7 +199,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     if (el.textContent !== text) el.textContent = text
   }
   const showHud = (r: Run): void => {
-    const v = hudOf(r.song.name, r.t, r.lastEndMs, runOutcome(r).judge)
+    const v = hudOf(r.song.name, r.t, r.lastEndMs, summarizeJudge(r.judge))
     put(title, v.title)
     const w = `${(v.progress * 100).toFixed(1)}%`
     if (bar.style.width !== w) bar.style.width = w
@@ -263,17 +264,19 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     }
   }
 
-  /** 終わった回: 計測の play 行を足し、S3 へ（ResultRecord の保存は手順 5） */
+  /** 終わった回: 記録を results に（#51）、計測の play 行を telemetry に足し、S3 へ（保存の失敗はメモリ内で続く、#50） */
   const finish = (r: Run): void => {
-    const o = runOutcome(r)
+    const at = new Date().toISOString()
+    const o = finishedPlay(r, { id: newRecordId(globalThis.crypto, Date.now(), Math.random), at, profile: prof.profile })
     ctx.setLastPlay(o)
     const row = playRow(
       r.collect,
       { chartId: o.chartId, variantId: o.variantId, profile: prof.profile, clock: 'novideo', mode: 'fixed' },
       o.judge,
       o.audioLateMaxMs,
-      new Date().toISOString(),
+      at,
     )
+    void ctx.booted.db.putResult(o.record).catch(() => {})
     void ctx.booted.db.appendTelemetry(row).catch(() => {})
     ctx.go('S3')
   } // prettier-ignore

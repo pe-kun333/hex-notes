@@ -51,7 +51,15 @@ import type { PlayEvent, PlayPhase } from '../play/state.ts'
 import type { FrameNote } from '../render/canvas/cells.ts'
 import { frameNotes } from '../render/canvas/commands.ts'
 import type { FxIntent } from '../render/canvas/feedback.ts'
-import type { Chart, Variant } from '../shared/types.ts'
+import {
+  chordRate,
+  weakBars,
+  type ChordRate,
+  type NoteOutcome,
+  type WeakBars,
+} from '../results/analysis.ts'
+import { resultRecord } from '../results/record.ts'
+import type { Chart, Profile, ResultRecord, Variant } from '../shared/types.ts'
 import {
   collectClock,
   collectFrame,
@@ -284,9 +292,23 @@ export interface PlayResult {
   readonly offsetUsed: number
   /** 校正 段 2 の母集団に入れるか（固定テンポ・1.0 倍・全鍵の通常プレイ。§2.7。M1 の S2 は常に真、鍵数制限は手順 7） */
   readonly calibEligible: boolean
+  /** 苦手区間（miss が最も多い連続 2 小節。miss が無ければ null） */
+  readonly weak: WeakBars | null
+  /** 同時押しが合った割合 */
+  readonly chords: ChordRate
+}
+
+/** 音ごとの結果（tick ＝ 描画のノートの group。結果の分析に渡す） */
+function noteOutcomes(r: Run): NoteOutcome[] {
+  const byIndex = resultsByIndex(r.judge)
+  return r.notes.map((n) => {
+    const res = byIndex.get(n.index)
+    return { tick: n.group, grade: res?.grade ?? null, skipped: res?.skipped ?? false }
+  })
 }
 
 export function runOutcome(r: Run): PlayResult {
+  const notes = noteOutcomes(r)
   return {
     chartId: r.song.chartId,
     variantId: r.song.variant.id,
@@ -296,7 +318,42 @@ export function runOutcome(r: Run): PlayResult {
     samples: timingSamples(r.judge),
     offsetUsed: r.opts.rules.offsetMs,
     calibEligible: true,
+    weak: weakBars(r.song.chart.pulse, notes),
+    chords: chordRate(notes),
   }
+}
+
+/** 保存した記録を持つ終わった回（S3 へ） */
+export interface FinishedPlay extends PlayResult {
+  readonly record: ResultRecord
+}
+
+/**
+ * 終わった回と記録。M1 の S2 は動画なし（clock novideo・syncUsed audio）・固定テンポ・1.0 倍・全鍵（鍵数制限は手順 7）。
+ * id と at は呼ぶ側（crypto.randomUUID と Date）
+ */
+export function finishedPlay(
+  r: Run,
+  meta: { readonly id: string; readonly at: string; readonly profile: Profile },
+): FinishedPlay {
+  const o = runOutcome(r)
+  const record = resultRecord(
+    {
+      id: meta.id,
+      chartId: o.chartId,
+      variantId: o.variantId,
+      profile: meta.profile,
+      clock: 'novideo',
+      mode: 'fixed',
+      rate: 1,
+      keyset: 'all',
+      at: meta.at,
+      syncUsed: { kind: 'audio' },
+      offsetUsed: o.offsetUsed,
+    },
+    o.judge,
+  )
+  return { ...o, record }
 }
 
 export interface RunControl {

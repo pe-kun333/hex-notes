@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { accuracyText, hudOf, progressOf } from '../../../src/app/hud.ts'
 import {
   LEAD_MS,
+  finishedPlay,
   newRun,
   runControl,
   runFrame,
@@ -122,6 +123,45 @@ describe('回帰ハーネスと同じ流れ（M1 の S2 のループ ＝ M0-10 �
     expect(s.counts.perfect).toBe(run.notes.length)
     expect(run.collect.pressCount).toBe(run.notes.length)
     expect(runNotes(run).every((n) => n.state === 'done')).toBe(true)
+  })
+})
+
+describe('終わった回と記録（finishedPlay、M1 の手順 5）', () => {
+  it('SD 0 の canon: 記録は動画なし・固定・1.0 倍・全鍵・自前音源・skipped 0、和音は全部合い、苦手区間なし', () => {
+    const { run } = autoplay(songOf('canon'), 0)
+    const f = finishedPlay(run, { id: 'r1', at: '2026-10-31T00:00:00.000Z', profile: 'beginner' })
+    const j = runOutcome(run).judge
+    expect(f.record).toEqual({
+      id: 'r1',
+      chartId: run.song.chartId,
+      variantId: 'ableton/2/octave',
+      profile: 'beginner',
+      clock: 'novideo',
+      mode: 'fixed',
+      rate: 1,
+      keyset: 'all',
+      at: '2026-10-31T00:00:00.000Z',
+      acc: 1,
+      rank: j.rank,
+      counts: j.counts,
+      selfRate: j.selfRate,
+      syncUsed: { kind: 'audio' },
+      offsetUsed: 0,
+      skipped: 0,
+    })
+    expect(f.chords.total).toBeGreaterThan(0)
+    expect(f.chords.hit).toBe(f.chords.total)
+    expect(f.weak).toBe(null)
+  })
+
+  it('何も押さずに終えた scale: 全部 miss、苦手区間は最初の 2 小節（どの組も同じ数なので前）', () => {
+    let r = started(songOf('scale'))
+    for (let now = START_NOW; runPhase(r) !== 'ended'; now += FRAME_MS)
+      r = runFrame(r, now, now).run
+    const f = finishedPlay(r, { id: 'r2', at: '2026-10-31T00:00:00.000Z', profile: 'beginner' })
+    expect(f.record.counts.miss).toBe(r.notes.length)
+    // 8 分音符の音階（1 小節に 8 音）
+    expect(f.weak).toEqual({ from: 1, to: 2, misses: 16 })
   })
 })
 

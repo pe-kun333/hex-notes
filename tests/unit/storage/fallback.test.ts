@@ -291,6 +291,7 @@ const result = (id: string, chartId = 'c1'): ResultRecord => ({
   selfRate: { solo: 1, hinted: 0, near: 0, miss: 0 },
   syncUsed: { kind: 'audio' },
   offsetUsed: 0,
+  skipped: 0,
 })
 
 const row = (i: number): TelemetryRow => ({ kind: 'embedError', at: AT, code: i })

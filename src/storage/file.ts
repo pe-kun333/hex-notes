@@ -254,6 +254,9 @@ export function parseResult(x: unknown): ResultRecord | null {
   if (typeof at !== 'string' || !Number.isFinite(Date.parse(at))) return null
   if (!isNum(acc) || acc < 0 || acc > 1) return null
   if (!isNum(offsetUsed) || Math.abs(offsetUsed) > OFFSET_LIMIT_MS) return null
+  // skipped（decisions #63）が無い旧い記録（M0 の開発ページの控え）は 0 と読む。あって数でなければ壊れた記録
+  const skipped = x['skipped'] === undefined ? 0 : x['skipped']
+  if (!isCount(skipped)) return null
   const c = counts(x['counts'], COUNT_KEYS)
   const s = counts(x['selfRate'], SELF_KEYS)
   const u = syncUsed(x['syncUsed'])
@@ -274,5 +277,6 @@ export function parseResult(x: unknown): ResultRecord | null {
     selfRate: s,
     syncUsed: u,
     offsetUsed,
+    skipped,
   }
 }
