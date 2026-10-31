@@ -321,6 +321,55 @@ a {
   justify-content: center;
 }
 
+/* hidden 属性は display を指定したクラスより強くする */
+[hidden] {
+  display: none !important;
+}
+
+/* 校正の部品（S0c・S6）と S3 の提案帯（m6 .card.soft・.kv・.hold） */
+.card.soft {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 8px 0;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 0 0 8px;
+}
+
+.kv dt {
+  color: var(--muted);
+}
+
+.kv dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.hold {
+  height: 8px;
+  background: var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hold i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+}
+
+.group h2 {
+  margin: 16px 0 4px;
+  font-size: 18px;
+}
+
 .steps {
   padding-left: 1.5em;
 }

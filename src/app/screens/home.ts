@@ -4,6 +4,7 @@
 
 import { DEFAULT_CHORD_LIMIT } from '../../shared/types.ts'
 import { offsetFor } from '../../storage/local.ts'
+import { signedMs } from '../calibration.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { button, frame, h } from './frame.ts'
 
@@ -15,13 +16,14 @@ export function limitText(limit: number | null): string {
 /** 上帯の校正（自前音源のオフセット。未校正は印だけ） */
 export function calibText(offsetMs: number | null): string {
   if (offsetMs === null) return '未校正'
-  return `校正済み（${offsetMs > 0 ? '＋' : offsetMs < 0 ? '−' : '±'}${Math.abs(offsetMs)} ms）`
+  return `校正済み（${signedMs(offsetMs)}）`
 }
 
 export function homeScreen(ctx: ScreenContext): ScreenView {
   const { doc, booted } = ctx
   const f = frame(ctx, 'ホーム', { gear: true })
-  const audio = booted.calibration.audio
+  const calibration = ctx.calibration()
+  const audio = calibration.audio
   const top = h(
     doc,
     'div',
@@ -38,7 +40,7 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
       'span',
       {},
       h(doc, 'b', {
-        text: calibText(audio === undefined ? null : offsetFor(booted.calibration, 'audio')),
+        text: calibText(audio === undefined ? null : offsetFor(calibration, 'audio')),
       }),
     ),
   )

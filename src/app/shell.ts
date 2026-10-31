@@ -5,7 +5,14 @@
 
 import { createAudioOut, type AudioOut } from '../audio/context.ts'
 import type { InputEvent } from '../input/keyboard.ts'
-import type { Settings } from '../storage/local.ts'
+import type { SyncKind } from '../shared/types.ts'
+import {
+  loadCalibration,
+  saveCalibration,
+  type CalibEntry,
+  type Calibration,
+  type Settings,
+} from '../storage/local.ts'
 import {
   bandOutside,
   bandStep,
@@ -32,6 +39,10 @@ export interface ScreenContext {
   readonly doc: Document
   readonly booted: Booted
   settings(): Settings
+  /** 校正（起動で読んだ値に、この後の保存を重ねた物。S1 の上帯・S2 の判定が読む） */
+  calibration(): Calibration
+  /** 1 つの音源種別の校正を保存する（hexnote.calibration。置き場が壊れていてもメモリ内で続く、decisions #50） */
+  saveCalibration(kind: SyncKind, entry: CalibEntry): void
   /** 画面を移る（行けない先は無視。router.ts） */
   go(to: ScreenId | 'back'): void
   /** 帯への知らせ（低負荷・予約の遅れなど。IME と保存の失敗は殻が受ける） */
@@ -45,6 +56,10 @@ export interface ScreenContext {
   /** 終わった回（S2 が書き S3 が読む。中身の画面は手順 5） */
   lastPlay(): PlayResult | null
   setLastPlay(r: PlayResult): void
+  /** 終わった回の校正の提案（段 2）がまだ片付いていないか（S3 を出入りしても calib 行を 1 回だけ書く） */
+  proposalOpen(): boolean
+  /** 提案を片付けた（適用・見送り・何もせず S3 を離れた・条件を満たさなかった） */
+  closeProposal(): void
   /** 音の出力（最初の呼び出しで作る。自動再生の制限があるので利用者の操作の中で呼ぶ。画面をまたいで 1 つ） */
   audio(): AudioOut
 }
@@ -122,7 +137,9 @@ export function startShell(opts: ShellOptions): Shell {
   let view: ScreenView | null = null
   let song: SongEntry | null = null
   let lastPlay: PlayResult | null = null
+  let proposalOpen = false
   let audio: AudioOut | null = null
+  let calibration = booted.calibration
 
   const renderBands = (): void => {
     if (view === null) return
@@ -156,6 +173,11 @@ export function startShell(opts: ShellOptions): Shell {
     doc,
     booted,
     settings: () => settings,
+    calibration: () => calibration,
+    saveCalibration: (kind, entry) => {
+      saveCalibration(booted.local, kind, entry)
+      calibration = loadCalibration(booted.local)
+    },
     go: (to) => go(to),
     band,
     devPages: opts.devPages ?? [],
@@ -167,6 +189,11 @@ export function startShell(opts: ShellOptions): Shell {
     lastPlay: () => lastPlay,
     setLastPlay: (r) => {
       lastPlay = r
+      proposalOpen = true
+    },
+    proposalOpen: () => proposalOpen,
+    closeProposal: () => {
+      proposalOpen = false
     },
     audio: () => (audio ??= createAudioOut()),
   }

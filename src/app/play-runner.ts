@@ -31,6 +31,7 @@ import {
   judgeSweep,
   resultsByIndex,
   summarizeJudge,
+  timingSamples,
   type JudgeOutcome,
   type JudgeRules,
   type JudgeState,
@@ -277,6 +278,12 @@ export interface PlayResult {
   readonly judge: JudgeSummary
   /** 予約の遅れの最大 ms（音を予約しない回は null） */
   readonly audioLateMaxMs: number | null
+  /** 正しい鍵で当てた音の dt（校正を足した後。校正 段 2 の標本、timingSamples） */
+  readonly samples: readonly number[]
+  /** この回に使った校正のオフセット ms */
+  readonly offsetUsed: number
+  /** 校正 段 2 の母集団に入れるか（固定テンポ・1.0 倍・全鍵の通常プレイ。§2.7。M1 の S2 は常に真、鍵数制限は手順 7） */
+  readonly calibEligible: boolean
 }
 
 export function runOutcome(r: Run): PlayResult {
@@ -286,6 +293,9 @@ export function runOutcome(r: Run): PlayResult {
     name: r.song.name,
     judge: summarizeJudge(r.judge),
     audioLateMaxMs: r.items.length === 0 ? null : r.sched.lateMaxMs,
+    samples: timingSamples(r.judge),
+    offsetUsed: r.opts.rules.offsetMs,
+    calibEligible: true,
   }
 }
 
