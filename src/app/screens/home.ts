@@ -45,7 +45,7 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
     ),
   )
   f.root.insertBefore(top, f.bandSlot)
-  // 曲の一覧（手順 3 は dev のフィクスチャ 6 曲。曲カード・譜面版・難度は手順 8）
+  // 曲の一覧（同梱曲、dev はフィクスチャも。曲カード・譜面版・難度・並びは手順 8）
   if (ctx.songs.length === 0)
     f.body.append(h(doc, 'p', { className: 'note', text: '曲の一覧は準備中です。' }))
   else

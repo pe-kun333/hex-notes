@@ -1,0 +1,45 @@
+{
+  "format": "hexnote-chart/1",
+  "id": "sha256:11ec101987cf5dcd3596a456cc1e1fd9328ca854b824d82f1a30f6880e4a58e3",
+  "name": "はじめの六角",
+  "bpm": 60,
+  "beats": 34,
+  "notes": [
+    { "midi": 64, "beat": 0, "dur": 2 },
+    { "midi": 65, "beat": 2, "dur": 2 },
+    { "midi": 64, "beat": 4, "dur": 2 },
+    { "midi": 67, "beat": 6, "dur": 2 },
+    { "midi": 64, "beat": 8, "dur": 2 },
+    { "midi": 71, "beat": 10, "dur": 2 },
+    { "midi": 64, "beat": 12, "dur": 2 },
+    { "midi": 72, "beat": 14, "dur": 2 },
+    { "midi": 64, "beat": 16, "dur": 2 },
+    { "midi": 69, "beat": 18, "dur": 2 },
+    { "midi": 64, "beat": 20, "dur": 2 },
+    { "midi": 65, "beat": 22, "dur": 2 },
+    { "midi": 64, "beat": 24, "dur": 2 },
+    { "midi": 62, "beat": 26, "dur": 2 },
+    { "midi": 64, "beat": 28, "dur": 2 },
+    { "midi": 60, "beat": 30, "dur": 4 }
+  ],
+  "pulse": {
+    "resolution": 240,
+    "tempo": [
+      { "beat": 0, "bpm": 60 }
+    ]
+  },
+  "sync": { "sources": [] },
+  "source": { "kind": "bundled", "rights": "own", "title": "はじめの六角", "origin": "tools/charts/bundle-songs.ts HAJIME（m1-kickoff §7-17）" },
+  "variants": [
+    {
+      "id": "ableton/2/octave",
+      "layout": "ableton",
+      "limit": 2,
+      "fold": "octave",
+      "keys": ["KeyD", "KeyF", "KeyD", "KeyG", "KeyD", "KeyJ", "KeyD", "KeyK", "KeyD", "KeyH", "KeyD", "KeyF", "KeyD", "KeyS", "KeyD", "KeyA"],
+      "stats": { "srcNotes": 16, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 },
+      "metrics": { "density": 0.471, "leap": 2.4, "leapMax": 5, "chord": 0, "rowCross": 0 }
+    }
+  ],
+  "generator": "hexnote bundle (M1-01)"
+}

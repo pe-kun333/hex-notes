@@ -1,0 +1,86 @@
+{
+  "format": "hexnote-chart/1",
+  "id": "sha256:af63ccb69276900d52ffceba16abe931ce6d9fcc92769ce7c7f8e54bf64fbe7c",
+  "name": "歓喜の歌",
+  "bpm": 112,
+  "beats": 33,
+  "notes": [
+    { "midi": 64, "beat": 0, "dur": 1 },
+    { "midi": 64, "beat": 1, "dur": 1 },
+    { "midi": 65, "beat": 2, "dur": 1 },
+    { "midi": 67, "beat": 3, "dur": 1 },
+    { "midi": 67, "beat": 4, "dur": 1 },
+    { "midi": 65, "beat": 5, "dur": 1 },
+    { "midi": 64, "beat": 6, "dur": 1 },
+    { "midi": 62, "beat": 7, "dur": 1 },
+    { "midi": 60, "beat": 8, "dur": 1 },
+    { "midi": 60, "beat": 9, "dur": 1 },
+    { "midi": 62, "beat": 10, "dur": 1 },
+    { "midi": 64, "beat": 11, "dur": 1 },
+    { "midi": 64, "beat": 12, "dur": 1.5 },
+    { "midi": 62, "beat": 13.5, "dur": 0.5 },
+    { "midi": 62, "beat": 14, "dur": 2 },
+    { "midi": 64, "beat": 16, "dur": 1 },
+    { "midi": 64, "beat": 17, "dur": 1 },
+    { "midi": 65, "beat": 18, "dur": 1 },
+    { "midi": 67, "beat": 19, "dur": 1 },
+    { "midi": 67, "beat": 20, "dur": 1 },
+    { "midi": 65, "beat": 21, "dur": 1 },
+    { "midi": 64, "beat": 22, "dur": 1 },
+    { "midi": 62, "beat": 23, "dur": 1 },
+    { "midi": 60, "beat": 24, "dur": 1 },
+    { "midi": 60, "beat": 25, "dur": 1 },
+    { "midi": 62, "beat": 26, "dur": 1 },
+    { "midi": 64, "beat": 27, "dur": 1 },
+    { "midi": 62, "beat": 28, "dur": 1.5 },
+    { "midi": 60, "beat": 29.5, "dur": 0.5 },
+    { "midi": 60, "beat": 30, "dur": 3 }
+  ],
+  "pulse": {
+    "resolution": 240,
+    "tempo": [
+      { "beat": 0, "bpm": 112 }
+    ]
+  },
+  "sync": { "sources": [] },
+  "source": { "kind": "bundled", "rights": "pd", "title": "歓喜の歌", "composer": "ベートーヴェン", "origin": "tools/charts/mel-songs.ts（docs/planning/mocks/m1-geometry.html SONGS の手採譜）.ode" },
+  "variants": [
+    {
+      "id": "ableton/2/octave",
+      "layout": "ableton",
+      "limit": 2,
+      "fold": "octave",
+      "keys": ["KeyD", "KeyD", "KeyF", "KeyG", "KeyG", "KeyF", "KeyD", "KeyS", "KeyA", "KeyA", "KeyS", "KeyD", "KeyD", "KeyS", "KeyS", "KeyD", "KeyD", "KeyF", "KeyG", "KeyG", "KeyF", "KeyD", "KeyS", "KeyA", "KeyA", "KeyS", "KeyD", "KeyS", "KeyA", "KeyA"],
+      "stats": { "srcNotes": 30, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 },
+      "metrics": { "density": 1.697, "leap": 0.69, "leapMax": 1, "chord": 0, "rowCross": 0 }
+    },
+    {
+      "id": "ableton/3/octave",
+      "layout": "ableton",
+      "limit": 3,
+      "fold": "octave",
+      "keys": ["KeyD", "KeyD", "KeyF", "KeyG", "KeyG", "KeyF", "KeyD", "KeyS", "KeyA", "KeyA", "KeyS", "KeyD", "KeyD", "KeyS", "KeyS", "KeyD", "KeyD", "KeyF", "KeyG", "KeyG", "KeyF", "KeyD", "KeyS", "KeyA", "KeyA", "KeyS", "KeyD", "KeyS", "KeyA", "KeyA"],
+      "stats": { "srcNotes": 30, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 },
+      "metrics": { "density": 1.697, "leap": 0.69, "leapMax": 1, "chord": 0, "rowCross": 0 }
+    },
+    {
+      "id": "vmpk/2/octave",
+      "layout": "vmpk",
+      "limit": 2,
+      "fold": "octave",
+      "keys": ["KeyE", "KeyE", "KeyR", "KeyT", "KeyT", "KeyR", "KeyE", "KeyW", "KeyQ", "KeyQ", "KeyW", "KeyE", "KeyE", "KeyW", "KeyW", "KeyE", "KeyE", "KeyR", "KeyT", "KeyT", "KeyR", "KeyE", "KeyW", "KeyQ", "KeyQ", "KeyW", "KeyE", "KeyW", "KeyQ", "KeyQ"],
+      "stats": { "srcNotes": 30, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 },
+      "metrics": { "density": 1.697, "leap": 0.69, "leapMax": 1, "chord": 0, "rowCross": 0 }
+    },
+    {
+      "id": "vmpk/3/octave",
+      "layout": "vmpk",
+      "limit": 3,
+      "fold": "octave",
+      "keys": ["KeyE", "KeyE", "KeyR", "KeyT", "KeyT", "KeyR", "KeyE", "KeyW", "KeyQ", "KeyQ", "KeyW", "KeyE", "KeyE", "KeyW", "KeyW", "KeyE", "KeyE", "KeyR", "KeyT", "KeyT", "KeyR", "KeyE", "KeyW", "KeyQ", "KeyQ", "KeyW", "KeyE", "KeyW", "KeyQ", "KeyQ"],
+      "stats": { "srcNotes": 30, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 },
+      "metrics": { "density": 1.697, "leap": 0.69, "leapMax": 1, "chord": 0, "rowCross": 0 }
+    }
+  ],
+  "generator": "hexnote bundle (M1-01)"
+}

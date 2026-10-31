@@ -1,0 +1,98 @@
+{
+  "format": "hexnote-chart/1",
+  "id": "sha256:8ee244ea59ab605ee5b43e71fa422c83ae9946023ea9233f50127a1f28f866ae",
+  "name": "きらきら星",
+  "bpm": 96,
+  "beats": 48,
+  "notes": [
+    { "midi": 60, "beat": 0, "dur": 1 },
+    { "midi": 60, "beat": 1, "dur": 1 },
+    { "midi": 67, "beat": 2, "dur": 1 },
+    { "midi": 67, "beat": 3, "dur": 1 },
+    { "midi": 69, "beat": 4, "dur": 1 },
+    { "midi": 69, "beat": 5, "dur": 1 },
+    { "midi": 67, "beat": 6, "dur": 2 },
+    { "midi": 65, "beat": 8, "dur": 1 },
+    { "midi": 65, "beat": 9, "dur": 1 },
+    { "midi": 64, "beat": 10, "dur": 1 },
+    { "midi": 64, "beat": 11, "dur": 1 },
+    { "midi": 62, "beat": 12, "dur": 1 },
+    { "midi": 62, "beat": 13, "dur": 1 },
+    { "midi": 60, "beat": 14, "dur": 2 },
+    { "midi": 67, "beat": 16, "dur": 1 },
+    { "midi": 67, "beat": 17, "dur": 1 },
+    { "midi": 65, "beat": 18, "dur": 1 },
+    { "midi": 65, "beat": 19, "dur": 1 },
+    { "midi": 64, "beat": 20, "dur": 1 },
+    { "midi": 64, "beat": 21, "dur": 1 },
+    { "midi": 62, "beat": 22, "dur": 2 },
+    { "midi": 67, "beat": 24, "dur": 1 },
+    { "midi": 67, "beat": 25, "dur": 1 },
+    { "midi": 65, "beat": 26, "dur": 1 },
+    { "midi": 65, "beat": 27, "dur": 1 },
+    { "midi": 64, "beat": 28, "dur": 1 },
+    { "midi": 64, "beat": 29, "dur": 1 },
+    { "midi": 62, "beat": 30, "dur": 2 },
+    { "midi": 60, "beat": 32, "dur": 1 },
+    { "midi": 60, "beat": 33, "dur": 1 },
+    { "midi": 67, "beat": 34, "dur": 1 },
+    { "midi": 67, "beat": 35, "dur": 1 },
+    { "midi": 69, "beat": 36, "dur": 1 },
+    { "midi": 69, "beat": 37, "dur": 1 },
+    { "midi": 67, "beat": 38, "dur": 2 },
+    { "midi": 65, "beat": 40, "dur": 1 },
+    { "midi": 65, "beat": 41, "dur": 1 },
+    { "midi": 64, "beat": 42, "dur": 1 },
+    { "midi": 64, "beat": 43, "dur": 1 },
+    { "midi": 62, "beat": 44, "dur": 1 },
+    { "midi": 62, "beat": 45, "dur": 1 },
+    { "midi": 60, "beat": 46, "dur": 2 }
+  ],
+  "pulse": {
+    "resolution": 240,
+    "tempo": [
+      { "beat": 0, "bpm": 96 }
+    ]
+  },
+  "sync": { "sources": [] },
+  "source": { "kind": "bundled", "rights": "pd", "title": "きらきら星", "composer": "フランス民謡", "origin": "tools/charts/mel-songs.ts（docs/planning/mocks/m1-geometry.html SONGS の手採譜）.twinkle" },
+  "variants": [
+    {
+      "id": "ableton/2/octave",
+      "layout": "ableton",
+      "limit": 2,
+      "fold": "octave",
+      "keys": ["KeyA", "KeyA", "KeyG", "KeyG", "KeyH", "KeyH", "KeyG", "KeyF", "KeyF", "KeyD", "KeyD", "KeyS", "KeyS", "KeyA", "KeyG", "KeyG", "KeyF", "KeyF", "KeyD", "KeyD", "KeyS", "KeyG", "KeyG", "KeyF", "KeyF", "KeyD", "KeyD", "KeyS", "KeyA", "KeyA", "KeyG", "KeyG", "KeyH", "KeyH", "KeyG", "KeyF", "KeyF", "KeyD", "KeyD", "KeyS", "KeyS", "KeyA"],
+      "stats": { "srcNotes": 42, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 },
+      "metrics": { "density": 1.4, "leap": 0.829, "leapMax": 4, "chord": 0, "rowCross": 0 }
+    },
+    {
+      "id": "ableton/3/octave",
+      "layout": "ableton",
+      "limit": 3,
+      "fold": "octave",
+      "keys": ["KeyA", "KeyA", "KeyG", "KeyG", "KeyH", "KeyH", "KeyG", "KeyF", "KeyF", "KeyD", "KeyD", "KeyS", "KeyS", "KeyA", "KeyG", "KeyG", "KeyF", "KeyF", "KeyD", "KeyD", "KeyS", "KeyG", "KeyG", "KeyF", "KeyF", "KeyD", "KeyD", "KeyS", "KeyA", "KeyA", "KeyG", "KeyG", "KeyH", "KeyH", "KeyG", "KeyF", "KeyF", "KeyD", "KeyD", "KeyS", "KeyS", "KeyA"],
+      "stats": { "srcNotes": 42, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 },
+      "metrics": { "density": 1.4, "leap": 0.829, "leapMax": 4, "chord": 0, "rowCross": 0 }
+    },
+    {
+      "id": "vmpk/2/octave",
+      "layout": "vmpk",
+      "limit": 2,
+      "fold": "octave",
+      "keys": ["KeyQ", "KeyQ", "KeyT", "KeyT", "KeyY", "KeyY", "KeyT", "KeyR", "KeyR", "KeyE", "KeyE", "KeyW", "KeyW", "KeyQ", "KeyT", "KeyT", "KeyR", "KeyR", "KeyE", "KeyE", "KeyW", "KeyT", "KeyT", "KeyR", "KeyR", "KeyE", "KeyE", "KeyW", "KeyQ", "KeyQ", "KeyT", "KeyT", "KeyY", "KeyY", "KeyT", "KeyR", "KeyR", "KeyE", "KeyE", "KeyW", "KeyW", "KeyQ"],
+      "stats": { "srcNotes": 42, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 },
+      "metrics": { "density": 1.4, "leap": 0.829, "leapMax": 4, "chord": 0, "rowCross": 0 }
+    },
+    {
+      "id": "vmpk/3/octave",
+      "layout": "vmpk",
+      "limit": 3,
+      "fold": "octave",
+      "keys": ["KeyQ", "KeyQ", "KeyT", "KeyT", "KeyY", "KeyY", "KeyT", "KeyR", "KeyR", "KeyE", "KeyE", "KeyW", "KeyW", "KeyQ", "KeyT", "KeyT", "KeyR", "KeyR", "KeyE", "KeyE", "KeyW", "KeyT", "KeyT", "KeyR", "KeyR", "KeyE", "KeyE", "KeyW", "KeyQ", "KeyQ", "KeyT", "KeyT", "KeyY", "KeyY", "KeyT", "KeyR", "KeyR", "KeyE", "KeyE", "KeyW", "KeyW", "KeyQ"],
+      "stats": { "srcNotes": 42, "droppedFold": 0, "movedFold": 0, "droppedThin": 0, "chordMax": 1 },
+      "metrics": { "density": 1.4, "leap": 0.829, "leapMax": 4, "chord": 0, "rowCross": 0 }
+    }
+  ],
+  "generator": "hexnote bundle (M1-01)"
+}

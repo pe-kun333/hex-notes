@@ -1,4 +1,4 @@
-// 曲の一覧と譜面版の選び方（M1 の手順 3）。出どころ: m1-kickoff 手順 3（完了条件「手弾きで 6 曲〔フィクスチャ〕を S2 で
+// 曲の一覧と譜面版の選び方（M1 の手順 3。同梱曲は手順 6）。出どころ: m1-kickoff 手順 3（完了条件「手弾きで 6 曲〔フィクスチャ〕を S2 で
 // 通す」。play-dev の曲・配列の select → 設定とプロファイルから）・§7-10（版の自動選択は手順 8）、decisions #7（上限の既定 2）・
 // #23（同梱曲の版は ableton×{2,3}・vmpk×{2,3}、fold octave）。同梱曲（content/charts/）と S1 の一覧は手順 6・8 で、
 // それまでは回帰ハーネスのフィクスチャ 6 曲を dev のときだけ S1 に出す（src/main.ts。build では空）。純関数。
@@ -14,6 +14,20 @@ export interface SongEntry {
   readonly name: string
   readonly url: string
 }
+
+/**
+ * 同梱曲（content/charts/。dev は vite が、build は copyContent が dist/content/ に写して配る。ADR 0003）。今は U-03 の
+ * 代替の 3 曲（m1-kickoff §5。チュートリアル曲と PD の 2 曲）。名前は譜面の name。並びと譜面版の自動選択は手順 8
+ */
+export const BUNDLED_SONGS: readonly SongEntry[] = [
+  ['tutorial/hajime', 'はじめの六角'],
+  ['pd/twinkle', 'きらきら星'],
+  ['pd/ode', '歓喜の歌'],
+].map(([file, name]) => ({
+  id: `bundled:${file}`,
+  name: name ?? '',
+  url: `/content/charts/${file}.json`,
+}))
 
 /** 手順 3 の曲: tests/fixtures/charts/m1/ の 6 曲（vite dev が配る。play-dev と同じ）。名前は譜面の name */
 export const FIXTURE_SONGS: readonly SongEntry[] = [

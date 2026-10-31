@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { FIXTURE_SONGS, songOf, variantFor } from '../../../src/app/songs.ts'
+import { BUNDLED_SONGS, FIXTURE_SONGS, songOf, variantFor } from '../../../src/app/songs.ts'
 import { stageOf } from '../../../src/app/stage.ts'
 import { buildVariant } from '../../../src/chart/variants.ts'
 import { LAYOUTS } from '../../../src/layout/presets.ts'
@@ -83,6 +83,18 @@ describe('曲の一覧と譜面版', () => {
       const id = s.id.replace(/^fixture:/, '')
       expect(s.url).toBe(`/tests/fixtures/charts/m1/${id}.hexnote.json`)
       expect(s.name).toBe(fixture(id).name)
+    }
+  })
+
+  it('同梱曲の名前は譜面の name と同じ、url は content/charts/ の譜面', () => {
+    expect(BUNDLED_SONGS.map((s) => s.url)).toEqual([
+      '/content/charts/tutorial/hajime.json',
+      '/content/charts/pd/twinkle.json',
+      '/content/charts/pd/ode.json',
+    ])
+    for (const s of BUNDLED_SONGS) {
+      const c = JSON.parse(readFileSync(path.join(root, ...s.url.split('/')), 'utf8')) as Chart
+      expect(s.name).toBe(c.name)
     }
   })
 

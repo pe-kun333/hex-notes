@@ -6,5 +6,8 @@ content/samples/
 # 機械生成物（照合用。空白を変えない）
 tests/fixtures/
 tests/harness/expected/
+# 同梱曲（tools/charts/bundle-run.ts の生成物。権利表 rights.json は手書きなので整形する）
+content/charts/**/*.json
+!content/charts/rights.json
 # 企画段階の写し（体裁を変えない）
 docs/planning/
