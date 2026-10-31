@@ -3,16 +3,15 @@
 // 曲は ableton/2/octave の 1 版、§1.3 S0d「常に Ableton 型」〕→ 難度 4 軸 → validateChart → content/charts/<pd|cc|own|tutorial>/）、
 // decisions #13（同梱曲は動画 ID を持たない ＝ sync.sources は空）・#23（4 版）・#47 (a)（伴奏は原曲音高）・#58・#59、
 // mel-fixtures.ts（m1Chart と formatJson の形）。書く文字列は決定的（日時を入れない）。
+// M2-01 前半（M2 の手順 1）で tidy・SMF の partsOf・組み立てを src/chart/import.ts に移した（同梱曲の出力は不変）。
 
-import { computeChartId } from '../../src/chart/hash.ts'
-import { variantMetrics } from '../../src/chart/metrics.ts'
-import { validateChart } from '../../src/chart/validate.ts'
-import { BUNDLED_VARIANT_SPECS, buildVariants, type VariantSpec } from '../../src/chart/variants.ts'
+import { assembleChart, smfParts, tidyNotes, type ChartParts } from '../../src/chart/import.ts'
+import type { Smf } from '../../src/chart/smf.ts'
+import { BUNDLED_VARIANT_SPECS, type VariantSpec } from '../../src/chart/variants.ts'
 import type { Chart, Note, Pulse, Source } from '../../src/shared/types.ts'
-import { CHART_FORMAT, DEFAULT_RESOLUTION } from '../../src/shared/types.ts'
+import { DEFAULT_RESOLUTION } from '../../src/shared/types.ts'
 import { formatJson } from './mel-fixtures.ts'
 import type { MelSong } from './mel-songs.ts'
-import type { Smf } from './smf.ts'
 
 /** bundle が書く generator */
 export const BUNDLE_GENERATOR = 'hexnote bundle (M1-01)'
@@ -42,19 +41,6 @@ export interface BundleSong {
   readonly specs?: readonly VariantSpec[]
 } // prettier-ignore
 
-/** 拍の 1/resolution に丸め、beat 昇順・同拍は midi 昇順、同拍同音は 1 つに（長い方） */
-function tidy(notes: readonly Note[], resolution: number): Note[] {
-  const q = (b: number): number => Math.round(b * resolution) / resolution
-  const byKey = new Map<string, Note>()
-  for (const n of notes) {
-    const m: Note = { ...n, beat: q(n.beat), dur: Math.max(1 / resolution, q(n.dur)) }
-    const k = `${m.beat}:${m.midi}`
-    const cur = byKey.get(k)
-    if (cur === undefined || m.dur > cur.dur) byKey.set(k, m)
-  }
-  return [...byKey.values()].sort((a, b) => a.beat - b.beat || a.midi - b.midi)
-}
-
 /** mel の旋律 → notes（m1' mel L244: 拍を積み、和音は同じ beat。vel は持たない） */
 function melNotes(song: MelSong): Note[] {
   let b = 0
@@ -66,56 +52,27 @@ function melNotes(song: MelSong): Note[] {
   return out
 } // prettier-ignore
 
-/** 元 → 名前・旋律・伴奏・pulse */
-function partsOf(from: BundleFrom): { name: string; notes: Note[]; accompaniment: Note[]; pulse: Pulse } {
+/** 元 → 名前・旋律・伴奏・pulse（SMF は持ち込みと同じ smfParts を通る。M2-01） */
+function partsOf(from: BundleFrom): { name: string; parts: Pick<ChartParts, 'notes' | 'accompaniment' | 'pulse'> } {
   if (from.kind === 'mel') {
     const pulse: Pulse = { resolution: DEFAULT_RESOLUTION, tempo: [{ beat: 0, bpm: from.song.bpm }] }
-    return { name: from.song.name, notes: tidy(melNotes(from.song), pulse.resolution), accompaniment: [], pulse }
+    return { name: from.song.name, parts: { notes: tidyNotes(melNotes(from.song), pulse.resolution).notes, accompaniment: [], pulse } }
   }
-  const s = from.smf
-  const play = s.tracks[from.play]
-  if (play === undefined) throw new RangeError(`bundle: 弾くトラック ${from.play} が無い（${s.tracks.length} 本）`)
-  const pulse: Pulse = {
-    resolution: DEFAULT_RESOLUTION,
-    tempo: s.tempo.map((t) => ({ ...t })),
-    ...(s.timeSig.length > 0 ? { timeSig: s.timeSig.map((t) => ({ ...t })) } : {}),
-  }
-  const acc = (from.accomp ?? []).flatMap((i) => {
-    const t = s.tracks[i]
-    if (t === undefined || i === from.play) throw new RangeError(`bundle: 伴奏トラック ${i} が無いか弾くトラックと同じ`)
-    return t.notes
-  })
-  return { name: from.name, notes: tidy(play.notes, pulse.resolution), accompaniment: tidy(acc, pulse.resolution), pulse }
+  return { name: from.name, parts: smfParts(from.smf, from.play, from.accomp) }
 } // prettier-ignore
 
-/** 同梱曲 1 つ（版と難度 4 軸付き。検査を通らなければ Error） */
+/** 同梱曲 1 つ（版と難度 4 軸付き。組み立ては持ち込みと同じ assembleChart。検査を通らなければ Error） */
 export async function bundledChart(song: BundleSong): Promise<Chart> {
   const p = partsOf(song.from)
-  const beats = p.notes.reduce((m, n) => Math.max(m, n.beat + n.dur), 0)
-  const first = p.pulse.tempo[0]
-  const chart: Chart = {
-    format: CHART_FORMAT,
-    id: '',
+  return assembleChart({
     name: p.name,
-    ...(first !== undefined && p.pulse.tempo.length === 1 ? { bpm: first.bpm } : {}),
-    beats,
-    notes: p.notes,
-    pulse: p.pulse,
-    sync: { sources: [] },
-    source: { ...song.source },
-    ...(p.accompaniment.length > 0 ? { accompaniment: p.accompaniment } : {}),
-    variants: [],
+    parts: p.parts,
+    source: song.source,
+    specs: song.specs ?? BUNDLED_VARIANT_SPECS,
     generator: BUNDLE_GENERATOR,
-  }
-  chart.variants = buildVariants(chart, song.specs ?? BUNDLED_VARIANT_SPECS).map((v) => ({
-    ...v,
-    metrics: variantMetrics(chart, v),
-  }))
-  chart.id = await computeChartId(chart)
-  const r = validateChart(chart)
-  if (!r.ok) throw new Error(`bundle(${song.file}): ${r.issues.map((i) => `${i.path} ${i.message}`).join('; ')}`)
-  return chart
-} // prettier-ignore
+    where: `bundle(${song.file})`,
+  })
+}
 
 /** content/charts/ に書くファイル（path は content/charts/ からの相対） */
 export async function buildBundle(

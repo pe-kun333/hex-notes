@@ -4,7 +4,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { variantMetrics } from '../../../src/chart/metrics.ts'
 import type { Chart, Variant } from '../../../src/shared/types.ts'
-import { parseSmf } from '../../../tools/charts/smf.ts'
+import { parseSmf } from '../../../src/chart/smf.ts'
+import { END, TEMPO_120, smfBytes as smf, type SmfEvent } from '../../fixtures/smf/build.ts'
 
 // src/chart/metrics.ts・tools/charts/smf.ts（M1-01、M1 の手順 6）。出どころ: m1-kickoff 手順 8 の期待値（フィクスチャ 6 曲・
 // ableton/2/octave の密度、2026-10-31 に node で計算）・§7-9（4 軸の定義、仮）・手順 6 の期待値（SMF 形式 0 の 2 音）、
@@ -74,28 +75,6 @@ describe('難度 4 軸（§7-9、仮）', () => {
 
 const round3 = (x: number): number => Math.round(x * 1000) / 1000
 
-/** 可変長の数 */
-function vlq(n: number): number[] {
-  const out = [n & 0x7f]
-  for (n >>= 7; n > 0; n >>= 7) out.unshift((n & 0x7f) | 0x80)
-  return out
-}
-
-/** SMF を組む（形式・division・トラックごとのイベントの列〔差分 tick とバイト〕） */
-function smf(format: number, division: number, tracks: (readonly [number, number[]])[][]): Uint8Array {
-  const u32 = (x: number) => [(x >>> 24) & 255, (x >>> 16) & 255, (x >>> 8) & 255, x & 255]
-  const u16 = (x: number) => [(x >>> 8) & 255, x & 255]
-  const out = [...'MThd'].map((c) => c.charCodeAt(0)).concat(u32(6), u16(format), u16(tracks.length), u16(division))
-  for (const ev of tracks) {
-    const body = ev.flatMap(([dt, b]) => [...vlq(dt), ...b])
-    out.push(...[...'MTrk'].map((c) => c.charCodeAt(0)), ...u32(body.length), ...body)
-  }
-  return new Uint8Array(out)
-} // prettier-ignore
-
-const TEMPO_120 = [0xff, 0x51, 3, 0x07, 0xa1, 0x20]
-const END = [0xff, 0x2f, 0]
-
 describe('SMF の読み取り（m5 parseMidi）', () => {
   it('形式 0 の 2 音（on 60 vel 100 @0、off @480、on 64 @480、off @960、tempo 500000、PPQ 480）', () => {
     const r = parseSmf(
@@ -104,7 +83,7 @@ describe('SMF の読み取り（m5 parseMidi）', () => {
     expect(r.format).toBe(0)
     expect(r.tempo).toEqual([{ beat: 0, bpm: 120 }])
     expect(r.tracks).toEqual([
-      { name: 'トラック 1', ch: 0, notes: [{ midi: 60, beat: 0, dur: 1, vel: 100 }, { midi: 64, beat: 1, dur: 1, vel: 100 }] },
+      { name: 'トラック 1', ch: 0, drum: false, notes: [{ midi: 60, beat: 0, dur: 1, vel: 100 }, { midi: 64, beat: 1, dur: 1, vel: 100 }] },
     ])
   }) // prettier-ignore
 
@@ -132,7 +111,7 @@ describe('SMF の読み取り（m5 parseMidi）', () => {
   }) // prettier-ignore
 
   it('テンポが無ければ 120、最初のテンポが拍 0 より後なら拍 0 に写す。形式 2・SMPTE・MThd なし・音符なしは Error', () => {
-    const notes: (readonly [number, number[]])[] = [[0, [0x90, 60, 64]], [96, [0x80, 60, 0]], [0, END]]
+    const notes: SmfEvent[] = [[0, [0x90, 60, 64]], [96, [0x80, 60, 0]], [0, END]]
     expect(parseSmf(smf(0, 96, [notes])).tempo).toEqual([{ beat: 0, bpm: 120 }])
     const late = parseSmf(smf(0, 96, [[[96, [0xff, 0x51, 3, 0x0f, 0x42, 0x40]], ...notes]]))
     expect(late.tempo).toEqual([{ beat: 0, bpm: 60 }])

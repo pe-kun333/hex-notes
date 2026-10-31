@@ -17,14 +17,13 @@ import {
   type ResultRecord,
   type Variant,
 } from '../shared/types.ts'
-import { variantMetrics } from '../chart/metrics.ts'
+import { DENSITY_CAUTION, LEAP_CAUTION, variantMetrics } from '../chart/metrics.ts'
 import { buildMsTable } from '../chart/mstable.ts'
 import { bestOf, finishedSong } from '../results/best.ts'
 import type { VariantSpec } from '../chart/variants.ts'
 
-/** 注意の目安（§2.4、仮） */
-export const DENSITY_CAUTION = 3.5
-export const LEAP_CAUTION = 6
+/** 注意の目安（§2.4、仮）。定義は chart/metrics.ts（S5 の注意と共有、M2-01） */
+export { DENSITY_CAUTION, LEAP_CAUTION }
 
 /** 上限 3〜4 の注記（m6 L771） */
 export const LIMIT_NOTE = '保証なし: 和音で 3 キー目が無反応なら設定で上限を戻せます。'

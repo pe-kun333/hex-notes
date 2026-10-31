@@ -84,8 +84,8 @@ describe('SMF から（弾くトラック 1 つ＋伴奏）', () => {
     tempo: [{ beat: 0, bpm: 90 }, { beat: 4, bpm: 100 }],
     timeSig: [{ beat: 0, num: 3, den: 4 }],
     tracks: [
-      { name: 'melody', ch: 0, notes: [{ midi: 64, beat: 0, dur: 1, vel: 100 }, { midi: 62, beat: 1, dur: 0.5, vel: 90 }, { midi: 64, beat: 1, dur: 0.25, vel: 70 }] },
-      { name: 'bass', ch: 1, notes: [{ midi: 36, beat: 0, dur: 2, vel: 80 }] },
+      { name: 'melody', ch: 0, drum: false, notes: [{ midi: 64, beat: 0, dur: 1, vel: 100 }, { midi: 62, beat: 1, dur: 0.5, vel: 90 }, { midi: 64, beat: 1, dur: 0.25, vel: 70 }] },
+      { name: 'bass', ch: 1, drum: false, notes: [{ midi: 36, beat: 0, dur: 2, vel: 80 }] },
     ],
   } // prettier-ignore
 
@@ -103,7 +103,7 @@ describe('SMF から（弾くトラック 1 つ＋伴奏）', () => {
   }) // prettier-ignore
 
   it('同拍同音は長い方を 1 つ、無いトラック・弾くトラックを伴奏に選ぶと Error', async () => {
-    const dup: Smf = { ...smf, tracks: [{ name: 'm', ch: 0, notes: [{ midi: 60, beat: 0, dur: 1, vel: 9 }, { midi: 60, beat: 0, dur: 2, vel: 8 }] }] }
+    const dup: Smf = { ...smf, tracks: [{ name: 'm', ch: 0, drum: false, notes: [{ midi: 60, beat: 0, dur: 1, vel: 9 }, { midi: 60, beat: 0, dur: 2, vel: 8 }] }] }
     const c = await bundledChart({ file: 'x', from: { kind: 'smf', smf: dup, name: 'x', play: 0 }, source: { kind: 'bundled', rights: 'cc0' } })
     expect(c.notes).toEqual([{ midi: 60, beat: 0, dur: 2, vel: 8 }])
     const src = { kind: 'bundled', rights: 'cc0' } as const
