@@ -148,6 +148,10 @@ export interface PlayMeta {
   readonly profile: Profile
   readonly clock: ClockKind
   readonly mode: PlayMode
+  /** テンポ段・鍵数制限・練習の要約（M2-03。§4.6 の改訂、m2-kickoff §7-20。無ければ行に書かない） */
+  readonly rate?: number
+  readonly keyset?: string
+  readonly practice?: PlayTelemetry['practice']
 }
 
 /**
@@ -182,5 +186,8 @@ export function playRow(
     frameIntervalP95: p95OfBins(c.frameBins, c.frameMax),
     clockResidualSd: welfordSd(c.clockDev),
     audioLateMaxMs,
+    ...(meta.rate === undefined ? {} : { rate: meta.rate }),
+    ...(meta.keyset === undefined ? {} : { keyset: meta.keyset }),
+    ...(meta.practice === undefined ? {} : { practice: meta.practice }),
   }
 }

@@ -360,3 +360,39 @@ describe('session（「疑う」で足した場面）', () => {
     expect(r.s.play).toEqual(S('ended'))
   })
 })
+
+describe('練習層の事象（M2-03、M2 の手順 5。decisions #80）', () => {
+  it('waitHit {t} は止めた時計を t へ戻してから再開（seek → resume）。待ちの外では無視', () => {
+    const w = playStep(S('playing', 'novideo'), { kind: 'waitStop' }).state
+    expect(playStep(w, { kind: 'waitHit', t: 2200 })).toEqual({ state: S('syncing', 'novideo'), clock: [{ kind: 'seek', t: 2200 }, { kind: 'resume' }], video: [] })
+    expect(playStep(S('playing', 'novideo'), { kind: 'waitHit', t: 1 }).clock).toEqual([])
+  }) // prettier-ignore
+
+  it('待ちから入った一時停止の再開は、時計を止めたまま待ちに戻す（他の一時停止は猶予を通る）', () => {
+    const w = playStep(S('playing', 'novideo'), { kind: 'waitStop' }).state
+    const p = playStep(w, { kind: 'pause', reason: 'escape' })
+    expect(p.state).toEqual({ phase: 'paused', source: 'novideo', pausedFrom: 'waiting' })
+    expect(playStep(p.state, { kind: 'resume' })).toEqual({ state: S('waiting', 'novideo'), clock: [], video: [] })
+    const q = playStep(S('playing', 'novideo'), { kind: 'pause', reason: 'escape' }).state
+    expect(playStep(q, { kind: 'resume' })).toEqual({ state: S('syncing', 'novideo'), clock: [{ kind: 'resume' }], video: [] })
+  }) // prettier-ignore
+
+  it('seek・setRate は時計へ渡す（待機の setRate・一時停止の seek も。終了の後は無視）', () => {
+    expect(playStep(S('playing', 'novideo'), { kind: 'seek', t: 7500 }).clock).toEqual([{ kind: 'seek', t: 7500 }])
+    expect(playStep(S('paused', 'novideo'), { kind: 'seek', t: 7500 }).clock).toEqual([{ kind: 'seek', t: 7500 }])
+    expect(playStep(S('idle', 'novideo'), { kind: 'setRate', rate: 0.75 }).clock).toEqual([{ kind: 'setRate', rate: 0.75 }])
+    expect(playStep(S('ended', 'novideo'), { kind: 'setRate', rate: 0.75 }).clock).toEqual([])
+    expect(playStep(S('idle', 'novideo'), { kind: 'seek', t: 1 }).clock).toEqual([])
+  }) // prettier-ignore
+
+  it('session: 待ちの解除で猶予 300 ms の終わりに t が戻した着地へ（rate 0.75 で t 2,275 → 2,500）', () => {
+    let s: Session = initialSession({ mode: 'novideo', t0: -2000, rate: 0.75 })
+    s = sessionInput(s, 0, { kind: 'start' }).session
+    s = sessionTick(s, 400, null).session
+    s = sessionInput(s, 10_000, { kind: 'waitStop' }).session
+    const r = sessionInput(s, 20_000, { kind: 'waitHit', t: 2275 })
+    expect([r.session.play.phase, r.out.t]).toEqual(['syncing', 2275])
+    const e = sessionTick(r.session, 20_300, null)
+    expect([e.session.play.phase, e.out.t]).toEqual(['playing', 2500])
+  }) // prettier-ignore
+})

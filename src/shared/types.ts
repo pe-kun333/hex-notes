@@ -222,6 +222,11 @@ export interface ResultRecord {
   offsetUsed: number
   /** 判定しなかった音の数（再開の猶予に窓が終わった音。0 でない回は完走・自己ベストの対象外。decisions #63） */
   skipped: number
+  /**
+   * ループで折り返した回（区間の音を何度も判定した。練習記録で完走・自己ベストの対象外。M2-03、decisions #87）。
+   * 折り返さなかった回は書かない（無ければ偽）
+   */
+  looped?: boolean
 }
 
 // ---------- 端末・設定の保存（§4.3 localStorage） ----------
@@ -279,6 +284,12 @@ export interface PlayTelemetry extends TelemetryBase {
    * 音が遅れた・抜けたのを見つける）。音を予約しない回（動画の音だけ）は null（decisions #47）
    */
   audioLateMaxMs: number | null
+  /** テンポ段（M2-03 で足した。無ければ 1。書き出しは hexnote-telemetry/1 のまま、m2-kickoff §7-20） */
+  rate?: number
+  /** 鍵数制限（無ければ all） */
+  keyset?: string
+  /** 練習の要約（ループの回数・テンポ段の始めと終わり・待った回数。練習の回だけ） */
+  practice?: { loops: number; tempoFrom: number; tempoTo: number; waits: number }
 }
 
 /** 校正の行（段 1 ＝ tap、段 2 ＝ propose。decisions #40・#54） */

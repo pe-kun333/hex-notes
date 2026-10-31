@@ -2,15 +2,20 @@
 // （行 ＝ 曲×プロファイル×配列×SD の 72 行、列 ＝ chartId・variantId・profile・jitterSd・precision・rank・counts・selfRate・
 // seed）、decisions #56（仮。列を足した: song・notes・skipped・holds・meanMs・ur・gamer）。
 // 曲は tests/fixtures/charts/m1/ の 6 曲（play-dev と同じ順）、配列は play-dev と同じ ableton・vmpk の limit 2・octave。
+// M2 の手順 5（m2-kickoff §7-21、decisions #56 (d)）: 練習の表（buildPracticeTable。テンポ段 0.75・SD 0 と、隣の鍵 12%）を
+// tests/harness/expected/m2-03.json に分ける。M0 の表（m0-10.json）は変えない（rate・wrongRate は既定なら行に書かない）。
 // 純関数（ファイルの読み書きは run.ts）。
 
 import { frameNotes } from '../../src/render/canvas/commands.ts'
 import { buildKeyboardGrid } from '../../src/render/hex/grid.ts'
 import { neighborOf, rulesOf } from '../../src/judge/judge.ts'
 import { PROFILES } from '../../src/judge/windows.ts'
+import { hexDist } from '../../src/render/hex/hex.ts'
+import { mulberry32 } from '../../src/shared/random.ts'
 import type {
   Chart,
   JudgeCounts,
+  KeyCode,
   LayoutId,
   Profile,
   Rank,
@@ -36,6 +41,10 @@ export interface HarnessRow {
   readonly variantId: string
   readonly profile: Profile
   readonly jitterSd: number
+  /** テンポ段（練習の表だけ。無ければ 1） */
+  readonly rate?: number
+  /** 鍵違いの割合（練習の表だけ。無ければ 0） */
+  readonly wrongRate?: number
   readonly seed: number
   /** 判定する音の数（keys が null の音を除く） */
   readonly notes: number
@@ -82,13 +91,46 @@ export function pickVariant(chart: Chart, layout: LayoutId): Variant {
   return v
 }
 
-/** 1 行（1 曲・1 プロファイル・1 配列・1 SD を自動で通す） */
+/** 練習の条件（テンポ段と鍵違い。既定 rate 1・wrongRate 0） */
+export interface PracticeCondition {
+  readonly rate?: number
+  readonly wrongRate?: number
+}
+
+/** 鍵違いの割合（m4 autoWrong L377 の 12%） */
+export const WRONG_RATE = 0.12
+
+/**
+ * 音ごとの押す鍵: 種 seed の一様乱数が rate 未満の音は、その鍵の隣（六角距離 1）の鍵を 1 つ（隣の鍵の名前の順に 2 つ目の
+ * 乱数で選ぶ）。他は null（正しい鍵）。添字は譜面の notes の添字（配列が違っても同じ音は同じ乱数）
+ */
+export function wrongKeys(
+  count: number,
+  codeOf: (index: number) => KeyCode | undefined,
+  byCode: ReadonlyMap<KeyCode, { row: number; col: number }>,
+  rate: number,
+  seed: number,
+): (KeyCode | null)[] {
+  const rng = mulberry32(seed)
+  return Array.from({ length: count }, (_, i) => {
+    const u = rng()
+    const v = rng()
+    const code = codeOf(i)
+    const p = code === undefined ? undefined : byCode.get(code)
+    if (u >= rate || p === undefined) return null
+    const near = [...byCode].filter(([, q]) => hexDist(p, q) === 1).map(([c]) => c).sort()
+    return near[Math.floor(v * near.length)] ?? null
+  })
+} // prettier-ignore
+
+/** 1 行（1 曲・1 プロファイル・1 配列・1 SD を自動で通す。cond は練習の表のテンポ段と鍵違い） */
 export function harnessRow(
   song: HarnessSong,
   layout: LayoutId,
   profile: Profile,
   jitterSd: number,
   seed: number = JITTER_SEED,
+  cond: PracticeCondition = {},
 ): HarnessRow {
   const variant = pickVariant(song.chart, layout)
   const notes = frameNotes(song.chart, variant)
@@ -96,7 +138,17 @@ export function harnessRow(
   const grid = buildKeyboardGrid(layout, 1, { left: 0, top: 0 })
   const rules = rulesOf(PROFILES[profile], { neighbor: neighborOf(grid.byCode) })
   const z = jitterZ(song.chart.notes.length, seed)
-  const run = runAutoplay(notes, rules, (index) => (z[index] ?? 0) * jitterSd)
+  const rate = cond.rate ?? 1
+  const wrongRate = cond.wrongRate ?? 0
+  const codes = new Map(notes.map((n) => [n.index, n.code]))
+  const wrong =
+    wrongRate > 0
+      ? wrongKeys(song.chart.notes.length, (i) => codes.get(i), grid.byCode, wrongRate, seed)
+      : []
+  const run = runAutoplay(notes, rules, (index) => (z[index] ?? 0) * jitterSd, {
+    rate,
+    keyOf: (i) => wrong[i] ?? null,
+  })
   const s = run.summary
   return {
     song: song.song,
@@ -104,6 +156,8 @@ export function harnessRow(
     variantId: variant.id,
     profile,
     jitterSd,
+    ...(rate === 1 ? {} : { rate }),
+    ...(wrongRate === 0 ? {} : { wrongRate }),
     seed,
     notes: notes.length,
     precision: round(s.acc, 6),
@@ -140,9 +194,34 @@ export function buildTable(
   return rows
 }
 
-/** 行の鍵（差分で行を突き合わせる。曲・譜面版・プロファイル・SD） */
-export function rowKey(r: Pick<HarnessRow, 'song' | 'variantId' | 'profile' | 'jitterSd'>): string {
-  return `${r.song} ${r.variantId} ${r.profile} sd${r.jitterSd}`
+/** 練習の表の条件（m2-kickoff §7-21・手順 5 の期待値: rate 0.75・SD 0 で精度 100%、隣の鍵 12% で near と miss が出る） */
+export const PRACTICE_CONDITIONS: readonly (PracticeCondition & { readonly jitterSd: number })[] = [
+  { rate: 0.75, jitterSd: 0 },
+  { wrongRate: WRONG_RATE, jitterSd: 0 },
+]
+
+/** 練習の表（曲 × プロファイル × 配列 × 条件の順。種は buildTable と同じ） */
+export function buildPracticeTable(
+  songs: readonly HarnessSong[],
+  opts: { readonly seed?: number } = {},
+): HarnessRow[] {
+  const seed = opts.seed ?? JITTER_SEED
+  const rows: HarnessRow[] = []
+  songs.forEach((song, k) => {
+    for (const profile of HARNESS_PROFILES)
+      for (const layout of HARNESS_LAYOUTS)
+        for (const c of PRACTICE_CONDITIONS) rows.push(harnessRow(song, layout, profile, c.jitterSd, seed + k, c))
+  })
+  return rows
+} // prettier-ignore
+
+/** 行の鍵（差分で行を突き合わせる。曲・譜面版・プロファイル・SD、練習の表はテンポ段と鍵違いも） */
+export function rowKey(
+  r: Pick<HarnessRow, 'song' | 'variantId' | 'profile' | 'jitterSd' | 'rate' | 'wrongRate'>,
+): string {
+  const rate = r.rate === undefined ? '' : ` r${r.rate}`
+  const wrong = r.wrongRate === undefined ? '' : ` w${r.wrongRate}`
+  return `${r.song} ${r.variantId} ${r.profile} sd${r.jitterSd}${rate}${wrong}`
 }
 
 /** 書き出す文字列（JSON として読める。行は 1 行に 1 つ） */
