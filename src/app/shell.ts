@@ -32,7 +32,7 @@ import {
 } from './bands.ts'
 import type { Booted } from './boot.ts'
 import { attachKeyboard } from './dom-input.ts'
-import type { FinishedPlay } from './play-runner.ts'
+import type { FinishedPlay, PracticeOptions } from './play-runner.ts'
 import { navigate, type Route, type ScreenId } from './router.ts'
 import { songList, type SongEntry } from './songs.ts'
 import { INITIAL_UPDATE, type UpdateState } from './sw-update.ts'
@@ -90,6 +90,12 @@ export interface ScreenContext {
   /** S1 で選んだ譜面版（無ければ設定の配列とプロファイルの上限、手順 8） */
   variantSpec(): VariantSpec | null
   pickSong(s: SongEntry, keyset?: KeysetId, spec?: VariantSpec): void
+  /**
+   * 練習の設定（S4 の回。null ＝ 練習室の外 ＝ 通常プレイ）。保存しない（S4 に入るたびに既定、m2-kickoff §7-7）。S3 の
+   * 「もう一度」はこれが null でなければ S4 へ
+   */
+  practice(): PracticeOptions | null
+  setPractice(p: PracticeOptions | null): void
   /** 終わった回（S2 が書き S3 が読む。中身の画面は手順 5） */
   lastPlay(): FinishedPlay | null
   setLastPlay(r: FinishedPlay): void
@@ -189,6 +195,7 @@ export function startShell(opts: ShellOptions): Shell {
   let song: SongEntry | null = null
   let keyset: KeysetId = 'all'
   let spec: VariantSpec | null = null
+  let practice: PracticeOptions | null = null
   let lastPlay: FinishedPlay | null = null
   let proposalOpen = false
   let audio: AudioOut | null = null
@@ -278,6 +285,10 @@ export function startShell(opts: ShellOptions): Shell {
       song = s
       keyset = k
       spec = v ?? null
+    },
+    practice: () => practice,
+    setPractice: (p) => {
+      practice = p
     },
     lastPlay: () => lastPlay,
     setLastPlay: (r) => {

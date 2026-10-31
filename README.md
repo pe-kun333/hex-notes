@@ -2,7 +2,7 @@
 
 六角セルの音符が上から流れ、PC キーボードを鍵盤に見立てて押す音ゲー。PC キーボードの千鳥配列（段ずれ 1/2・1/4・1/2 キー）を六角格子として扱い、六角セルの音符と鍵盤を一体の見立てにする。
 
-状態: **M1（遊べる最小版）の手順 1〜14 済み（main）、出口は手元の確かめ待ち**（初回導線の秒・実機・音・Firefox と同梱曲の入門 9 曲。`docs/planning/m1-verification.md` §4）。**M2（持ち込みと練習）の手順 1〜5 済み**（SMF の取り込みと CLI `npm run charts:smf`、S5 曲の持ち込みと S1 の一覧、同期タップの部品と開発ページ、持ち込み曲ライブラリ〔S1 の絞り込みと「この配列／上限の版を作る」、S6 の一覧・削除・版の作り直し・曲のファイルの取り込み〕、練習層〔`src/practice/` の音待ち・フレーズ待ち・ループ・テンポ段と S2 の走行〕。手順 5 は PR の取り込み待ち）（手順書は `docs/planning/m2-kickoff.md`、10 手順・累積 28 日。§7 の重い 5 件は利用者が採用 → decisions #78〜#82）。設計は `docs/design.md`、決定は `docs/decisions.md`、手順は `docs/planning/m2-kickoff.md`（M1 の記録は `docs/planning/m1-kickoff.md` と `docs/planning/m1-verification.md`、M0 の記録は `docs/planning/m0-kickoff.md`、下調べは `docs/planning/research/`）。
+状態: **M1（遊べる最小版）の手順 1〜14 済み（main）、出口は手元の確かめ待ち**（初回導線の秒・実機・音・Firefox と同梱曲の入門 9 曲。`docs/planning/m1-verification.md` §4）。**M2（持ち込みと練習）の手順 1〜6 済み**（SMF の取り込みと CLI `npm run charts:smf`、S5 曲の持ち込みと S1 の一覧、同期タップの部品と開発ページ、持ち込み曲ライブラリ〔S1 の絞り込みと「この配列／上限の版を作る」、S6 の一覧・削除・版の作り直し・曲のファイルの取り込み〕、練習層〔`src/practice/` の音待ち・フレーズ待ち・ループ・テンポ段と S2 の走行〕、練習室 S4 と導線〔S1・S3 の「練習室で弾く」、S0d の音待ち〕。手順 6 は PR の取り込み待ち）（手順書は `docs/planning/m2-kickoff.md`、10 手順・累積 28 日。§7 の重い 5 件は利用者が採用 → decisions #78〜#82）。設計は `docs/design.md`、決定は `docs/decisions.md`、手順は `docs/planning/m2-kickoff.md`（M1 の記録は `docs/planning/m1-kickoff.md` と `docs/planning/m1-verification.md`、M0 の記録は `docs/planning/m0-kickoff.md`、下調べは `docs/planning/research/`）。
 
 ## 構成
 

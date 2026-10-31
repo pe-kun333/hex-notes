@@ -30,6 +30,7 @@ import type { KeyCode, PlayMode } from '../shared/types.ts'
 import { phraseOfBar } from '../practice/bars.ts'
 import {
   initialLoop,
+  setLoop,
   loopLimitMs,
   loopMiss,
   loopPhraseEnd,
@@ -71,6 +72,7 @@ import {
 } from '../judge/judge.ts'
 import type { FadeState } from '../judge/self-rate.ts'
 import { lateEdge } from '../judge/windows.ts'
+import { GRACE_MS } from '../clock/grace.ts'
 import { midiOf } from '../layout/presets.ts'
 import {
   initialSession,
@@ -139,6 +141,24 @@ export interface PracticeOptions {
   readonly autoLoop: boolean
   readonly autoTempo: boolean
 }
+
+/** 練習の設定の既定（S4 に入るたびに。音待ち・1.0・ループ無し・自動ループ ON・自動昇降 ON、m2-kickoff §7-7、仮） */
+export const DEFAULT_PRACTICE: PracticeOptions = Object.freeze({
+  mode: 'note',
+  rate: 1,
+  loop: null,
+  autoLoop: true,
+  autoTempo: true,
+})
+
+/** S0d の段階の練習（音待ち・1.0・ループ無し・自動なし。decisions #61・#82） */
+export const TUTORIAL_PRACTICE: PracticeOptions = Object.freeze({
+  mode: 'note',
+  rate: 1,
+  loop: null,
+  autoLoop: false,
+  autoTempo: false,
+})
 
 /** 練習の回の状態（Run.practice） */
 export interface PracticeRun {
@@ -469,15 +489,91 @@ function practiceFrame(r0: Run, misses: readonly number[], now: number, effects:
   }
   // 段の切替（待ちの解除より先に。解除の t は今の段で戻す）
   r = applyRate(r, P(), now, effects)
-  // 待ち: 再生中に着地に達した組で止める。待ち中は解除の時刻を見る（フレーズ待ちの空白）
-  if (runPhase(r) === 'playing') {
-    const byIndex = resultsByIndex(r.judge)
-    const c = waitCheck(P().wait, P().byLand, (i) => (byIndex.get(i)?.state ?? 'pending') === 'pending', r.t)
-    if (c.state !== P().wait) r = { ...r, practice: { ...P(), wait: c.state } }
-    if (c.stop) r = practiceEvent(r, now, { kind: 'waitStop' }, effects)
-  } else if (runPhase(r) === 'waiting') r = releaseWait(r, now, effects)
+  // 待ち: 再生中に着地に達した組で止める（掃き出しの前にも見ている、waitStopFirst）。待ち中は解除の時刻を見る
+  if (runPhase(r) === 'playing') r = waitStopFirst(r, now, effects)
+  else if (runPhase(r) === 'waiting') r = releaseWait(r, now, effects)
   return r
 } // prettier-ignore
+
+/**
+ * 再生中に着地に達した組があれば止める（waitStop）。runFrame は MISS の掃き出しより先にこれを呼ぶ: フレームが途切れて t が
+ * 着地を遅れ側の窓より大きく越えても、待つ音を MISS にしない（止まった時計では掃き出さない）。browser pane で見つけた
+ */
+function waitStopFirst(r: Run, now: number, effects: RunEffect[]): Run {
+  const p = r.practice
+  if (p === null || p.mode === 'fixed' || runPhase(r) !== 'playing') return r
+  const byIndex = resultsByIndex(r.judge)
+  const c = waitCheck(
+    p.wait,
+    p.byLand,
+    (i) => (byIndex.get(i)?.state ?? 'pending') === 'pending',
+    r.t,
+  )
+  const r1: Run = c.state === p.wait ? r : { ...r, practice: { ...p, wait: c.state } }
+  return c.stop ? practiceEvent(r1, now, { kind: 'waitStop' }, effects) : r1
+}
+
+/**
+ * 練習の設定を回の途中で替える（S4 のパネル、M2 の手順 6）。待ち方は待ちの状態を作り直し（待ち中なら解除と同じく戻して
+ * 再開）、テンポ段は自動昇降と同じく猶予に窓が掛からないフレームまで待って切り替え、区間は決めた直後に頭出し（区間を
+ * 外すなら止めずに通しへ）、自動ループ・自動昇降は次の評価から。待機中の回は呼ぶ側が newRun で作り直す
+ */
+export function runSetPractice(r: Run, now: number, patch: Partial<PracticeOptions>): RunStep {
+  const p0 = r.practice
+  const effects: RunEffect[] = []
+  if (p0 === null) return { run: r, effects }
+  const opts: PracticeOptions = { ...p0.opts, ...patch }
+  let p: PracticeRun = { ...p0, opts, loop: { ...p0.loop, autoLoop: opts.autoLoop } }
+  let next: Run = { ...r, practice: p }
+  if (patch.mode !== undefined && patch.mode !== p0.mode) {
+    const mode = effectiveMode(patch.mode, 'novideo')
+    const group = p0.wait.group
+    const wait = { ...initialWait(mode, r.notes, r.song.chart.pulse), waits: p0.wait.waits }
+    p = { ...p, mode, wait }
+    next = { ...next, practice: p }
+    // 待ち中に待ち方を替えたら、待っていた組の着地 − 猶予·rate から再開する（固定テンポなら止まらずに続く）
+    if (runPhase(next) === 'waiting' && group !== null) {
+      next = practiceEvent(
+        next,
+        now,
+        { kind: 'waitHit', t: group.landMs - GRACE_MS * p.rate },
+        effects,
+      )
+      next = { ...next, sched: seekSchedule(next.sched, next.items, group.landMs) }
+    }
+  }
+  if (patch.rate !== undefined) {
+    const cur = next.practice as PracticeRun
+    next = {
+      ...next,
+      practice: { ...cur, pendingRate: patch.rate === cur.rate ? null : patch.rate },
+    }
+    next = applyRate(next, next.practice as PracticeRun, now, effects)
+  }
+  if (patch.loop !== undefined) {
+    const cur = next.practice as PracticeRun
+    const loop = setLoop(cur.loop, patch.loop)
+    next = { ...next, practice: { ...cur, loop } }
+    const phase = runPhase(next)
+    if (patch.loop !== null && phase !== 'idle' && phase !== 'ended')
+      next = rewindLoop(next, next.practice as PracticeRun, patch.loop, now, effects)
+  }
+  return { run: next, effects }
+}
+
+/** 今の t の小節（1 始まり。助走の間は 1） */
+export function runBar(r: Run): number {
+  const pulse = r.song.chart.pulse
+  const ms = r.practice?.ms ?? buildMsTable(pulse)
+  return Math.max(1, barOf(pulse, ms.msToBeat(Math.max(0, r.t))))
+}
+
+/** 曲の小節の数（最終ノートの終わりを含む小節まで） */
+export function runBars(r: Run): number {
+  const pulse = r.song.chart.pulse
+  const ms = r.practice?.ms ?? buildMsTable(pulse)
+  return Math.max(1, barOf(pulse, ms.msToBeat(Math.max(0, r.lastEndMs - 1))))
+}
 
 /** 演奏の離し（ホールドの終わり。強制の離し〔blur〕も渡す） */
 export function runRelease(
@@ -501,6 +597,8 @@ export function runFrame(r: Run, now: number, frameMs: number): RunStep {
   const effects: RunEffect[] = []
   const collect = runPhase(r) === 'idle' ? r.collect : collectFrame(r.collect, frameMs)
   let next = applyStep({ ...r, collect }, sessionTick(r.session, now, null), now, effects)
+  // 待ちは掃き出しより先（途切れたフレームの後でも、待つ音を MISS にせず止める）
+  if (next.practice !== null) next = waitStopFirst(next, now, effects)
   const j = judgeSweep(next.judge, { map: next.map, now })
   next = { ...next, judge: j.state }
   effects.push(...judgeEffects(next, j.out, now))
