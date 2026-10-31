@@ -12,6 +12,7 @@ import {
   type DeviceInfo,
   type LayoutId,
 } from '../../shared/types.ts'
+import { localDay, streakDays } from '../../results/awards.ts'
 import { offsetFor } from '../../storage/local.ts'
 import { signedMs } from '../calibration.ts'
 import {
@@ -176,6 +177,10 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
   // 曲の譜面と記録を読む（読めない譜面はその曲だけ文で出す。記録が読めなければ自己ベストなし）
   void (async () => {
     const records = await booted.db.listResults().catch(() => [])
+    // 上帯のストリーク（手順 11、m6 L754。1 日以上のときだけ）
+    const streak = streakDays(records, localDay(new Date().toISOString()))
+    if (alive && streak > 0)
+      top.append(h(doc, 'span', {}, 'ストリーク ', h(doc, 'b', { text: `${streak} 日` }), '（自前音源のプレイだけが対象）'))
     const results = await Promise.all(
       ctx.songs.map(async (entry): Promise<Loaded | Failed> => {
         try {

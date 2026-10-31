@@ -6,7 +6,8 @@
 
 import { proposalFor, proposalText, signedMs } from '../calibration.ts'
 import type { PlayResult } from '../play-runner.ts'
-import { resultView } from '../result-view.ts'
+import { resultView, rewardView } from '../result-view.ts'
+import { awardsFor, localDay } from '../../results/awards.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { calibRow } from '../../telemetry/rows.ts'
 import { button, frame, h } from './frame.ts'
@@ -51,11 +52,12 @@ function proposalBand(ctx: ScreenContext, last: PlayResult): { el: HTMLElement |
 } // prettier-ignore
 
 export function resultScreen(ctx: ScreenContext): ScreenView {
-  const { doc } = ctx
+  const { doc, booted } = ctx
   const last = ctx.lastPlay()
   const v = last === null ? null : resultView(last)
   const f = frame(ctx, v?.title ?? '結果', { gear: true })
   let leave = (): void => {}
+  let alive = true
   if (last === null || v === null)
     f.body.append(h(doc, 'p', { className: 'note', text: '結果がありません。' }))
   else {
@@ -98,7 +100,16 @@ export function resultScreen(ctx: ScreenContext): ScreenView {
     if (p.el !== null) offset.append(p.el)
     leave = p.leave
     offset.append(h(doc, 'h3', { text: '苦手区間' }), h(doc, 'p', { text: v.weak ?? 'はずれはありませんでした。' }))
-    f.body.append(h(doc, 'div', { className: 'grid2' }, main, side), offset)
+    // 称号・ストリーク（手順 11。記録を全部読んでから。保存がまだ終わっていなくても、この回の記録は足して数える）
+    const reward = h(doc, 'div', { className: 'card' }, h(doc, 'h3', { text: '称号・ストリーク' }), h(doc, 'p', { className: 'note', text: '集計中…' }))
+    f.body.append(h(doc, 'div', { className: 'grid2' }, main, side), offset, reward)
+    void (async () => {
+      const [records, bundledIds] = await Promise.all([booted.db.listResults().catch(() => []), ctx.bundledIds()])
+      if (!alive) return
+      const rv = rewardView(awardsFor(records, last.record, { today: localDay(new Date().toISOString()), bundledIds }))
+      const pills = h(doc, 'div', { className: 'btnrow' }, ...rv.pills.map((t) => h(doc, 'span', { className: 'pill good', text: t })))
+      reward.replaceChildren(h(doc, 'h3', { text: '称号・ストリーク' }), ...(rv.pills.length > 0 ? [pills] : []), ...rv.lines.map((t, i) => h(doc, 'p', { className: i === 0 ? '' : 'note', text: t })))
+    })()
   }
   if (last?.onboardEnd === true)
     f.body.append(h(doc, 'p', { className: 'note', text: '初回導線はここで終わります。「ホームへ」で曲一覧に進みます。' }))
@@ -113,5 +124,12 @@ export function resultScreen(ctx: ScreenContext): ScreenView {
     ),
   )
   // 何もせず S3 を離れたら見送りとして 1 回書く（S6 へ行って戻ったときも片付いたものとする）
-  return { root: f.root, bandSlot: f.bandSlot, unmount: () => leave() }
+  return {
+    root: f.root,
+    bandSlot: f.bandSlot,
+    unmount: () => {
+      alive = false
+      leave()
+    },
+  }
 } // prettier-ignore

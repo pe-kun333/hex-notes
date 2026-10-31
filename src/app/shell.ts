@@ -5,6 +5,7 @@
 
 import { createAudioOut, type AudioOut } from '../audio/context.ts'
 import type { KeysetId } from '../chart/keyset.ts'
+import { validateChart } from '../chart/validate.ts'
 import type { VariantSpec } from '../chart/variants.ts'
 import type { InputEvent } from '../input/keyboard.ts'
 import type { DeviceInfo, SyncKind } from '../shared/types.ts'
@@ -60,6 +61,8 @@ export interface ScreenContext {
   /** 初回導線の今の段（S6 へ行って戻っても続きから。始める前は null） */
   onboard(): OnboardState | null
   setOnboard(s: OnboardState | null): void
+  /** 同梱曲の chartId（「同梱 10 曲完走」を数える。初めて呼んだときに譜面を読んで覚える、手順 11） */
+  bundledIds(): Promise<readonly string[]>
   /** 校正（起動で読んだ値に、この後の保存を重ねた物。S1 の上帯・S2 の判定が読む） */
   calibration(): Calibration
   /** 1 つの音源種別の校正を保存する（hexnote.calibration。置き場が壊れていてもメモリ内で続く、decisions #50） */
@@ -162,6 +165,7 @@ export function startShell(opts: ShellOptions): Shell {
   let device = booted.device
   let tutorial: TutorialRun | null = null
   let onboard: OnboardState | null = null
+  let bundled: Promise<readonly string[]> | null = null
   let view: ScreenView | null = null
   let song: SongEntry | null = null
   let keyset: KeysetId = 'all'
@@ -225,6 +229,19 @@ export function startShell(opts: ShellOptions): Shell {
     setOnboard: (s) => {
       onboard = s
     },
+    bundledIds: () =>
+      (bundled ??= Promise.all(
+        (opts.songs ?? [])
+          .filter((s) => s.id.startsWith('bundled:'))
+          .map(async (s) => {
+            try {
+              const v = validateChart(await (await fetch(s.url)).json())
+              return v.ok ? v.chart.id : null
+            } catch {
+              return null
+            }
+          }),
+      ).then((ids) => ids.filter((x): x is string => x !== null))),
     calibration: () => calibration,
     saveCalibration: (kind, entry) => {
       saveCalibration(booted.local, kind, entry)
