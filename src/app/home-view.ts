@@ -11,6 +11,7 @@ import {
   DEFAULT_CHORD_LIMIT,
   type Chart,
   type ChordLimit,
+  type FoldId,
   type LayoutId,
   type Metrics,
   type Profile,
@@ -30,9 +31,18 @@ export const LIMIT_NOTE = '保証なし: 和音で 3 キー目が無反応なら
 
 const dropped = (v: Variant): number => v.keys.filter((k) => k === null).length
 
-/** 譜面が持つ版（fold は octave だけ、§2.9 の同梱曲） */
+/**
+ * 譜面の版の折り畳み（同梱曲は octave、持ち込み曲は S5 の段 3 の選択。版は全て同じ fold で作る、decisions #83 (c)）。
+ * 版が無ければ octave
+ */
+export function foldOf(chart: Pick<Chart, 'variants'>): FoldId {
+  return chart.variants?.[0]?.fold ?? 'octave'
+}
+
+/** 譜面が持つ版（その曲の fold の版だけ） */
 function variantsOf(chart: Pick<Chart, 'variants'>): Variant[] {
-  return (chart.variants ?? []).filter((v) => v.fold === 'octave')
+  const fold = foldOf(chart)
+  return (chart.variants ?? []).filter((v) => v.fold === fold)
 }
 
 export interface LimitChoice {
@@ -82,7 +92,7 @@ export function versionChoice(
   }))
   // 上限 2 から昇順で、選べて版のある最小（ふつうは 2）
   const first = limits.find((c) => c.available && c.allowed)
-  return { layouts, recommended, limits, pick: first === undefined ? null : { layout: use, limit: first.limit, fold: 'octave' } }
+  return { layouts, recommended, limits, pick: first === undefined ? null : { layout: use, limit: first.limit, fold: foldOf(chart) } }
 } // prettier-ignore
 
 /** 曲の長さ（最終ノートの終わり、秒） */

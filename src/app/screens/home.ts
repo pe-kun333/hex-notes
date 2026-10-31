@@ -1,7 +1,8 @@
 // S1 ホーム／選曲（M1-08、M1 の手順 8。骨組みは手順 2）。曲カード・並び・譜面版の選択の中身は home-view.ts（純関数）。
 // 出どころ: design.md §1.3 S1（上帯: プロファイル〔M1 では隠す〕・端末の上限・校正の有無。曲カード・譜面版の選択・並び）、
 // m6 S1 L298–324（上帯・並び・曲カード・譜面版の箱）、m1-kickoff 手順 8 の手直し（device が無ければ「未診断（2）」。
-// プロファイル切替・持ち込み・絞り込み・動画の切替は M1 では出さない）。開発ページへの導線は dev のときだけ（src/main.ts が渡す）。
+// プロファイル切替・絞り込み・動画の切替は M1 では出さない）。開発ページへの導線は dev のときだけ（src/main.ts が渡す）。
+// M2 の手順 2: 「＋ 曲を持ち込む」（初回でないとき）と、一覧に持ち込み曲（同梱曲の後）。版は曲の fold で選ぶ（foldOf）。
 
 import { validateChart } from '../../chart/validate.ts'
 import { LAYOUTS } from '../../layout/presets.ts'
@@ -18,6 +19,7 @@ import { signedMs } from '../calibration.ts'
 import {
   LIMIT_NOTE,
   SORT_NAMES,
+  foldOf,
   missingText,
   songCard,
   sortCards,
@@ -74,7 +76,10 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
   const list = h(doc, 'div', { className: 'songs' }, h(doc, 'p', { className: 'note', text: '曲を読み込み中…' }))
   const panel = h(doc, 'div', { className: 'card variant' })
   panel.hidden = true
-  f.body.append(h(doc, 'div', { className: 'btnrow' }, h(doc, 'span', { className: 'note', text: '並び' }), sortSel), list, panel)
+  const sortRow = h(doc, 'div', { className: 'btnrow' }, h(doc, 'span', { className: 'note', text: '並び' }), sortSel)
+  // 曲を持ち込む（S5）は初回でないときだけ。S1 を開くたびに評価する（m6 L312、m2-kickoff §7-27）
+  if (!ctx.isFirst()) sortRow.append(button(doc, '＋ 曲を持ち込む', () => ctx.go('S5'), 'import-entry'))
+  f.body.append(sortRow, list, panel)
 
   let loaded: Loaded[] = []
   let failed: Failed[] = []
@@ -148,7 +153,7 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
     }
     const play = button(doc, 'この譜面版で遊ぶ → プレイ', () => {
       if (limit === null) return
-      ctx.pickSong(l.entry, 'all', { layout, limit, fold: 'octave' })
+      ctx.pickSong(l.entry, 'all', { layout, limit, fold: foldOf(l.chart) })
       ctx.go('S2')
     }, 'primary')
     play.disabled = limit === null
@@ -181,12 +186,11 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
     const streak = streakDays(records, localDay(new Date().toISOString()))
     if (alive && streak > 0)
       top.append(h(doc, 'span', {}, 'ストリーク ', h(doc, 'b', { text: `${streak} 日` }), '（自前音源のプレイだけが対象）'))
+    const songs = await ctx.songs()
     const results = await Promise.all(
-      ctx.songs.map(async (entry): Promise<Loaded | Failed> => {
+      songs.map(async (entry): Promise<Loaded | Failed> => {
         try {
-          const res = await fetch(entry.url)
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          const v = validateChart(await res.json())
+          const v = validateChart(await entry.load())
           if (!v.ok) return { entry, why: '譜面が読めません' }
           const c = songCard(entry.id, v.chart, { preferred: settings.layout, deviceLimit, profile: settings.profile, records, tutorialId: TUTORIAL_SONG_ID })
           // 名前は一覧の名前（dev のフィクスチャは「試験:」付き。同梱曲は譜面の name と同じ）

@@ -422,9 +422,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     title.textContent = entry.name
     let json: unknown
     try {
-      const res = await fetch(entry.url)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      json = await res.json()
+      json = await entry.load()
     } catch (e) {
       if (alive) status.textContent = `曲が読めません（${e instanceof Error ? e.message : String(e)}）`
       return

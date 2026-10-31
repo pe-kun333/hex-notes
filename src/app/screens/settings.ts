@@ -261,9 +261,9 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
   const songList = h(doc, 'ul', {}, h(doc, 'li', { className: 'note', text: '読み込み中…' }))
   void (async () => {
     const rows = await Promise.all(
-      ctx.songs.filter((s) => s.id.startsWith('bundled:')).map(async (s) => {
+      (await ctx.songs()).filter((s) => s.id.startsWith('bundled:')).map(async (s) => {
         try {
-          const v = validateChart(await (await fetch(s.url)).json())
+          const v = validateChart(await s.load())
           return v.ok ? creditOf(v.chart) : `${s.name}（読めません）`
         } catch {
           return `${s.name}（読めません）`

@@ -686,3 +686,49 @@ details.dev {
   margin-top: 24px;
   color: var(--muted);
 }
+
+/* S5 曲の持ち込み（m6 .stage5・.grid3・m5 のドロップ領域。M2 の手順 2） */
+.import-entry {
+  margin-left: auto;
+}
+
+.drop.over {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.card.fold {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.card.fold.sel {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+table.tracks th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--muted);
+  padding: 2px 16px 2px 0;
+}
+
+@media (max-width: 480px) {
+  table.tracks th,
+  table.tracks td {
+    padding-right: 8px;
+  }
+}
