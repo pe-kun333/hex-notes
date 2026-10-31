@@ -24,6 +24,9 @@ import {
   HARNESS_LAYOUTS,
   HARNESS_PROFILES,
   HARNESS_SONGS,
+  PRACTICE_CONDITIONS,
+  WRONG_RATE,
+  buildPracticeTable,
   buildTable,
   harnessRow,
   parseTable,
@@ -471,16 +474,25 @@ describe('run.ts（子プロセス）', () => {
       const dir = mkdtempSync(path.join(os.tmpdir(), 'hexnote-harness-'))
       try {
         const exp = path.join(dir, 'expected.json')
-        const w = run('--expected', exp)
+        const expP = path.join(dir, 'expected-practice.json')
+        const w = run('--expected', exp, '--expected-practice', expP)
         expect(w.status).toBe(0)
         expect(w.stdout).toContain('144 行')
+        expect(w.stdout).toContain('48 行')
         expect(readFileSync(exp, 'utf8')).toBe(tableText(TABLE))
+        expect(readFileSync(expP, 'utf8')).toBe(tableText(buildPracticeTable(SONGS)))
         const out = path.join(dir, 'out')
         const c = run('--check', '--out', out)
         expect(c.status).toBe(0)
-        expect(c.stdout).toContain('✓ 回帰ハーネス: 差分なし（144 行）')
+        expect(c.stdout).toContain('✓ 回帰ハーネス（M0の表）: 差分なし（144 行）')
+        expect(c.stdout).toContain('✓ 回帰ハーネス（練習の表）: 差分なし（48 行）')
         expect(readFileSync(path.join(out, 'table.json'), 'utf8')).toBe(tableText(TABLE))
-        expect(readFileSync(path.join(out, 'diff.md'), 'utf8')).toBe(diffText([], 144))
+        expect(readFileSync(path.join(out, 'table-m2-03.json'), 'utf8')).toBe(
+          tableText(buildPracticeTable(SONGS)),
+        )
+        const md = readFileSync(path.join(out, 'diff.md'), 'utf8')
+        expect(md).toContain(diffText([], 144))
+        expect(md).toContain(diffText([], 48))
       } finally {
         rmSync(dir, { recursive: true, force: true })
       }
@@ -524,4 +536,37 @@ describe('run.ts（子プロセス）', () => {
     },
     TIMEOUT,
   )
+})
+
+describe('練習の表 m2-03.json（M2 の手順 5、m2-kickoff §7-21・decisions #56 (d)）', () => {
+  const PRACTICE = buildPracticeTable(SONGS)
+  const expected = parseTable(
+    readFileSync(path.join(root, 'tests', 'harness', 'expected', 'm2-03.json'), 'utf8'),
+  )
+
+  it('6 曲 × 2 プロファイル × 2 配列 × 2 条件（rate 0.75・SD 0、隣の鍵 12%）。期待の表と差分 0', () => {
+    expect(PRACTICE).toHaveLength(HARNESS_SONGS.length * HARNESS_PROFILES.length * HARNESS_LAYOUTS.length * PRACTICE_CONDITIONS.length)
+    expect(diffTables(expected, PRACTICE)).toEqual([])
+  }) // prettier-ignore
+
+  it('rate 0.75・SD 0 は全ての行で精度 100%・skipped 0（判定窓は実時間のまま、時計が 0.75 倍で進む）', () => {
+    const rs = PRACTICE.filter((r) => r.rate === 0.75)
+    expect(rs).toHaveLength(24)
+    expect(rs.every((r) => r.precision === 1 && r.skipped === 0 && r.counts.perfect === r.notes)).toBe(true)
+  }) // prettier-ignore
+
+  it('隣の鍵 12% で入門者に NEAR、音ゲー向け（NEAR なし）に MISS が出る。正しい鍵だけの行より精度が下がる', () => {
+    const rs = PRACTICE.filter((r) => r.wrongRate === WRONG_RATE)
+    expect(rs.filter((r) => r.profile === 'beginner').some((r) => r.counts.near > 0)).toBe(true)
+    expect(rs.filter((r) => r.profile === 'gamer').every((r) => r.counts.near === 0)).toBe(true)
+    expect(rs.filter((r) => r.profile === 'gamer').some((r) => r.counts.miss > 0)).toBe(true)
+    expect(rs.some((r) => r.precision < 1)).toBe(true)
+  }) // prettier-ignore
+
+  it('M0 の表の行は rate・wrongRate を持たず、行の鍵も変わらない（m0-10.json は作り直さない）', () => {
+    expect(TABLE.some((r) => 'rate' in r || 'wrongRate' in r)).toBe(false)
+    expect(rowKey({ song: 'a', variantId: 'v', profile: 'beginner', jitterSd: 0 })).toBe('a v beginner sd0')
+    expect(rowKey({ song: 'a', variantId: 'v', profile: 'beginner', jitterSd: 0, rate: 0.75 })).toBe('a v beginner sd0 r0.75')
+    expect(rowKey({ song: 'a', variantId: 'v', profile: 'beginner', jitterSd: 0, wrongRate: 0.12 })).toBe('a v beginner sd0 w0.12')
+  }) // prettier-ignore
 })

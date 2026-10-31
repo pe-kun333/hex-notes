@@ -10,7 +10,7 @@ import { LAYOUTS } from '../layout/presets.ts'
 import { JUDGE_WORDS } from '../render/canvas/feedback.ts'
 import type { Awards } from '../results/awards.ts'
 import { isFinished } from '../results/record.ts'
-import type { LayoutId, Profile, SelfRate } from '../shared/types.ts'
+import type { LayoutId, PlayMode, Profile, ResultRecord, SelfRate } from '../shared/types.ts'
 import { leanWord, signedMs } from './calibration.ts'
 import { accuracyText } from './hud.ts'
 import type { FinishedPlay } from './play-runner.ts'
@@ -65,6 +65,19 @@ export function selfParts(s: SelfRate): SelfPart[] {
   })
 }
 
+/** 待ち方の言葉（S4 の待ち方の箱と同じ。§1.3 S4） */
+const MODE_NAMES: Readonly<Record<PlayMode, string>> = {
+  fixed: '固定テンポ',
+  note: '音待ち',
+  phrase: 'フレーズ待ち',
+}
+
+/** 練習の条件（「音待ち・0.75 倍・全鍵」。ループした回は「・ループ」。m2-kickoff 手順 5） */
+export function conditionText(r: Pick<ResultRecord, 'mode' | 'rate' | 'keyset' | 'looped'>): string {
+  const keys = r.keyset === 'all' ? '全鍵' : (KEYSET_NAMES[r.keyset as KeysetId] ?? r.keyset)
+  return `${MODE_NAMES[r.mode]}・${Number.isInteger(r.rate) ? r.rate.toFixed(1) : String(r.rate)} 倍・${keys}${r.looped === true ? '・ループ' : ''}`
+} // prettier-ignore
+
 export function resultView(p: FinishedPlay): ResultView {
   const r = p.record
   const c = r.counts
@@ -76,11 +89,11 @@ export function resultView(p: FinishedPlay): ResultView {
     [w.miss, String(c.miss)],
   ]
   if (r.skipped > 0) rows.push(['判定なし（再開の猶予の中）', String(r.skipped)])
-  // 練習記録（鍵数制限。M2 で待ち・テンポ≠1.0 も）は条件と残すものを出す（m6 renderS3 L846–847）
-  const practice = r.keyset !== 'all'
+  // 練習記録（鍵数制限・待ち・テンポ≠1.0・ループ。M2 の手順 5）は条件と残すものを出す（m6 renderS3 L846–847）
+  const practice = r.keyset !== 'all' || r.mode !== 'fixed' || r.rate !== 1 || r.looped === true
   if (practice)
     rows.push(
-      ['条件', `固定テンポ・1.0 倍・${KEYSET_NAMES[r.keyset as KeysetId] ?? r.keyset}`],
+      ['条件', conditionText(r)],
       ['残すもの', '精度%と自力率だけ（自己ベスト・完走・オフセット提案の対象外）'],
     )
   else

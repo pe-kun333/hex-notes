@@ -6,6 +6,9 @@
 // 1 回の演奏の状態（時計と状態機械・判定・計測・発音の予約）→ 次の状態と、画面がする事（演出・打鍵音・予約の取り消し）の
 // 純関数。now は src/app/ が読んだ performance.now を値で受ける（decisions #25・#32）。DOM・Canvas・AudioContext は
 // screens/play.ts。
+// M2 の手順 5（M2-03 前半）: RunOptions.practice で練習層（src/practice/ の待ち・ループ・テンポ段）を回す。練習層は時計に
+// 触らず、ここが PlayEvent（waitStop・waitHit・seek・setRate）と判定層の judgeWaitHit・judgeRewind に渡す（decisions #80・
+// #81・#87、m2-kickoff 手順 5・§7-3・§7-10・§7-11）。描画は曲時間軸のまま（テンポ段で跳ばない）。
 
 import { keyclickFor, type KeyclickPlan } from '../audio/keyclick.ts'
 import {
@@ -19,9 +22,35 @@ import {
   type SoundOptions,
 } from '../audio/scheduler.ts'
 import { filterKeyset, type KeysetId } from '../chart/keyset.ts'
+import { buildMsTable, type MsTable } from '../chart/mstable.ts'
 import type { AudioBridge } from '../clock/audio-bridge.ts'
+import { perfAt } from '../clock/map.ts'
 import type { ClockMap } from '../clock/types.ts'
-import type { KeyCode } from '../shared/types.ts'
+import type { KeyCode, PlayMode } from '../shared/types.ts'
+import { phraseOfBar } from '../practice/bars.ts'
+import {
+  initialLoop,
+  loopLimitMs,
+  loopMiss,
+  loopPhraseEnd,
+  loopSeekMs,
+  loopStartMs,
+  loopWrap,
+  type LoopRange,
+  type LoopState,
+} from '../practice/loop.ts'
+import { isCorrect, rateChangeSafe, tempoAfter } from '../practice/tempo.ts'
+import {
+  clearWait,
+  effectiveMode,
+  initialWait,
+  waitCheck,
+  waitPress,
+  waitRelease,
+  type WaitMode,
+  type WaitState,
+} from '../practice/wait.ts'
+import { barOf } from '../results/analysis.ts'
 import {
   END_TAIL_MS,
   endAtMs,
@@ -29,7 +58,9 @@ import {
   judgeClock,
   judgePress,
   judgeRelease,
+  judgeRewind,
   judgeSweep,
+  judgeWaitHit,
   resultsByIndex,
   summarizeJudge,
   timingSamples,
@@ -39,6 +70,7 @@ import {
   type JudgeSummary,
 } from '../judge/judge.ts'
 import type { FadeState } from '../judge/self-rate.ts'
+import { lateEdge } from '../judge/windows.ts'
 import { midiOf } from '../layout/presets.ts'
 import {
   initialSession,
@@ -92,6 +124,42 @@ export interface RunOptions {
   readonly keyclick: boolean
   /** 鍵数制限（実行時フィルタ、src/chart/keyset.ts。無ければ all。S0d の段階 1・2 と M2-07） */
   readonly keyset?: KeysetId
+  /** 練習（S4・S0d。無ければ通常プレイ ＝ 固定テンポ・1.0 倍・ループ無し） */
+  readonly practice?: PracticeOptions
+}
+
+/** 練習の設定（殻が持ち、保存しない。m2-kickoff §7-7） */
+export interface PracticeOptions {
+  /** 待ち方（源が動画なら固定テンポ） */
+  readonly mode: WaitMode
+  /** 始めのテンポ段 */
+  readonly rate: number
+  /** 始めの区間（S3 の苦手 2 小節。始点の 1 小節前から始める） */
+  readonly loop?: LoopRange | null
+  readonly autoLoop: boolean
+  readonly autoTempo: boolean
+}
+
+/** 練習の回の状態（Run.practice） */
+export interface PracticeRun {
+  readonly opts: PracticeOptions
+  readonly mode: WaitMode
+  readonly wait: WaitState
+  readonly loop: LoopState
+  /** 今のテンポ段（時計へ出した物） */
+  readonly rate: number
+  /** 自動昇降が決めて、まだ時計へ出していない段（猶予に窓が掛からないフレームまで待つ） */
+  readonly pendingRate: number | null
+  /** この回で使った段（記録の rate・計測のテンポ段の始めと終わり） */
+  readonly rates: readonly number[]
+  /** 評価したフレーズ（この通過。頭出しで数え直す）と、評価を始めるフレーズ（頭出しの前の小節は評価しない） */
+  readonly evaluated: readonly number[]
+  readonly evalFrom: number
+  /** 音（notes の添字）の小節とフレーズ */
+  readonly pos: ReadonlyMap<number, { readonly bar: number; readonly phrase: number }>
+  /** 判定するノート（着地の順。待ちが見る） */
+  readonly byLand: readonly FrameNote[]
+  readonly ms: MsTable
 }
 
 export interface Run {
@@ -113,6 +181,8 @@ export interface Run {
   readonly collect: PlayCollect
   readonly items: readonly SoundItem[]
   readonly sched: SchedulerState
+  /** 練習（RunOptions.practice。通常プレイは null） */
+  readonly practice: PracticeRun | null
 }
 
 /** 画面がする事（出た順に効かせる） */
@@ -127,18 +197,48 @@ export interface RunStep {
   readonly effects: RunEffect[]
 }
 
+/** 練習の回の始め（動画なし。源が動画なら固定テンポ、M3-02） */
+function newPractice(song: RunSong, notes: readonly FrameNote[], p: PracticeOptions): PracticeRun {
+  const pulse = song.chart.pulse
+  const pos = new Map<number, { bar: number; phrase: number }>()
+  for (const n of notes) {
+    const bar = barOf(pulse, n.group / pulse.resolution)
+    pos.set(n.index, { bar, phrase: phraseOfBar(bar) })
+  }
+  const mode = effectiveMode(p.mode, 'novideo')
+  const loop = initialLoop(p.loop ?? null, p.autoLoop)
+  return {
+    opts: p,
+    mode,
+    wait: initialWait(mode, notes, pulse),
+    loop,
+    rate: p.rate,
+    pendingRate: null,
+    rates: [p.rate],
+    evaluated: [],
+    evalFrom: loop.range === null ? 0 : phraseOfBar(loop.range.startBar),
+    pos,
+    byLand: [...notes].sort((a, b) => a.tLandMs - b.tLandMs || a.index - b.index),
+    ms: buildMsTable(pulse),
+  }
+}
+
 /** 待機の回（Space を待つ）。ノート・発音の列はここで 1 回作る */
 export function newRun(song: RunSong, opts: RunOptions): Run {
   const all = frameNotes(song.chart, song.variant)
   // 鍵数制限で外した音は判定にも描画にも出さない。終わりと進行は曲全体（ガイド音は外さないので最後まで鳴る）
   const notes = [...filterKeyset(all, opts.keyset ?? 'all')]
   const endMs = endAtMs(all)
+  const practice = opts.practice === undefined ? null : newPractice(song, notes, opts.practice)
+  // 始めの区間があれば始点の 1 小節前から（それより前の音は開始の猶予で skipped）
+  const range = practice?.loop.range ?? null
+  const t0 = range === null || practice === null ? -LEAD_MS : loopSeekMs(practice.ms, song.chart.pulse, range, LEAD_MS)
   return {
     song,
     opts,
-    session: initialSession({ mode: 'novideo', t0: -LEAD_MS }),
-    map: { a: 0, b: -LEAD_MS },
-    t: -LEAD_MS,
+    session: initialSession({ mode: 'novideo', t0, ...(practice === null ? {} : { rate: practice.rate }) }),
+    map: { a: 0, b: t0 },
+    t: t0,
     notes,
     judge: initialJudge(notes, opts.rules, opts.fade),
     lastEndMs: endMs - END_TAIL_MS,
@@ -146,8 +246,9 @@ export function newRun(song: RunSong, opts: RunOptions): Run {
     collect: initialCollect(),
     items: soundItems(song.chart, song.variant, opts.sound),
     sched: initialScheduler(),
+    practice,
   }
-}
+} // prettier-ignore
 
 export const runPhase = (r: Run): PlayPhase => r.session.play.phase
 
@@ -191,7 +292,8 @@ function applyStep(r: Run, step: SessionStep, realNow: number, effects: RunEffec
       cancel = true
     }
   const phase = step.session.play.phase
-  if (phase === 'paused' && before !== 'paused') cancel = true
+  // 一時停止・待ちに入ったら先の予約を止める（待ちの解除は着地から数え直す）
+  if ((phase === 'paused' || phase === 'waiting') && before !== phase) cancel = true
   if (cancel) effects.push({ kind: 'cancelSounds' })
   const j = judgeClock(r.judge, step.out.events, { map: step.out.map, now: realNow })
   const next: Run = {
@@ -225,12 +327,157 @@ export function runPress(
   const effects: RunEffect[] = []
   const r1 = applyStep(r, sessionIdle(r.session, now), now, effects)
   const phase = runPhase(r1)
+  // 待ち中の押下は練習層へ（判定層の窓では見ない。計測の演奏の押下にも数えない、m2-kickoff 手順 5）
+  if (phase === 'waiting' && r1.practice !== null)
+    return { run: waitPressRun(r1, r1.practice, press, now, effects), effects }
   if (phase !== 'playing' && phase !== 'syncing') return { run: r1, effects }
   const j = judgePress(r1.judge, press, { map: r1.map, now })
   const r2: Run = { ...r1, judge: j.state, collect: collectPress(r1.collect, press.lag) }
   effects.push(...judgeEffects(r2, j.out, now))
   return { run: r2, effects }
 }
+
+/** 練習層への事象を状態機械と時計に効かせる */
+function practiceEvent(r: Run, now: number, ev: PlayEvent, effects: RunEffect[]): Run {
+  return applyStep(r, sessionInput(r.session, now, ev), now, effects)
+}
+
+/**
+ * 待ちの解除（組が揃った後。フレーズ待ちは 250 ms の空白の後）。待った tick の着地 − 猶予·rate へ戻して再開し、発音の予約は
+ * 着地から数え直す（巻き戻した区間を鳴らし直さない、§7-3）
+ */
+function releaseWait(r: Run, now: number, effects: RunEffect[]): Run {
+  const p = r.practice
+  if (p === null) return r
+  const rel = waitRelease(p.wait, now, p.rate)
+  const r1: Run = rel.state === p.wait ? r : { ...r, practice: { ...p, wait: rel.state } }
+  if (rel.release === null) return r1
+  const r2 = practiceEvent(r1, now, { kind: 'waitHit', t: rel.release.t }, effects)
+  return { ...r2, sched: seekSchedule(r2.sched, r2.items, rel.release.landMs) }
+}
+
+/** 待ち中の押下 1 つ: 組の鍵なら judgeWaitHit、鍵違いは tainted と誤打の音（時計が止まっていても鳴らす、#48 の例外） */
+function waitPressRun(
+  r: Run,
+  p: PracticeRun,
+  press: { readonly code: KeyCode; readonly tsPerf: number },
+  now: number,
+  effects: RunEffect[],
+): Run {
+  const w = waitPress(p.wait, press.code)
+  const r1: Run = { ...r, practice: { ...p, wait: w.state } }
+  if (w.press.kind === 'wrong') {
+    if (r.opts.keyclick) {
+      const layout = r.song.variant.layout
+      const stray = {
+        kind: 'stray',
+        code: press.code,
+        tsPerf: press.tsPerf,
+        reason: 'window',
+      } as const
+      const plan = keyclickFor(stray, (c: KeyCode) => midiOf(layout, c))
+      if (plan !== null) effects.push({ kind: 'keyclick', plan })
+    }
+    return r1
+  }
+  if (w.press.kind !== 'hit') return r1
+  const j = judgeWaitHit(r1.judge, w.press.index, { tainted: w.press.tainted })
+  const r2: Run = { ...r1, judge: j.state }
+  effects.push(...judgeEffects(r2, j.out, now))
+  return w.press.done ? releaseWait(r2, now, effects) : r2
+}
+
+/** 区間の頭出し: 区間の音を未判定に戻し（judgeRewind）、始点の 1 小節前へ。待ちの組を下ろし、評価を数え直す */
+function rewindLoop(r: Run, p: PracticeRun, range: LoopRange, now: number, effects: RunEffect[]): Run {
+  const pulse = r.song.chart.pulse
+  const j = judgeRewind(r.judge, loopStartMs(p.ms, pulse, range))
+  const practice: PracticeRun = { ...p, wait: clearWait(p.wait), evaluated: [], evalFrom: phraseOfBar(range.startBar) }
+  const r1: Run = { ...r, judge: j.state, practice }
+  const t = loopSeekMs(p.ms, pulse, range, LEAD_MS)
+  // 待ちの間は時計が止まっているので、seek だけでは動かない。解除と同じく戻して再開する
+  return practiceEvent(r1, now, runPhase(r1) === 'waiting' ? { kind: 'waitHit', t } : { kind: 'seek', t }, effects)
+} // prettier-ignore
+
+/** フレーズ 1 つの評価（境 ＋ 遅れ側の窓 ＋ G の後、か折り返し）: 自動ループの同じ通過の miss を 0 に、自動昇降の段を決める */
+function evalPhrase(r: Run, p: PracticeRun, phrase: number): PracticeRun {
+  let judged = 0
+  let correct = 0
+  if (p.opts.autoTempo) {
+    const byIndex = resultsByIndex(r.judge)
+    for (const n of r.notes) {
+      if (p.pos.get(n.index)?.phrase !== phrase) continue
+      const res = byIndex.get(n.index)
+      if (res === undefined || res.grade === null || res.skipped) continue
+      judged++
+      if (isCorrect(res.grade, res.self)) correct++
+    }
+  }
+  const cur = p.pendingRate ?? p.rate
+  const next = p.opts.autoTempo ? tempoAfter(cur, judged, correct) : cur
+  return {
+    ...p,
+    loop: loopPhraseEnd(p.loop, phrase),
+    evaluated: [...p.evaluated, phrase],
+    pendingRate: next === p.rate ? null : next,
+  }
+}
+
+/** 決めた段を時計へ（猶予の中に窓が終わる未判定の音が無いフレームまで待つ。止まっている時計はすぐ） */
+function applyRate(r: Run, p: PracticeRun, now: number, effects: RunEffect[]): Run {
+  const rate = p.pendingRate
+  if (rate === null) return r
+  const phase = runPhase(r)
+  if (phase === 'playing' || phase === 'syncing') {
+    const wLate = lateEdge(r.opts.rules.windows)
+    const byIndex = resultsByIndex(r.judge)
+    const ends = r.notes.filter((n) => byIndex.get(n.index)?.state === 'pending').map((n) => perfAt(r.map, n.tLandMs) + wLate)
+    if (!rateChangeSafe(ends, now)) return r
+  }
+  const r1: Run = { ...r, practice: { ...p, rate, pendingRate: null, rates: [...p.rates, rate] } }
+  return practiceEvent(r1, now, { kind: 'setRate', rate }, effects)
+} // prettier-ignore
+
+/**
+ * 練習層の 1 フレーム（時計・判定の掃き出しの後）: miss → 自動ループ、フレーズの評価 → 自動昇降、折り返し、段の切替、待ち
+ */
+function practiceFrame(r0: Run, misses: readonly number[], now: number, effects: RunEffect[]): Run {
+  let r = r0
+  const pulse = r.song.chart.pulse
+  const P = (): PracticeRun => r.practice as PracticeRun
+  // miss → 区間の miss か自動ループ（同じ通過で 3 回 → そのフレーズを区間に、すぐ頭出し）
+  for (const index of misses) {
+    const pos = P().pos.get(index)
+    if (pos === undefined) continue
+    const m = loopMiss(P().loop, pos)
+    r = { ...r, practice: { ...P(), loop: m.state } }
+    if (m.start !== null) r = rewindLoop(r, P(), m.start, now, effects)
+  }
+  // フレーズの評価（境 ＋ 遅れ側の窓 ＋ G を曲 ms に直した後）
+  const rules = r.opts.rules
+  const tEval = r.t - (lateEdge(rules.windows) + rules.missMarginMs) * P().rate
+  const done = phraseOfBar(barOf(pulse, P().ms.msToBeat(tEval))) - 1
+  if (done >= P().evalFrom && !P().evaluated.includes(done)) r = { ...r, practice: evalPhrase(r, P(), done) }
+  // 折り返し（区間の最後のフレーズもここで評価）。ノーミス 2 周なら区間を外して通しへ
+  const range = P().loop.range
+  const phase = runPhase(r)
+  if (range !== null && (phase === 'playing' || phase === 'syncing') && r.t >= loopLimitMs(P().ms, pulse, range, r.lastEndMs)) {
+    const last = phraseOfBar(range.endBar)
+    if (!P().evaluated.includes(last)) r = { ...r, practice: evalPhrase(r, P(), last) }
+    const w = loopWrap(P().loop)
+    r = { ...r, practice: { ...P(), loop: w.state } }
+    if (!w.release) r = rewindLoop(r, P(), range, now, effects)
+  }
+  // 段の切替（待ちの解除より先に。解除の t は今の段で戻す）
+  r = applyRate(r, P(), now, effects)
+  // 待ち: 再生中に着地に達した組で止める。待ち中は解除の時刻を見る（フレーズ待ちの空白）
+  if (runPhase(r) === 'playing') {
+    const byIndex = resultsByIndex(r.judge)
+    const c = waitCheck(P().wait, P().byLand, (i) => (byIndex.get(i)?.state ?? 'pending') === 'pending', r.t)
+    if (c.state !== P().wait) r = { ...r, practice: { ...P(), wait: c.state } }
+    if (c.stop) r = practiceEvent(r, now, { kind: 'waitStop' }, effects)
+  } else if (runPhase(r) === 'waiting') r = releaseWait(r, now, effects)
+  return r
+} // prettier-ignore
 
 /** 演奏の離し（ホールドの終わり。強制の離し〔blur〕も渡す） */
 export function runRelease(
@@ -257,7 +504,12 @@ export function runFrame(r: Run, now: number, frameMs: number): RunStep {
   const j = judgeSweep(next.judge, { map: next.map, now })
   next = { ...next, judge: j.state }
   effects.push(...judgeEffects(next, j.out, now))
-  if (next.t > next.endMs && runPhase(next) === 'playing') {
+  if (next.practice !== null) {
+    const misses = j.out.flatMap((o) => (o.kind === 'miss' ? [o.index] : []))
+    next = practiceFrame(next, misses, now, effects)
+  }
+  // ループ中は chartEnd を出さない（区間の終わりで折り返す、§7-10）
+  if (next.t > next.endMs && runPhase(next) === 'playing' && next.practice?.loop.range == null) {
     const end = runInput(next, now, { kind: 'chartEnd' })
     return { run: end.run, effects: [...effects, ...end.effects] }
   }
@@ -297,12 +549,32 @@ export interface PlayResult {
   readonly offsetUsed: number
   /** 鍵数制限（all でなければ練習記録: 自己ベスト・完走・校正 段 2 の母集団に入らない。§2.3・§2.7） */
   readonly keyset: KeysetId
-  /** 校正 段 2 の母集団に入れるか（固定テンポ・1.0 倍・全鍵の通常プレイ。§2.7。M1 の S2 は全鍵の回だけ真） */
+  /** 待ち方（通常プレイは fixed） */
+  readonly mode: PlayMode
+  /** 記録のテンポ段（回の全てを 1.0 で弾いたときだけ 1。途中で替えたら最後に使った 1.0 以外の段。decisions #87） */
+  readonly rate: number
+  /** 練習の要約（通常プレイは null。計測の play 行と S3 の条件） */
+  readonly practice: PracticeSummary | null
+  /** 校正 段 2 の母集団に入れるか（固定テンポ・1.0 倍・全鍵・ループ無しの通常プレイ。§2.7） */
   readonly calibEligible: boolean
   /** 苦手区間（miss が最も多い連続 2 小節。miss が無ければ null） */
   readonly weak: WeakBars | null
   /** 同時押しが合った割合 */
   readonly chords: ChordRate
+}
+
+/** 練習の要約（m6 L451「測ること」: ループの回数・テンポ段の始めと終わり・待った回数、§7-20） */
+export interface PracticeSummary {
+  readonly loops: number
+  readonly tempoFrom: number
+  readonly tempoTo: number
+  readonly waits: number
+}
+
+/** 記録のテンポ段: 全て 1.0 なら 1、途中で替えたら最後に使った 1.0 以外の段（1.0 に戻っても練習記録のまま） */
+export function recordRate(rates: readonly number[]): number {
+  for (let i = rates.length - 1; i >= 0; i--) if (rates[i] !== 1) return rates[i] as number
+  return 1
 }
 
 /** 音ごとの結果（tick ＝ 描画のノートの group。結果の分析に渡す） */
@@ -316,6 +588,19 @@ function noteOutcomes(r: Run): NoteOutcome[] {
 
 export function runOutcome(r: Run): PlayResult {
   const notes = noteOutcomes(r)
+  const p = r.practice
+  const mode = p?.mode ?? 'fixed'
+  const rate = p === null ? 1 : recordRate(p.rates)
+  const keyset = r.opts.keyset ?? 'all'
+  const practice: PracticeSummary | null =
+    p === null
+      ? null
+      : {
+          loops: p.loop.loops,
+          tempoFrom: p.rates[0] ?? 1,
+          tempoTo: p.rates[p.rates.length - 1] ?? 1,
+          waits: p.wait.waits,
+        }
   return {
     chartId: r.song.chartId,
     variantId: r.song.variant.id,
@@ -324,8 +609,12 @@ export function runOutcome(r: Run): PlayResult {
     audioLateMaxMs: r.items.length === 0 ? null : r.sched.lateMaxMs,
     samples: timingSamples(r.judge),
     offsetUsed: r.opts.rules.offsetMs,
-    keyset: r.opts.keyset ?? 'all',
-    calibEligible: (r.opts.keyset ?? 'all') === 'all',
+    keyset,
+    mode,
+    rate,
+    practice,
+    calibEligible:
+      keyset === 'all' && mode === 'fixed' && rate === 1 && (practice?.loops ?? 0) === 0,
     weak: weakBars(r.song.chart.pulse, notes),
     chords: chordRate(notes),
   }
@@ -339,8 +628,8 @@ export interface FinishedPlay extends PlayResult {
 }
 
 /**
- * 終わった回と記録。M1 の S2 は動画なし（clock novideo・syncUsed audio）・固定テンポ・1.0 倍。鍵数制限は RunOptions.keyset。
- * id と at は呼ぶ側（crypto.randomUUID と Date）
+ * 終わった回と記録。動画なし（clock novideo・syncUsed audio）。待ち方・テンポ段・ループは練習層の実値（M2-03）、鍵数制限は
+ * RunOptions.keyset。id と at は呼ぶ側（crypto.randomUUID と Date）
  */
 export function finishedPlay(
   r: Run,
@@ -354,12 +643,13 @@ export function finishedPlay(
       variantId: o.variantId,
       profile: meta.profile,
       clock: 'novideo',
-      mode: 'fixed',
-      rate: 1,
+      mode: o.mode,
+      rate: o.rate,
       keyset: o.keyset,
       at: meta.at,
       syncUsed: { kind: 'audio' },
       offsetUsed: o.offsetUsed,
+      ...((o.practice?.loops ?? 0) > 0 ? { looped: true } : {}),
     },
     o.judge,
   )

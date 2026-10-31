@@ -3,6 +3,8 @@
 // 押下の前に sessionIdle で今の相へ進め、毎フレーム sessionTick → judgeClock → judgeSweep、t が終了を過ぎたら chartEnd）、
 // kickoff 手順 13「now は手で進める」、decisions #56（仮）。
 // performance.now は使わない。実時刻は START_NOW から FRAME_MS ずつ進め、押下・離しはその時刻（遅れ 0）で渡す。
+// M2 の手順 5（m2-kickoff §7-21、decisions #56 (d)）: テンポ段 rate（時計の再生レート。判定窓は実時間のまま）と鍵違い
+// （音ごとに押す鍵を差し替える。table.ts が隣の鍵を 12% で選ぶ。m4 autoWrong L377）を足した。既定は rate 1・鍵違いなし。
 
 import { perfAt, toChartMap } from '../../src/clock/map.ts'
 import type { ClockMap } from '../../src/clock/types.ts'
@@ -49,7 +51,7 @@ export interface AutoAction {
 
 /**
  * 押す・離す時刻の列（tsPerf の順。同じ時刻なら index の順、同じ音なら押す → 離す〔作った順。sort は安定〕）。
- * 押す: 着地の実時刻 ＋ 揺れ（offsetOf(index)）。正しい鍵だけ押す（NEAR・空打ちは作らない）。
+ * 押す: 着地の実時刻 ＋ 揺れ（offsetOf(index)）。押す鍵は keyOf(index) が返せばその鍵（鍵違い）、無ければ正しい鍵。
  * 離す: 終わりの実時刻 ＋ 同じ揺れ（音全体をずらす）。ただし同じ鍵を次に押す時刻の RELEASE_GAP_MS 前より後には
  * しない（押したままの鍵をもう一度押さない）。押した時刻より前にはしない。
  */
@@ -57,9 +59,10 @@ export function planActions(
   notes: readonly JudgeNote[],
   perfOf: (chartMs: number) => number,
   offsetOf: (index: number) => number,
+  keyOf: (index: number) => KeyCode | null = () => null,
 ): AutoAction[] {
   const presses = notes.map((n) => ({
-    n,
+    n: { ...n, code: keyOf(n.index) ?? n.code },
     press: perfOf(n.tLandMs) + offsetOf(n.index),
     end: perfOf(n.tEndMs) + offsetOf(n.index),
   }))
@@ -97,8 +100,9 @@ export function runAutoplay(
   notes: readonly JudgeNote[],
   rules: JudgeRules,
   offsetOf: (index: number) => number,
+  opts: { readonly rate?: number; readonly keyOf?: (index: number) => KeyCode | null } = {},
 ): AutoRun {
-  let session: Session = initialSession({ mode: 'novideo', t0: -LEAD_MS })
+  let session: Session = initialSession({ mode: 'novideo', t0: -LEAD_MS, rate: opts.rate ?? 1 })
   let judge = initialJudge(notes, rules)
   let map: ClockMap = { a: 0, b: -LEAD_MS }
   let t = -LEAD_MS
@@ -111,9 +115,9 @@ export function runAutoplay(
 
   apply(sessionInput(session, START_NOW, { kind: 'start' }), START_NOW)
   const chartMap = toChartMap(map, rules.axis)
-  const actions = planActions(notes, (ms) => perfAt(chartMap, ms), offsetOf)
+  const actions = planActions(notes, (ms) => perfAt(chartMap, ms), offsetOf, opts.keyOf)
   const endMs = endAtMs(notes)
-  const maxFrames = Math.ceil((LEAD_MS + endMs + 1000) / FRAME_MS)
+  const maxFrames = Math.ceil((LEAD_MS + endMs + 1000) / FRAME_MS / Math.min(1, opts.rate ?? 1))
 
   let k = 0
   let f = 0

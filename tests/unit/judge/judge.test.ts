@@ -10,7 +10,9 @@ import {
   judgeClock,
   judgePress,
   judgeRelease,
+  judgeRewind,
   judgeSweep,
+  judgeWaitHit,
   neighborOf,
   resultsByIndex,
   rulesOf,
@@ -534,4 +536,36 @@ describe('人工ジッタで精度が単調に下がる（§5.1 M0-06 の完了�
       expect(accs[2]).toBeLessThan(1)
     }
   })
+})
+
+describe('練習層の口（M2-03、M2 の手順 5。decisions #39 (c) の例外・#80）', () => {
+  it('judgeWaitHit: perfect で記録し dt を持たない（ずれの標本に入れない）。tainted は自力率 miss、2 度目は何もしない', () => {
+    const ns = [note('KeyA', 1000), note('KeyS', 1000)]
+    let s = initialJudge(ns, beginner())
+    const a = judgeWaitHit(s, ns[0]?.index ?? -1, { tainted: false })
+    expect(kinds(a.out)).toEqual(['hit'])
+    s = a.state
+    s = judgeWaitHit(s, ns[1]?.index ?? -1, { tainted: true }).state
+    expect([s.score.counts.perfect, timingSamples(s), s.selfRate]).toEqual([2, [], { solo: 0, hinted: 1, near: 0, miss: 1 }])
+    expect(judgeWaitHit(s, ns[0]?.index ?? -1, { tainted: false }).state).toBe(s)
+    expect(isComplete(s)).toBe(true)
+  }) // prettier-ignore
+
+  it('judgeRewind: 着地が境以上の判定済み・skipped を未判定に戻し、ホールド中は採点せずに閉じる。点・自力率は戻さない、from は数え直す', () => {
+    const ns = [note('KeyA', 1000), note('KeyS', 2000), note('KeyD', 3000, { hold: true, tEndMs: 4000 })]
+    let s = initialJudge(ns, beginner())
+    s = press(s, 'KeyA', 1000).state
+    s = press(s, 'KeyS', 2000).state
+    s = press(s, 'KeyD', 3000).state
+    expect(s.results.map((r) => r.state)).toEqual(['done', 'done', 'holding'])
+    const r = judgeRewind(s, 2000)
+    expect(r.state.results.map((x) => x.state)).toEqual(['done', 'pending', 'pending'])
+    expect([r.state.from, r.state.holds.size, r.state.score.counts.perfect, r.state.selfRate.hinted]).toEqual([1, 0, 3, 3])
+    expect(isComplete(r.state)).toBe(false)
+    // 戻した音をもう一度当てられる
+    const again = press(r.state, 'KeyS', 5000, 5000, { a: 1, b: -3000 })
+    expect([again.state.results[1]?.grade, again.state.score.counts.perfect]).toEqual(['perfect', 4])
+    // 境より前しか無ければ何も戻さない
+    expect(judgeRewind(s, 9999).state.results.map((x) => x.state)).toEqual(['done', 'done', 'holding'])
+  }) // prettier-ignore
 })

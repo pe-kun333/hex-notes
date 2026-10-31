@@ -3,6 +3,8 @@
 // 出どころ: §1.2 遷移図・§4.2・§1.3 S2／S7、decisions #11（プログラムからの pause／seek／play は Pause 再開・ループ
 // 頭出し・停止検知の 3 用途）・#26（Pause 要求は冪等）、kickoff 手順 7 の申し送り。
 // 待ち（S4、M2-03）と終了（最終ノート＋1.2 秒、判定層の後）は型と遷移だけを置く。
+// M2 の手順 5（M2-03 前半）: 練習層から時計へ届ける seek・setRate と、待ちの解除 waitHit の t（待った音の着地 − 猶予·rate へ
+// 戻して再開）を足し、待ちから入った一時停止の再開は時計を止めたまま待ちに戻す（pausedFrom。decisions #80、m2-kickoff §7-3）。
 
 import type { PauseReason } from '../input/focus.ts'
 import type { ClockCommand, ClockEvent, ClockMode, VideoRequest } from '../clock/types.ts'
@@ -17,6 +19,8 @@ export type PlayPhase = 'idle' | 'syncing' | 'playing' | 'waiting' | 'paused' | 
 export interface PlayState {
   readonly phase: PlayPhase
   readonly source: ClockMode
+  /** 待ちから入った一時停止（再開は待ちに戻す。paused の間だけ持つ） */
+  readonly pausedFrom?: 'waiting'
 }
 
 /**
@@ -35,9 +39,13 @@ export type PlayEvent =
   | { kind: 'return' }
   /** 判定層: 最終ノート＋1.2 秒（§4.2。手順 8 の後） */
   | { kind: 'chartEnd' }
-  /** 練習層: 待ちで止める／正解で進める（S4、M2-03） */
+  /** 練習層: 待ちで止める／正解で進める（S4、M2-03）。waitHit の t は再開する曲 ms（無ければ止めた t から） */
   | { kind: 'waitStop' }
-  | { kind: 'waitHit' }
+  | { kind: 'waitHit'; t?: number }
+  /** 練習層: ループの頭出し（時計が止まっていれば保留される） */
+  | { kind: 'seek'; t: number }
+  /** 練習層: テンポ段（動画なし。走っていれば再アンカーで猶予に入る） */
+  | { kind: 'setRate'; rate: number }
   | { kind: 'clock'; event: ClockEvent }
 
 export interface PlayStep {
@@ -55,7 +63,11 @@ const stay = (state: PlayState): PlayStep => ({ state, clock: [], video: [] })
 /** 一時停止へ（時計を止め、動画ありなら pauseVideo。decisions #35: #11 の「Pause 再開」の用途） */
 function toPaused(s: PlayState, alreadyPaused: boolean): PlayStep {
   return {
-    state: { ...s, phase: 'paused' },
+    state: {
+      phase: 'paused',
+      source: s.source,
+      ...(s.phase === 'waiting' ? { pausedFrom: 'waiting' as const } : {}),
+    },
     clock: [{ kind: 'pause' }],
     video: s.source === 'video' && !alreadyPaused ? [{ kind: 'pauseVideo', why: 'user' }] : [],
   }
@@ -94,6 +106,10 @@ function onClock(s: PlayState, ev: ClockEvent): PlayStep {
 export function playStep(s: PlayState, ev: PlayEvent): PlayStep {
   if (s.phase === 'ended') return stay(s)
 
+  // テンポ段は待機・一時停止の間も効かせる（止まっている時計は rate だけ替える）
+  if (ev.kind === 'setRate')
+    return { state: s, clock: [{ kind: 'setRate', rate: ev.rate }], video: [] }
+
   if (s.phase === 'idle') {
     if (ev.kind === 'start' && s.source === 'novideo')
       return { state: { ...s, phase: 'syncing' }, clock: [{ kind: 'start' }], video: [] }
@@ -102,12 +118,17 @@ export function playStep(s: PlayState, ev: PlayEvent): PlayStep {
   }
 
   if (s.phase === 'paused') {
+    // 待ちから入った一時停止は、時計を止めたまま待ちに戻す（猶予に入れると待っていた音が skipped になる。§7-3）
+    if (ev.kind === 'resume' && s.pausedFrom === 'waiting')
+      return stay({ phase: 'waiting', source: s.source })
     if (ev.kind === 'resume')
       return {
-        state: { ...s, phase: 'syncing' },
+        state: { phase: 'syncing', source: s.source },
         clock: [{ kind: 'resume' }],
         video: s.source === 'video' ? [{ kind: 'playVideo' }] : [],
       }
+    // 止まっている時計の seek は保留（再開でその t から）
+    if (ev.kind === 'seek') return { state: s, clock: [{ kind: 'seek', t: ev.t }], video: [] }
     return stay(s)
   }
 
@@ -130,9 +151,19 @@ export function playStep(s: PlayState, ev: PlayEvent): PlayStep {
         ? { state: { ...s, phase: 'waiting' }, clock: [{ kind: 'pause' }], video: [] }
         : stay(s)
     case 'waitHit':
+      // 止めた時計の t を戻してから再開（猶予 300 ms の終わりで t が着地に戻る、decisions #80）
       return s.phase === 'waiting'
-        ? { state: { ...s, phase: 'syncing' }, clock: [{ kind: 'resume' }], video: [] }
+        ? {
+            state: { ...s, phase: 'syncing' },
+            clock: [
+              ...(ev.t === undefined ? [] : [{ kind: 'seek' as const, t: ev.t }]),
+              { kind: 'resume' },
+            ],
+            video: [],
+          }
         : stay(s)
+    case 'seek':
+      return { state: s, clock: [{ kind: 'seek', t: ev.t }], video: [] }
     case 'start':
     case 'resume':
       return stay(s)

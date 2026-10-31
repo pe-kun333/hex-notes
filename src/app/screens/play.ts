@@ -311,7 +311,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     ctx.setLastPlay(o)
     const row = playRow(
       r.collect,
-      { chartId: o.chartId, variantId: o.variantId, profile: prof.profile, clock: 'novideo', mode: 'fixed' },
+      { chartId: o.chartId, variantId: o.variantId, profile: prof.profile, clock: 'novideo', mode: o.mode, rate: o.rate, keyset: o.keyset, ...(o.practice === null ? {} : { practice: o.practice }) },
       o.judge,
       o.audioLateMaxMs,
       at,

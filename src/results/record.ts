@@ -20,7 +20,8 @@ export type RecordMeta = Pick<
   | 'at'
   | 'syncUsed'
   | 'offsetUsed'
->
+> &
+  Pick<Partial<ResultRecord>, 'looped'>
 
 export function resultRecord(
   meta: RecordMeta,
@@ -43,6 +44,7 @@ export function resultRecord(
     syncUsed: { ...meta.syncUsed },
     offsetUsed: meta.offsetUsed,
     skipped: judge.skipped,
+    ...(meta.looped === true ? { looped: true } : {}),
   }
 }
 
@@ -61,8 +63,12 @@ export function newRecordId(
 
 /**
  * 完走か（§4.4: 固定テンポ・1.0 倍・全鍵・skipped 0 で最後まで）。M1 の回は全て最後まで弾く（途中終了は M2-05 で印を
- * 足す）ので、ここでは条件の 4 つだけを見る
+ * 足す）ので、ここでは条件の 4 つと、ループで折り返していないこと（M2-03、decisions #87）を見る
  */
-export function isFinished(r: Pick<ResultRecord, 'mode' | 'rate' | 'keyset' | 'skipped'>): boolean {
-  return r.mode === 'fixed' && r.rate === 1 && r.keyset === 'all' && r.skipped === 0
+export function isFinished(
+  r: Pick<ResultRecord, 'mode' | 'rate' | 'keyset' | 'skipped' | 'looped'>,
+): boolean {
+  return (
+    r.mode === 'fixed' && r.rate === 1 && r.keyset === 'all' && r.skipped === 0 && r.looped !== true
+  )
 }

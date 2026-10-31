@@ -71,7 +71,7 @@ export function sessionIdle(s: Session, now: number): SessionStep {
 }
 
 /**
- * 入力の事象（start・pause・resume・return・chartEnd・waitStop・waitHit）。now は入力のハンドラの now。
+ * 入力の事象（start・pause・resume・return・chartEnd・waitStop・waitHit・seek・setRate）。now は入力のハンドラの now。
  * 先に今の時計を 1 歩進め（猶予の終わり）、その事象の後に入力を処理する。
  */
 export function sessionInput(s: Session, now: number, ev: PlayEvent): SessionStep {

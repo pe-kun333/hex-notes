@@ -9,6 +9,8 @@
 //
 // 呼ぶ側の順: 毎フレーム judgeClock（その回の時計の事象）→ judgeSweep。入力のハンドラでは judgePress・judgeRelease
 // （先に judgeClock で時計を今に進める）。押下は届いた順に渡す（tsPerf の順。猶予中に溜めた押下は tsPerf で並べ直す）。
+// 練習層（M2-03、M2 の手順 5）の口: 待ちで当てた音 judgeWaitHit（perfect、ずれの標本に入れない、待ち中の誤打は tainted）と、
+// ループの頭出しで区間の音を未判定に戻す judgeRewind（decisions #39 (c) の例外、#80・#87）。
 
 import { endsInGrace } from '../clock/grace.ts'
 import { IDENTITY_AXIS, perfAt, toChartMap, type SyncAxis } from '../clock/map.ts'
@@ -275,13 +277,14 @@ function settle(
   grade: Judgment,
   dt: number | null,
   code: KeyCode | null,
+  tainted = false,
 ): void {
   const s = w.s
   const n = s.notes[i]
   if (n === undefined) return
   const r = s.rules
   const hit = grade === 'miss' ? 'miss' : grade === 'near' ? 'near' : 'hit'
-  const cat = classify(hit, labelVisible(s.fade, n.midi, r.labels))
+  const cat = classify(hit, labelVisible(s.fade, n.midi, r.labels), tainted)
   const holding = n.hold && hit !== 'miss' && code !== null
   const results = resultsOf(w)
   results[i] = {
@@ -497,6 +500,55 @@ export function judgeSweep(s0: JudgeState, clock: JudgeClock): JudgeStep {
     if (n !== undefined && nowJ >= perfAt(map, n.tEndMs)) closeHold(w, i, 'ok')
   }
   return finish(w)
+}
+
+// ---------- 練習層の口（M2-03） ----------
+
+/**
+ * 待ちで当てた音（§2.7「音待ち／フレーズ待ち」、decisions #80）。index は notes の添字。perfect で記録し、dt は持たない
+ * （ずれの標本・FAST／SLOW に入れない）。自力率は α のラベルで hinted／solo、tainted（待ち中に鍵違いを押した）なら miss。
+ * 未判定でなければ何もしない
+ */
+export function judgeWaitHit(
+  s0: JudgeState,
+  index: number,
+  opts: { readonly tainted: boolean },
+): JudgeStep {
+  const i = s0.notes.findIndex((n) => n.index === index)
+  const n = s0.notes[i]
+  if (n === undefined || s0.results[i]?.state !== 'pending') return { state: s0, out: [] }
+  const w = begin(s0)
+  settle(w, i, 'perfect', null, n.code, opts.tainted)
+  return finish(w)
+}
+
+/**
+ * ループの頭出し（§2.7「自動ループ」、m2-kickoff §7-10）。着地が fromChartMs 以上の音を未判定に戻す（判定済み・skipped。
+ * ホールド中は採点せずに閉じてから戻す）。点・自力率・α・コンボは戻さない（周をまたいで積む）。溜めた押下は捨てる。
+ * decisions #39 (c)「再アンカーは判定済みを戻さない」の例外で、ループの折り返しと区間を決めた直後だけ呼ぶ
+ */
+export function judgeRewind(s0: JudgeState, fromChartMs: number): JudgeStep {
+  const w = begin(s0)
+  for (const [code, i] of [...curHolds(w)]) {
+    const n = w.s.notes[i]
+    if (n !== undefined && n.tLandMs >= fromChartMs) {
+      resultsOf(w)[i] = PENDING
+      holdsOf(w).delete(code)
+    }
+  }
+  for (let i = 0; i < w.s.notes.length; i++) {
+    const n = w.s.notes[i]
+    if (n !== undefined && n.tLandMs >= fromChartMs && curResult(w, i).state !== 'pending')
+      resultsOf(w)[i] = PENDING
+  }
+  if (w.s.deferred.length > 0) w.out.push({ kind: 'dropped', count: w.s.deferred.length })
+  w.s = { ...w.s, deferred: [] }
+  const step = finish(w)
+  // finish は from を前へしか進めないので、戻した位置まで数え直す
+  const results = step.state.results
+  let from = 0
+  while (from < results.length && results[from]?.state === 'done') from++
+  return from === step.state.from ? step : { ...step, state: { ...step.state, from } }
 }
 
 // ---------- 読み出し ----------

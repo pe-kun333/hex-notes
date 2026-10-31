@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FinishedPlay } from '../../../src/app/play-runner.ts'
-import { resultView, selfParts, variantText } from '../../../src/app/result-view.ts'
+import { conditionText, resultView, selfParts, variantText } from '../../../src/app/result-view.ts'
 import { summarizeJudge, initialJudge, beginnerRules } from '../../../src/judge/judge.ts'
 import { rankOf } from '../../../src/judge/score.ts'
 import { barOf, chordRate, weakBars, type NoteOutcome } from '../../../src/results/analysis.ts'
@@ -149,6 +149,9 @@ function play(over: Partial<FinishedPlay> = {}, judgeOver = {}): FinishedPlay {
     samples: new Array<number>(108).fill(0),
     offsetUsed: -6,
     keyset: 'all',
+    mode: 'fixed',
+    rate: 1,
+    practice: null,
     calibEligible: true,
     weak: { from: 17, to: 18, misses: 5 },
     chords: { hit: 14, total: 18 },
@@ -219,4 +222,17 @@ describe('S3 の文言（m6 renderS3、#31 (e)）', () => {
     ])
     expect(variantText('vmpk/3/octave')).toBe('VMPK 型／上限 3')
   })
+})
+
+describe('練習の結果の条件（M2 の手順 5）', () => {
+  it('「音待ち・0.75 倍・全鍵」、ループした回は「・ループ」。待ち・テンポ≠1.0・ループの回は「練習の結果」', () => {
+    expect(conditionText({ mode: 'note', rate: 0.75, keyset: 'all' })).toBe('音待ち・0.75 倍・全鍵')
+    expect(conditionText({ mode: 'phrase', rate: 1.1, keyset: 'dfjk', looped: true })).toBe('フレーズ待ち・1.1 倍・ホームポジション（D F J K）・ループ')
+    expect(conditionText({ mode: 'fixed', rate: 1, keyset: 'all' })).toBe('固定テンポ・1.0 倍・全鍵')
+    for (const over of [{ mode: 'note' as const }, { rate: 0.9 }, { looped: true }]) {
+      const v = resultView(play({ record: { ...play().record, ...over } }))
+      expect([v.title, v.rows.find((x) => x[0] === '条件')?.[1] !== undefined]).toEqual(['練習の結果', true])
+    }
+    expect(resultView(play()).title).toBe('結果')
+  }) // prettier-ignore
 })
