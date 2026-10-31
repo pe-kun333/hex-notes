@@ -5,7 +5,13 @@
 // オフセット − 平均、文言「平均 −12 ms（少し早め）→ オフセットを ＋12 ms にしますか」）、m1-kickoff §7-18（ずれの言葉の
 // 閾 ±5 ms、仮）。純関数（DOM は calibration-panel.ts・screens/result.ts）。
 
-import { TAP_COUNT, proposeOffset, type OffsetVerdict } from '../judge/calibration-offset.ts'
+import {
+  OFFSET_LIMIT_MS,
+  TAP_COUNT,
+  atLimit,
+  proposeOffset,
+  type OffsetVerdict,
+} from '../judge/calibration-offset.ts'
 import type { PlayResult } from './play-runner.ts'
 
 /** ずれの言葉で「ちょうど」とする |平均| の上限 ms（m1-kickoff §7-18、仮） */
@@ -26,7 +32,7 @@ export function leanWord(meanMs: number): string {
 /** 段 1 の結果の文（n は数えた打数） */
 export function tapResultText(v: OffsetVerdict, n: number): string {
   if (v.ok)
-    return `平均 ${signedMs(v.mean)}（${leanWord(v.mean)}）、ばらつき ${Math.round(v.sd)} ms。オフセットを ${signedMs(v.offset)} にしました。`
+    return `平均 ${signedMs(v.mean)}（${leanWord(v.mean)}）、ばらつき ${Math.round(v.sd)} ms。オフセットを ${signedMs(v.offset)} にしました${limitNote(v.offset, -v.mean)}。`
   if (v.reason === 'sd')
     return `ばらつきが大きい（SD ${Math.round(v.sd ?? 0)} ms）ので適用しません。プレイ後に提案します。`
   return `打数が足りません（${n}/${TAP_COUNT}）。適用しません。`
@@ -51,13 +57,21 @@ export function proposalFor(r: PlayResult): OffsetVerdict | null {
   return proposeOffset(r.samples, r.offsetUsed)
 }
 
-/** 提案の見出し（#62）と内訳 */
+/** 上限で切ったときの注記（範囲 ±120、§2.7。M1 の手順 14、decisions #77） */
+function limitNote(offset: number, unclamped: number): string {
+  return atLimit(offset, unclamped)
+    ? `（上限 ±${OFFSET_LIMIT_MS} ms。それより大きいずれは残ります）`
+    : ''
+}
+
+/** 提案の見出し（#62）と内訳。used は今のオフセット（上限の注記に使う） */
 export function proposalText(
   v: OffsetVerdict & { ok: true },
   n: number,
+  used = 0,
 ): { title: string; detail: string } {
   return {
-    title: `平均 ${signedMs(v.mean)}（${leanWord(v.mean)}）→ オフセットを ${signedMs(v.offset)} にしますか`,
+    title: `平均 ${signedMs(v.mean)}（${leanWord(v.mean)}）→ オフセットを ${signedMs(v.offset)} にしますか${limitNote(v.offset, used - v.mean)}`,
     detail: `ばらつき ${Math.round(v.sd)} ms、ヒット ${n}。自前音源のオフセットとして保存します。`,
   }
 }

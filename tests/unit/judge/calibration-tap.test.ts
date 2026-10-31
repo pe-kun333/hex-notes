@@ -115,6 +115,18 @@ describe('結果（tapOffset、decisions #40 (b)）と文言', () => {
     )
   })
 
+  it('上限で切ったら注記（M1 の手順 14 の通しで見た ＋129 → −120）。ちょうど 120 は注記しない', () => {
+    const v = calResult(tapAll(new Array<number>(24).fill(129)))
+    expect(v).toEqual({ ok: true, offset: -120, mean: 129, sd: 0 })
+    expect(tapResultText(v, 24)).toBe(
+      '平均 ＋129 ms（少し遅め）、ばらつき 0 ms。オフセットを −120 ms にしました（上限 ±120 ms。それより大きいずれは残ります）。',
+    )
+    const edge = calResult(tapAll(new Array<number>(24).fill(-120)))
+    expect(tapResultText(edge, 24)).toBe(
+      '平均 −120 ms（少し早め）、ばらつき 0 ms。オフセットを ＋120 ms にしました。',
+    )
+  })
+
   it('SD 41 → 拒否（sd）、23 打 → 不足（count）', () => {
     // ±41 を交互に 24 個: 平均 0、標本 SD ＝ 41·√(24/23) ≈ 41.9
     const wide = calResult(tapAll(Array.from({ length: 24 }, (_, i) => (i % 2 ? 41 : -41))))
@@ -190,6 +202,19 @@ describe('プレイ後の提案（段 2、#40 (c)・#62）', () => {
       detail: 'ばらつき 21 ms、ヒット 118。自前音源のオフセットとして保存します。',
     })
   })
+
+  it('もう上限にいて動かせない提案は出さない（M1 の手順 14: 使った −120・平均 ＋22 で「−120 ms にしますか」と出ていた）', () => {
+    const s = samples(22, 9, 42)
+    expect(proposalFor({ ...base, samples: s, offsetUsed: -120 })).toMatchObject({ ok: false, reason: 'small' })
+    // 上限の手前から上限へは提案し、注記を付ける
+    const v = proposalFor({ ...base, samples: s, offsetUsed: -110 })
+    if (v === null || !v.ok) throw new Error('提案が無い')
+    expect(v.offset).toBe(-120)
+    expect(proposalText(v, 42, -110).title).toBe('平均 ＋22 ms（少し遅め）→ オフセットを −120 ms にしますか（上限 ±120 ms。それより大きいずれは残ります）')
+    // ちょうど上限に届くなら注記しない
+    const w = proposalFor({ ...base, samples: s, offsetUsed: -98 })
+    expect(w?.ok && proposalText(w, 42, -98).title).toBe('平均 ＋22 ms（少し遅め）→ オフセットを −120 ms にしますか')
+  }) // prettier-ignore
 
   it('使ったオフセットから引く（使った ＋8・平均 −12 → ＋20）。3 条件の門と母集団', () => {
     const s = samples(-12, 21, 118)

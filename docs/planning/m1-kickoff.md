@@ -185,6 +185,7 @@
 - 作る: `docs/planning/m1-verification.md`（視口×ブラウザ×曲の表、初回導線の所要秒、コンソールの出力、見つけた物と直し）。tests-inventory の「M1 手順 14」の行。
 - 期待値: コンソールのエラー 0。初回導線 S0a〜S0d の onboard 行の秒の和 ≤ 300（M-4 の到達も見る）。3 視口で R・v が手順 3 の表のとおり（1093×614@125% は U-05 の端末）。Firefox の timeStamp の刻み（tsResolution）と入力遅延の中央値を device・play 行から読む（M-2）。
 - 完了条件: 「エラーなし。初回導線 5 分以内」（§5.2 L245）。
+- 実際に取った手順（2026-11-01、手順 14、ブランチ `m1-14-verification`）: `docs/planning/m1-verification.md`。browser pane（Chromium）で build を vite preview で開き、S0a → S0d → S1 → S2 → S3 → S6 を合成の keydown で通した（途中から rAF をタイマーに差し替え）。3 視口の箱は設計の値、コンソールのエラー 0、同梱 3 曲のうち 2 曲と S0d の 3 段階が完走。見つけた物 3 件を直した（F1 初回の回の「更新する」、F2 上限での同じ値の提案、F3 上限の注記。decisions #77）。初回導線の秒・Firefox・実機・音は利用者の手元（m1-verification.md §4）。試験 1,014 → 1,016 件、初回読込 174,760 → 175,223 バイト。
 
 ## 3. 記録の形の追加（型は手順 1 で固定する）
 

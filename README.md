@@ -2,7 +2,7 @@
 
 六角セルの音符が上から流れ、PC キーボードを鍵盤に見立てて押す音ゲー。PC キーボードの千鳥配列（段ずれ 1/2・1/4・1/2 キー）を六角格子として扱い、六角セルの音符と鍵盤を一体の見立てにする。
 
-状態: **M0 整備 済み、M1（遊べる最小版）の着手前**（M0 で部品を層ごとに揃えた。製品画面は M1 から）。設計は `docs/design.md`、決定は `docs/decisions.md`、手順は `docs/planning/m1-kickoff.md`（M0 の記録は `docs/planning/m0-kickoff.md`、下調べは `docs/planning/research/`）。
+状態: **M1（遊べる最小版）の手順 1〜14 済み、出口は手元の確かめ待ち**（初回導線の秒・実機・音・Firefox と同梱曲の入門 9 曲。`docs/planning/m1-verification.md` §4）。設計は `docs/design.md`、決定は `docs/decisions.md`、手順は `docs/planning/m1-kickoff.md`（通し検証の記録は `docs/planning/m1-verification.md`、M0 の記録は `docs/planning/m0-kickoff.md`、下調べは `docs/planning/research/`）。
 
 ## 構成
 
