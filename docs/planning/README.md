@@ -6,6 +6,7 @@
 |---|---|---|
 | `report.md` | 考察レポート。§0〜§9 が R1、§10 が R2 と M0 の追記 | `report.md` |
 | `m0-kickoff.md` | M0 着手手順書（14 手順・累積 31 日、§1.5 末尾に「実際に取った手順」） | `ideas/R2/m0-kickoff.md` |
+| `m1-kickoff.md` | M1 着手手順書（14 手順・累積 24 日。起草 2026-10-31。§7 の重い 6 件は利用者が採用 → decisions #58〜#64、残りは着手時に裁定） | （リポジトリで起草。元のパス無し） |
 | `research/` | 下調べ 13 話題（出どころ付きの事実と事例）と地図 `map.md` | `research/` |
 | `ideas/main-ideas-R1.md` | 主担当の先出し案 | `ideas/main-ideas-R1.md` |
 | `ideas/R1/catalog.md` `plan.md` | 案 90 件の一覧と計画（比較表・箱分け・モック仕様・問い） | `ideas/R1/` |
