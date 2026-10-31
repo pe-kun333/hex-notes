@@ -4,9 +4,10 @@ import type { Plugin } from 'vite'
 import { defineConfig } from 'vitest/config'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// PWA の殻（docs/planning/m0-kickoff.md §1.4、ADR 0004）: 殻＋チュートリアル曲は precache、
-// 同梱曲と音源は cache-first。YouTube の規則は親ページが読む iframe_api にだけ効く（iframe 内は SW の外）。
-// COEP は足さない（M0-11 で可否を見る）。dev では SW を無効にする。
+// PWA の殻（docs/planning/m0-kickoff.md §1.4、ADR 0004）: 殻＋同梱曲（チュートリアル曲を含む）は precache、
+// 音源は cache-first（decisions #64、M1 の手順 13）。YouTube の規則は親ページが読む iframe_api にだけ効く（iframe 内は
+// SW の外）。COEP は足さない（decisions #57）。dev では SW を無効にする。登録は src/app/sw-register.ts が
+// virtual:pwa-register で行い、更新は S6 と S3 の「更新する」で適用する（prompt。S2 には出さない）。
 // content/ は public/ の外にあるので、ビルド時に dist/content/ へ写す（ADR 0003）。
 
 /** content/charts/**\/*.json（rights.json を除く）と content/samples/** を dist/content/ に写す。 */
@@ -54,22 +55,18 @@ export default defineConfig({
     copyContent(),
     VitePWA({
       registerType: 'prompt',
-      injectRegister: 'script-defer',
+      injectRegister: false,
       manifest: false,
       includeAssets: ['icons/*.svg', 'icons/*.png', 'manifest.webmanifest'],
       devOptions: { enabled: false },
       workbox: {
         globPatterns: [
           '**/*.{js,css,html,svg,png,webmanifest}',
-          // チュートリアル曲は precache（ADR 0003）。無いうちは glob の警告を避けるため足さない
-          ...(existsSync('content/charts/tutorial') ? ['content/charts/tutorial/**/*.json'] : []),
+          // 同梱曲は precache（decisions #64。copyContent は rights.json を写さないので譜面だけ）。無いうちは glob の
+          // 警告を避けるため足さない
+          ...(existsSync('content/charts') ? ['content/charts/**/*.json'] : []),
         ],
         runtimeCaching: [
-          {
-            urlPattern: /\/content\/charts\/.*\.json$/,
-            handler: 'CacheFirst',
-            options: { cacheName: 'charts' },
-          },
           {
             urlPattern: /\.(opus|mp3|ogg)$/,
             handler: 'CacheFirst',

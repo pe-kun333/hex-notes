@@ -12,6 +12,7 @@ import { resultScreen } from './app/screens/result.ts'
 import { settingsScreen } from './app/screens/settings.ts'
 import { startShell, type DevPage, type ScreenFactory, type Shell } from './app/shell.ts'
 import { BUNDLED_SONGS, FIXTURE_SONGS, type SongEntry } from './app/songs.ts'
+import { registerUpdates } from './app/sw-register.ts'
 import type { StorageFailure } from './storage/fallback.ts'
 import { openIdb } from './storage/idb.ts'
 
@@ -55,6 +56,9 @@ const booted = boot({
   iso: () => new Date().toISOString(),
 })
 
+// Service Worker（M1 の手順 13。殻＋同梱曲の precache と、S6・S3 の「更新する」）
+const updates = registerUpdates(() => shell?.updated())
+
 const host = document.getElementById('app')
 if (host === null) throw new Error('#app が無い')
 shell = startShell({
@@ -64,5 +68,6 @@ shell = startShell({
   screens: SCREENS,
   devPages: DEV_PAGES,
   songs: SONGS,
+  updates,
 })
 for (const f of early) shell.band({ kind: 'storageFail', area: f.area })

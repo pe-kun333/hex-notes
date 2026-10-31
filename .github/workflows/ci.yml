@@ -33,6 +33,8 @@ jobs:
         run: npm run build
       - name: 初回読込の大きさ（≤ 10 MB、decisions #10）
         run: npm run size
+      - name: precache の検査（同梱曲が全部 precache にある。decisions #64）
+        run: npm run pwa:check
       - name: 回帰ハーネスの差分表（M0-10。期待の表・今の表・差分表）
         if: always()
         uses: actions/upload-artifact@v7

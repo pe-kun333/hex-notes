@@ -8,6 +8,12 @@
       "port": 5173
     },
     {
+      "name": "hexnote-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview", "--", "--port", "4173", "--strictPort"],
+      "port": 4173
+    },
+    {
       "name": "coep-spike",
       "runtimeExecutable": "node",
       "runtimeArgs": ["spikes/coep-youtube/serve.ts", "--port", "5180"],
