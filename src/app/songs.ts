@@ -29,6 +29,9 @@ export const BUNDLED_SONGS: readonly SongEntry[] = [
   url: `/content/charts/${file}.json`,
 }))
 
+/** チュートリアル曲（S0d。手順 7 の鍵数制限の 3 段階、手順 9 の導線） */
+export const TUTORIAL_SONG_ID = 'bundled:tutorial/hajime'
+
 /** 手順 3 の曲: tests/fixtures/charts/m1/ の 6 曲（vite dev が配る。play-dev と同じ）。名前は譜面の name */
 export const FIXTURE_SONGS: readonly SongEntry[] = [
   ['twinkle', 'きらきら星'],
@@ -43,13 +46,19 @@ export const FIXTURE_SONGS: readonly SongEntry[] = [
   url: `/tests/fixtures/charts/m1/${id}.hexnote.json`,
 }))
 
-/** 譜面にその版があればそれ、無ければ作る（持ち込み曲は M2-01 で全部の版を作るので、ここは足りない版の埋め合わせ） */
+/**
+ * 譜面にその版があればそれ。譜面が版を持つのにその配列の版が 1 つも無ければ（チュートリアル曲は Ableton 型の 1 版だけ、
+ * §1.3 S0d「常に Ableton 型」）作らずに譜面の最初の版、他は作る（持ち込み曲は M2-01 で全部の版を作るので、ここは足りない
+ * 版の埋め合わせ）。端末に合う版の自動選択は手順 8（m1-kickoff §7-10）
+ */
 export function variantFor(chart: Chart, spec: VariantSpec): Variant {
-  const hit = chart.variants?.find(
-    (v) => v.layout === spec.layout && v.limit === spec.limit && v.fold === spec.fold,
-  )
-  return hit ?? buildVariant(chart, spec)
-}
+  const vs = chart.variants ?? []
+  const hit = vs.find((v) => v.layout === spec.layout && v.limit === spec.limit && v.fold === spec.fold)
+  if (hit !== undefined) return hit
+  const first = vs[0]
+  if (first !== undefined && !vs.some((v) => v.layout === spec.layout)) return first
+  return buildVariant(chart, spec)
+} // prettier-ignore
 
 /** 読んだ JSON → 演奏する曲。譜面として通らなければ最初の問題の文（画面に出す） */
 export function songOf(json: unknown, spec: VariantSpec): RunSong | string {

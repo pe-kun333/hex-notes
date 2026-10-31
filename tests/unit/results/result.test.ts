@@ -148,6 +148,7 @@ function play(over: Partial<FinishedPlay> = {}, judgeOver = {}): FinishedPlay {
     audioLateMaxMs: 0,
     samples: new Array<number>(108).fill(0),
     offsetUsed: -6,
+    keyset: 'all',
     calibEligible: true,
     weak: { from: 17, to: 18, misses: 5 },
     chords: { hit: 14, total: 18 },

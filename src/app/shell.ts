@@ -4,6 +4,7 @@
 // （状態 → 描く）。状態は startShell の閉包に持つ（グローバルに置かない）。試験の外（DOM）なので手で確かめる（M1 の手順 14）。
 
 import { createAudioOut, type AudioOut } from '../audio/context.ts'
+import type { KeysetId } from '../chart/keyset.ts'
 import type { InputEvent } from '../input/keyboard.ts'
 import type { SyncKind } from '../shared/types.ts'
 import {
@@ -50,9 +51,11 @@ export interface ScreenContext {
   readonly devPages: readonly DevPage[]
   /** 選べる曲（手順 3 は dev のフィクスチャ 6 曲。同梱曲は手順 6・8） */
   readonly songs: readonly SongEntry[]
-  /** 選んだ曲（S1 で選び S2 が読む。S3 の「もう一度」も同じ曲） */
+  /** 選んだ曲（S1 で選び S2 が読む。S3 の「もう一度」も同じ曲・同じ鍵数制限） */
   song(): SongEntry | null
-  pickSong(s: SongEntry): void
+  /** 選んだ鍵数制限（既定 all。S0d の段階 1・2 は d・dfjk、手順 7・9） */
+  keyset(): KeysetId
+  pickSong(s: SongEntry, keyset?: KeysetId): void
   /** 終わった回（S2 が書き S3 が読む。中身の画面は手順 5） */
   lastPlay(): FinishedPlay | null
   setLastPlay(r: FinishedPlay): void
@@ -136,6 +139,7 @@ export function startShell(opts: ShellOptions): Shell {
   const settings = booted.settings
   let view: ScreenView | null = null
   let song: SongEntry | null = null
+  let keyset: KeysetId = 'all'
   let lastPlay: FinishedPlay | null = null
   let proposalOpen = false
   let audio: AudioOut | null = null
@@ -183,8 +187,10 @@ export function startShell(opts: ShellOptions): Shell {
     devPages: opts.devPages ?? [],
     songs: opts.songs ?? [],
     song: () => song,
-    pickSong: (s) => {
+    keyset: () => keyset,
+    pickSong: (s, k = 'all') => {
       song = s
+      keyset = k
     },
     lastPlay: () => lastPlay,
     setLastPlay: (r) => {

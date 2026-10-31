@@ -167,6 +167,7 @@ describe('プレイ後の提案（段 2、#40 (c)・#62）', () => {
     audioLateMaxMs: null,
     samples: [],
     offsetUsed: 0,
+    keyset: 'all',
     calibEligible: true,
     weak: null,
     chords: { hit: 0, total: 0 },

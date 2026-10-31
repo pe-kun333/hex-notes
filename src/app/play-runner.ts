@@ -18,6 +18,7 @@ import {
   type SoundItem,
   type SoundOptions,
 } from '../audio/scheduler.ts'
+import { filterKeyset, type KeysetId } from '../chart/keyset.ts'
 import type { AudioBridge } from '../clock/audio-bridge.ts'
 import type { ClockMap } from '../clock/types.ts'
 import type { KeyCode } from '../shared/types.ts'
@@ -89,6 +90,8 @@ export interface RunOptions {
   readonly sound: SoundOptions
   /** 誤打の打鍵音（S6「空打ち発音」。decisions #48） */
   readonly keyclick: boolean
+  /** 鍵数制限（実行時フィルタ、src/chart/keyset.ts。無ければ all。S0d の段階 1・2 と M2-07） */
+  readonly keyset?: KeysetId
 }
 
 export interface Run {
@@ -126,8 +129,10 @@ export interface RunStep {
 
 /** 待機の回（Space を待つ）。ノート・発音の列はここで 1 回作る */
 export function newRun(song: RunSong, opts: RunOptions): Run {
-  const notes = frameNotes(song.chart, song.variant)
-  const endMs = endAtMs(notes)
+  const all = frameNotes(song.chart, song.variant)
+  // 鍵数制限で外した音は判定にも描画にも出さない。終わりと進行は曲全体（ガイド音は外さないので最後まで鳴る）
+  const notes = [...filterKeyset(all, opts.keyset ?? 'all')]
+  const endMs = endAtMs(all)
   return {
     song,
     opts,
@@ -290,7 +295,9 @@ export interface PlayResult {
   readonly samples: readonly number[]
   /** この回に使った校正のオフセット ms */
   readonly offsetUsed: number
-  /** 校正 段 2 の母集団に入れるか（固定テンポ・1.0 倍・全鍵の通常プレイ。§2.7。M1 の S2 は常に真、鍵数制限は手順 7） */
+  /** 鍵数制限（all でなければ練習記録: 自己ベスト・完走・校正 段 2 の母集団に入らない。§2.3・§2.7） */
+  readonly keyset: KeysetId
+  /** 校正 段 2 の母集団に入れるか（固定テンポ・1.0 倍・全鍵の通常プレイ。§2.7。M1 の S2 は全鍵の回だけ真） */
   readonly calibEligible: boolean
   /** 苦手区間（miss が最も多い連続 2 小節。miss が無ければ null） */
   readonly weak: WeakBars | null
@@ -317,7 +324,8 @@ export function runOutcome(r: Run): PlayResult {
     audioLateMaxMs: r.items.length === 0 ? null : r.sched.lateMaxMs,
     samples: timingSamples(r.judge),
     offsetUsed: r.opts.rules.offsetMs,
-    calibEligible: true,
+    keyset: r.opts.keyset ?? 'all',
+    calibEligible: (r.opts.keyset ?? 'all') === 'all',
     weak: weakBars(r.song.chart.pulse, notes),
     chords: chordRate(notes),
   }
@@ -329,7 +337,7 @@ export interface FinishedPlay extends PlayResult {
 }
 
 /**
- * 終わった回と記録。M1 の S2 は動画なし（clock novideo・syncUsed audio）・固定テンポ・1.0 倍・全鍵（鍵数制限は手順 7）。
+ * 終わった回と記録。M1 の S2 は動画なし（clock novideo・syncUsed audio）・固定テンポ・1.0 倍。鍵数制限は RunOptions.keyset。
  * id と at は呼ぶ側（crypto.randomUUID と Date）
  */
 export function finishedPlay(
@@ -346,7 +354,7 @@ export function finishedPlay(
       clock: 'novideo',
       mode: 'fixed',
       rate: 1,
-      keyset: 'all',
+      keyset: o.keyset,
       at: meta.at,
       syncUsed: { kind: 'audio' },
       offsetUsed: o.offsetUsed,
