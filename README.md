@@ -2,7 +2,7 @@
 
 六角セルの音符が上から流れ、PC キーボードを鍵盤に見立てて押す音ゲー。PC キーボードの千鳥配列（段ずれ 1/2・1/4・1/2 キー）を六角格子として扱い、六角セルの音符と鍵盤を一体の見立てにする。
 
-状態: **M1（遊べる最小版）の手順 1〜14 済み（main）、出口は手元の確かめ待ち**（初回導線の秒・実機・音・Firefox と同梱曲の入門 9 曲。`docs/planning/m1-verification.md` §4）。**M2（持ち込みと練習）の着手手順書を起草**（`docs/planning/m2-kickoff.md`、10 手順・累積 28 日。§7 の提案の採否待ち）。設計は `docs/design.md`、決定は `docs/decisions.md`、手順は `docs/planning/m2-kickoff.md`（M1 の記録は `docs/planning/m1-kickoff.md` と `docs/planning/m1-verification.md`、M0 の記録は `docs/planning/m0-kickoff.md`、下調べは `docs/planning/research/`）。
+状態: **M1（遊べる最小版）の手順 1〜14 済み（main）、出口は手元の確かめ待ち**（初回導線の秒・実機・音・Firefox と同梱曲の入門 9 曲。`docs/planning/m1-verification.md` §4）。**M2（持ち込みと練習）の着手手順書を起草**（`docs/planning/m2-kickoff.md`、10 手順・累積 28 日。§7 の重い 5 件は利用者が採用 → decisions #78〜#82）。設計は `docs/design.md`、決定は `docs/decisions.md`、手順は `docs/planning/m2-kickoff.md`（M1 の記録は `docs/planning/m1-kickoff.md` と `docs/planning/m1-verification.md`、M0 の記録は `docs/planning/m0-kickoff.md`、下調べは `docs/planning/research/`）。
 
 ## 構成
 
