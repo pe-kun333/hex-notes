@@ -9,7 +9,7 @@
 ## 決定
 
 - (b)。`content/` はリポジトリ直下のまま。`vite.config.ts` の自前プラグイン `copyContent`（数十行、依存なし）が `closeBundle` で `content/charts/**/*.json`（`rights.json` を除く）と `content/samples/**`（LICENSE・ATTRIBUTION.md・manifest.json を含む）を `dist/content/` に写す。vite-plugin-pwa の `closeBundle` より先に走るので、precache の glob が写した後の `dist/` を見る。
-- precache は殻＋チュートリアル曲（`content/charts/tutorial/**/*.json`）。他の曲と音源は runtime cache-first（§1.4）。
+- precache は殻＋チュートリアル曲（`content/charts/tutorial/**/*.json`）。他の曲と音源は runtime cache-first（§1.4）。→ 2026-10-31 decisions #64 で同梱曲全部（10 曲）を precache に改めた（ADR 0004 の改訂。runtime は音源だけ。初回読込の数え方 #49 は不変）。
 - LICENSE の置き方: ルートの `LICENSE`（MIT）が `src/`・`tools/`・`tests/`・`docs/`・ビルド設定を覆う。`content/charts/` は `RIGHTS.md` と `rights.json`（曲ごと）、`content/samples/<音源>/` は各 `LICENSE` と `ATTRIBUTION.md`。REUSE（SPDX ヘッダ）は採らない。
 - tools（`charts:validate`・`charts:rights`）の既定パスは `content/charts` のまま。
 
