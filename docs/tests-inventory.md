@@ -122,6 +122,14 @@
 | 10 | 伴奏付きで鳴る | 開発ページ audio.html で canon（旋律＋ベース） | 合成音と Salamander（合成した 30 音の Opus を 30/30 復号）で予約・一時停止・−5 秒 | 設計 §5.1 M0-08 | 確認済（2026-10-31、browser pane は隠れていて耳では聞いていない。実物の Salamander は配置の後） |
 | 11 | 上限の丸め | '7' | 4（2..4 に丸める） | m1' L269（2..6 を直す）、決定 #7 | 未検算 |
 | 11 | 保存の失敗 | setItem が例外 | storageFail 1 回、処理は続く | 設計 §4.1、§4.3 | 未検算 |
+| 12 | 逐次の SD `welfordSd` | [1,2,3,4]、乱数の列 50 本、1 つ・空 | 1.2909944（m3 の sd・welford・判定層の sampleSd と同じ）、m3 と同じ平均と SD、null（m3 の welford は NaN） | kickoff 手順 12 の期待値、m3 mean／sd L247–248・welford L404（行番号で切り出して照合） | 検算済（tests/unit/telemetry/telemetry.test.ts） |
+| 12 | リング `pushRing` | 1,001 行、size 3・1・0、保存層の memoryDb と並べて 1,001 行 | 先頭が消え 1,000 行、元を変えない・最後の 1 つ・RangeError、同じ行が残る | kickoff 手順 12 の期待値、decisions #51・#54（仮） | 検算済（tests/unit/telemetry/telemetry.test.ts） |
+| 12 | 時計の集計 `collectClock` | 理由ごとの resync、novideo 2 回、grace・held・locked の dev、ダミー動画（15 ms 切り捨て・60 fps）で飛び 1 回＋2 秒の凍結 | jump・unheld・adEnd だけ数える、最初の t（曲の ms は軸で写す）、locked の dev だけ、再同期 1・切替あり・残差 SD 3.5〜5 | decisions #32 (f)・#54（仮）、tests/unit/clock/clock-source.test.ts の同じ走り | 検算済（tests/unit/telemetry/telemetry.test.ts） |
+| 12 | フレーム間隔 `collectFrame` | 60 fps ちょうど、乱数の間隔 40 本、16 ms×95＋40 ms×5・94＋6、100 ms 以上・1,000 ms 超・戻る時刻、1 フレームだけ | SD ≈ 0・p95 16.67、低負荷の p95（生の値）以上で差 1 ms 未満、17・40、見た最大・入れない、null | design.md §6.3 M-7、src/render/canvas/lowload.ts の p95、decisions #29・#54（仮） | 検算済（tests/unit/telemetry/telemetry.test.ts） |
+| 12 | 押下と play 行 `collectPress`・`playRow` | lag 3・null・8・1・null・20、動画ありの回の行 | 中央値 5.5・押下 6・標本なし 2、§4.6 の項目が揃い videoId を含まない・hist は写し | design.md §4.6、decisions #25・#47・#54（仮） | 検算済（tests/unit/telemetry/telemetry.test.ts） |
+| 12 | 他の行 `uaClass`・`deviceRow`・`calibRow` ほか | UA 13 本（Claude アプリの Chromium を含む）、tsResolution 0.1・0・無し、段 1・段 2 の判定（通る・数が足りない） | ブラウザ/OS の大分類、正の数だけ書く、applied は通ったときだけ・proposed と reason | design.md §4.6、decisions #40・#55（仮） | 検算済（tests/unit/telemetry/telemetry.test.ts） |
+| 12 | 書き出し `telemetryFileText` | 3 行・空・1,005 行 | JSON で読み戻すと同じ・1 行に 1 つ、空でも読める、新しい 1,000 行・名前は日付 | design.md §4.6、decisions #55（仮） | 検算済（tests/unit/telemetry/telemetry.test.ts） |
+| 12 | 行が貯まる（完了条件） | play-dev で 2 曲、telemetry.html | device 1・play 2・calib 2 が IndexedDB に貯まり並ぶ | §5.1 M0-12 | 2026-10-31 browser pane で確かめた（1 曲目は pane が隠れていたのでフレーム間隔は null） |
 | 12 | 統計 `sd` | [1, 2, 3, 4] | 1.2909944 | m3 `sd` L248 | 未検算 |
 | 12 | リング `ring` | 1,001 行目 | 先頭が消える（1,000 行） | 設計 §4.3、手順書 手順 12 | 未検算 |
 | 13 | ハーネス `run` | 同じ種（mulberry32） | 差分 0 | m3 `mulberry32` L244、`gauss` L245 | 未検算 |

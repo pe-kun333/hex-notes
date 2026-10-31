@@ -199,7 +199,7 @@ Canvas 2D・rAF 1 本（PixiJS 8 MIT は 300 セル超で 60 fps を割ったら
 
 ### 4.6 計測の仕組み
 
-初版は送信しない。計測層が `telemetry` に貯め、S6 の計測盤で見て JSON で書き出す。送信は M4 の後、同意制・匿名、動画 ID と視聴時間は送らない。行: play（chartId、variantId、profile、clock、mode、UR、早遅ヒストグラム、精度、NEAR 率、再同期回数、動画なし切替、入力遅延中央値（押下の now − timeStamp の中央値。OS かブラウザが時刻を付けてからハンドラまでで、中身は OS とブラウザで違う。標本が無ければ null。decisions #25）、フレーム間隔 SD、時計残差 SD、発音の予約の遅れの最大 audioLateMaxMs〔音を予約しない回は null。decisions #47〕）、calib（SD、採否、提案値）、onboard／quit（段ごとの到達・秒・離脱、止めた位置）、device（UA 大分類、画面 px、拡大率、上限、getLayoutMap 可否、timeStamp の刻み tsResolution）、storageFail、embedError。
+初版は送信しない。計測層が `telemetry` に貯め、S6 の計測盤で見て JSON で書き出す。送信は M4 の後、同意制・匿名、動画 ID と視聴時間は送らない。行: play（chartId、variantId、profile、clock、mode、UR、早遅ヒストグラム、精度、NEAR 率、再同期回数、動画なし切替、入力遅延中央値（押下の now − timeStamp の中央値。OS かブラウザが時刻を付けてからハンドラまでで、中身は OS とブラウザで違う。標本が無ければ null。decisions #25）、フレーム間隔 SD、時計残差 SD、発音の予約の遅れの最大 audioLateMaxMs〔音を予約しない回は null。decisions #47〕）、calib（SD、採否、提案値）、onboard／quit（段ごとの到達・秒・離脱、止めた位置）、device（UA 大分類、画面 px、拡大率、上限、getLayoutMap 可否、timeStamp の刻み tsResolution）、storageFail、embedError。細部（decisions #54・#55、2026-10-31、仮。実装 src/telemetry/）: play 行には M-2・M-7 のため演奏の押下の数 pressCount・遅延の標本にならなかった数 pressNoLag・rAF 間隔の 95 パーセンタイル frameIntervalP95 を足し、UR・フレーム間隔 SD・p95 は標本が足りなければ null。フレーム間隔は 1,000 ms 超を途切れとして除く。calib 行は段（tap／propose）・標本の数・満たさなかった理由を持つ。UA は「ブラウザ/OS」の大分類で版を持たない。行の時刻は Date の ISO 8601。書き出しは hexnote-telemetry/1（新しい 1,000 行まで、取り込まない）。
 
 ## 5. 作業表
 

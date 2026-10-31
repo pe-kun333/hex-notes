@@ -244,8 +244,8 @@ export interface PlayTelemetry extends TelemetryBase {
   profile: Profile
   clock: ClockKind
   mode: PlayMode
-  /** Unstable Rate（判定ずれの SD ×10） */
-  ur: number
+  /** Unstable Rate（判定ずれの SD ×10）。正しい鍵で当てた音が 2 つ未満なら null（decisions #54） */
+  ur: number | null
   /** 早遅ヒストグラム（ms の階級 → 件数） */
   hist: Record<string, number>
   acc: number
@@ -254,7 +254,15 @@ export interface PlayTelemetry extends TelemetryBase {
   fallback: boolean
   /** 押下の now − timeStamp の中央値（ms）。標本が無ければ null（decisions #25） */
   inputLatencyMedian: number | null
-  frameIntervalSd: number
+  /** 演奏の押下の数と、そのうち入力遅延の標本にならなかった（timeStamp が使えない・古い）数（decisions #54） */
+  pressCount: number
+  pressNoLag: number
+  /**
+   * rAF のフレーム間隔の標本 SD（n − 1）と 95 パーセンタイル（最近接順位、1 ms の階級の上端で見た最大を超えない。M-7）。1,000 ms を超える間隔は
+   * 途切れとして入れない。標本が足りなければ null（decisions #54）
+   */
+  frameIntervalSd: number | null
+  frameIntervalP95: number | null
   /**
    * 時計の残差（locked の tick の dev の標本標準偏差、n − 1。ms）。動画なしで始めた回など標本が 2 つ未満なら null
    * （decisions #32 (f)）
@@ -267,11 +275,20 @@ export interface PlayTelemetry extends TelemetryBase {
   audioLateMaxMs: number | null
 }
 
+/** 校正の行（段 1 ＝ tap、段 2 ＝ propose。decisions #40・#54） */
 export interface CalibTelemetry extends TelemetryBase {
   kind: 'calib'
-  sd: number
+  stage: 'tap' | 'propose'
+  /** 標本の数（段 1 は打った数、段 2 は正しい鍵で当てた数） */
+  n: number
+  /** 標本 SD（2 つ未満なら null） */
+  sd: number | null
+  /** 適用した（段 1 は条件を満たして入れた、段 2 は利用者が提案を受けた） */
   applied: boolean
-  proposed: number
+  /** 条件を満たしたときのオフセット（ms）。満たさなければ null */
+  proposed: number | null
+  /** 満たさなかった理由（src/judge/calibration-offset.ts の OffsetVerdict） */
+  reason?: 'count' | 'sd' | 'small'
 }
 
 export interface OnboardTelemetry extends TelemetryBase {

@@ -7,6 +7,8 @@
 // decisions #38〜#40）。「位置で読めるか」の記録（readability.ts、±300 ms の対応付け）は判定と別に、再生中で猶予の
 // 終わり以後の押下だけ取る（ADR 0006 の確認を他の端末でもやり直せるように残す）。performance.now の直呼びは src/app/
 // だけ（src/README.md）。
+// 計測（手順 12、src/telemetry/）: 時計の出力・rAF・演奏の押下を集め、曲の終わりに play 行と calib 行（段 2 の提案、受けて
+// いない）を IndexedDB の telemetry に足す。開いたときに device 行を 1 つ足す。行は開発ページ telemetry.html で見る。
 
 import { buildVariant } from '../../chart/variants.ts'
 import { songAt } from '../../clock/map.ts'
@@ -52,6 +54,18 @@ import { regionsOf } from '../../render/canvas/primitives.ts'
 import { buildKeyboardGrid, type KeyboardGrid } from '../../render/hex/grid.ts'
 import type { LandingMode } from '../../render/hex/landing.ts'
 import { TRAVEL_MS, computeSizing, sizeForViewport, type Sizing } from '../../render/hex/sizing.ts'
+import { openIdb } from '../../storage/idb.ts'
+import { resilientDb, safeStorage, storageFailRow } from '../../storage/fallback.ts'
+import { loadDevice } from '../../storage/local.ts'
+import {
+  collectClock,
+  collectFrame,
+  collectPress,
+  initialCollect,
+  playRow,
+  type PlayCollect,
+} from '../../telemetry/collect.ts'
+import { calibRow, deviceRow } from '../../telemetry/rows.ts'
 import { attachKeyboard } from './dom-input.ts'
 import { matchPress, summarize, type NoteOutcome, type ReadabilitySummary } from './readability.ts'
 
@@ -77,6 +91,8 @@ function stressChart(): Pick<Chart, 'name' | 'notes' | 'pulse'> {
 
 type Loaded = {
   name: string
+  /** 計測の chartId（負荷譜面は id が無いので dev:stress） */
+  chartId: string
   chart: Pick<Chart, 'notes' | 'pulse'>
   variants: Map<LayoutId, Variant>
 }
@@ -87,7 +103,7 @@ async function loadSong(id: SongId): Promise<Loaded> {
     const variants = new Map<LayoutId, Variant>()
     for (const layout of ['ableton', 'vmpk'] as const)
       variants.set(layout, buildVariant(c, { layout, limit: 2, fold: 'octave' }))
-    return { name: c.name, chart: c, variants }
+    return { name: c.name, chartId: 'dev:stress', chart: c, variants }
   }
   const res = await fetch(`/tests/fixtures/charts/m1/${id}.hexnote.json`)
   if (!res.ok) throw new Error(`play-dev: ${id} が読めない（${res.status}）`)
@@ -95,7 +111,7 @@ async function loadSong(id: SongId): Promise<Loaded> {
   const variants = new Map<LayoutId, Variant>()
   for (const v of chart.variants ?? [])
     if (v.limit === 2 && v.fold === 'octave') variants.set(v.layout, v)
-  return { name: chart.name, chart, variants }
+  return { name: chart.name, chartId: chart.id, chart, variants }
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -154,6 +170,8 @@ type Run = {
   endMs: number
   profile: Profile
   offsetMs: number
+  /** 計測（時計の出力・rAF・演奏の押下） */
+  collect: PlayCollect
 }
 
 function main(): void {
@@ -282,6 +300,38 @@ function main(): void {
     out,
   )
 
+  // 計測の置き場（失敗したらメモリ内で続け、storageFail の行も足す。保存層 decisions #50）
+  const db = resilientDb(
+    () => openIdb(globalThis.indexedDB),
+    (f) => void db.appendTelemetry(storageFailRow(f, new Date().toISOString())),
+  )
+  const local = safeStorage(
+    'local',
+    () => window.localStorage,
+    (f) => {
+      void db.appendTelemetry(storageFailRow(f, new Date().toISOString()))
+    },
+  )
+  {
+    const kb = (navigator as Navigator & { keyboard?: { getLayoutMap?: unknown } }).keyboard
+    const at = new Date().toISOString()
+    void db.appendTelemetry(
+      deviceRow(
+        {
+          ua: navigator.userAgent,
+          screenPx: [screen.width, screen.height],
+          dpr: window.devicePixelRatio || 1,
+          device: loadDevice(local) ?? {
+            limit: 2,
+            at,
+            layoutMapOk: typeof kb?.getLayoutMap === 'function',
+          },
+        },
+        at,
+      ),
+    )
+  }
+
   let loaded: Loaded | null = null
   let sizing: Sizing | null = null
   let grid: KeyboardGrid | null = null
@@ -393,6 +443,7 @@ function main(): void {
     r.session = step.session
     r.map = step.out.map
     r.t = step.out.t
+    r.collect = collectClock(r.collect, step.out)
     for (const ev of step.out.events) if (ev.kind === 'resync') r.graceUntil = ev.graceUntil
     const j = judgeClock(r.judge, step.out.events, { map: step.out.map, now: realNow })
     r.judge = j.state
@@ -445,6 +496,7 @@ function main(): void {
       endMs: endAtMs(notesTemplate),
       profile,
       offsetMs,
+      collect: initialCollect(),
     }
     run = r
     effects = []
@@ -482,6 +534,30 @@ function main(): void {
         ? `終わりました。校正の提案: ${rec.proposal.offset} ms（平均 ${Math.round(rec.proposal.mean)} ms）。Space でもう一度`
         : '終わりました。表の「読めた」を付けてください。Space でもう一度',
     )
+    // 計測: play 行と calib 行（段 2 の提案。play-dev では受けない）。動画なし・固定テンポ・全鍵
+    const at = new Date().toISOString()
+    const variant = loaded.variants.get(rec.layout)
+    const play = playRow(
+      r.collect,
+      {
+        chartId: loaded.chartId,
+        variantId: variant?.id ?? `${rec.layout}/2/octave`,
+        profile: r.profile,
+        clock: 'novideo',
+        mode: 'fixed',
+      },
+      rec.judge,
+      null,
+      at,
+    )
+    const calib = calibRow('propose', rec.proposal, timingSamples(r.judge).length, false, at)
+    void Promise.all([db.appendTelemetry(play), db.appendTelemetry(calib)]).then(async () => {
+      const mode = await db.mode()
+      info.textContent =
+        `計測: play 行と calib 行を足した（${mode}）。入力遅延の中央値 ${fmt(play.inputLatencyMedian, ' ms')}・` +
+        `フレーム間隔 SD ${play.frameIntervalSd?.toFixed(2) ?? '—'} ms・p95 ${play.frameIntervalP95?.toFixed(1) ?? '—'} ms・` +
+        `押下 ${play.pressCount}（遅延の標本なし ${play.pressNoLag}）`
+    })
   }
 
   const fmt = (x: number | null, unit = ''): string =>
@@ -573,7 +649,7 @@ function main(): void {
     effects = [...effects, fx]
   }
 
-  const onPress = (code: KeyCode, tsPerf: number): void => {
+  const onPress = (code: KeyCode, tsPerf: number, lag: number | null): void => {
     if (!run) return
     // 押下の前に今の相へ進める（猶予の終わりを次のフレームまで待たない）
     const realNow = performance.now()
@@ -589,6 +665,7 @@ function main(): void {
     }
     // 判定: 再生・同期中の押下を判定層へ（同期中の猶予は溜めて猶予の終わりに判定、時計が止まった広告中は空打ち）
     if (phase !== 'playing' && phase !== 'syncing') return
+    r.collect = collectPress(r.collect, lag)
     const j = judgePress(r.judge, { code, tsPerf }, { map: r.map, now: realNow })
     r.judge = j.state
     applyJudge(r, j.out, realNow)
@@ -605,7 +682,7 @@ function main(): void {
 
   const onEvents = (events: InputEvent[]): void => {
     for (const ev of events) {
-      if (ev.kind === 'press') onPress(ev.code, ev.tsPerf)
+      if (ev.kind === 'press') onPress(ev.code, ev.tsPerf, ev.lag)
       else if (ev.kind === 'release') onRelease(ev.code, ev.tsPerf, ev.forced)
       else if (ev.kind === 'role' && ev.role === 'primary') {
         if (!run) startRun()
@@ -663,6 +740,7 @@ function main(): void {
     const now = performance.now()
     if (run) {
       const r = run
+      r.collect = collectFrame(r.collect, ts)
       applyStep(r, sessionTick(r.session, now, null), now)
       const j = judgeSweep(r.judge, { map: r.map, now })
       r.judge = j.state

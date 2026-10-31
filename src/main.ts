@@ -5,11 +5,12 @@
 if (import.meta.env.DEV) {
   const DEV_PAGES: readonly { href: string; label: string }[] = [
     { href: '/src/app/dev/input.html', label: '入力層（手順 5）' },
-    { href: '/src/app/dev/play.html', label: '描画層・判定層（手順 6・7・8）' },
+    { href: '/src/app/dev/play.html', label: '描画層・判定層・計測（手順 6・7・8・12）' },
     { href: '/src/app/dev/clock.html', label: '時計層（手順 7）' },
     { href: '/src/app/dev/layout.html', label: '配列層（手順 9、U-01 の記録）' },
     { href: '/src/app/dev/audio.html', label: '音源層（手順 10）' },
     { href: '/src/app/dev/storage.html', label: '保存層（手順 11）' },
+    { href: '/src/app/dev/telemetry.html', label: '計測層（手順 12）' },
   ]
   const app = document.getElementById('app')
   if (app !== null) {

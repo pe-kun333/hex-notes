@@ -15,7 +15,7 @@
 | `judge/`         | 判定・採点層（窓・NEAR・ホールド・精度・自力率・校正のオフセット）                         | 手順 8    |
 | `audio/`         | 音源層（予約、合成音、メトロノーム、打鍵音、Salamander の遅延読込）                        | 手順 10   |
 | `storage/`       | 保存層（localStorage の記録、IndexedDB、失敗時のメモリ内続行、旧鍵の移行、*.hexnote.json） | 手順 11   |
-| `telemetry/`     | 計測層                                                                                     | 手順 12   |
+| `telemetry/`     | 計測層（play 行の集め方、他の行、リング、書き出し）                                        | 手順 12   |
 | `sw/`            | Service Worker（vite-plugin-pwa が生成。自前にするときはここ）                             | 手順 1    |
 | `app/dev/`       | 開発ページ（手順ごとの確認用。製品画面ではない）                                           | 手順 5〜  |
 
