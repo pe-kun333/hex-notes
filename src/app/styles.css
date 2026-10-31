@@ -216,6 +216,8 @@ a {
 .play .bands {
   flex: 1 1 auto;
   min-height: 0;
+  /* 列を左列の幅に収める（auto の列は 1 行に詰めた帯の中身の幅まで広がる） */
+  grid-template-columns: minmax(0, 1fr);
   overflow: auto;
   align-content: start;
   margin: 0;
