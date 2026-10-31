@@ -34,7 +34,7 @@ import type { Booted } from './boot.ts'
 import { attachKeyboard } from './dom-input.ts'
 import type { FinishedPlay } from './play-runner.ts'
 import { navigate, type Route, type ScreenId } from './router.ts'
-import { localSong, type SongEntry } from './songs.ts'
+import { songList, type SongEntry } from './songs.ts'
 import { INITIAL_UPDATE, type UpdateState } from './sw-update.ts'
 
 /** 開発ページへの導線（dev のときだけ S1 に出す。build では空） */
@@ -270,13 +270,7 @@ export function startShell(opts: ShellOptions): Shell {
     go: (to) => go(to),
     band,
     devPages: opts.devPages ?? [],
-    songs: async () => {
-      const local = await booted.db.listCharts().catch(() => [])
-      const named = [...local].sort(
-        (a, b) => a.name.localeCompare(b.name, 'ja') || a.id.localeCompare(b.id),
-      )
-      return [...(opts.songs ?? []), ...named.map(localSong)]
-    },
+    songs: async () => songList(opts.songs ?? [], await booted.db.listCharts().catch(() => [])),
     song: () => song,
     keyset: () => keyset,
     variantSpec: () => spec,

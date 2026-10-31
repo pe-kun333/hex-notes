@@ -682,6 +682,27 @@ button.song.sel {
   gap: 4px;
 }
 
+/* S6 の持ち込み曲（M2-06。曲名・版の行は長いので折り返し、釦は行の後ろ） */
+.group h3 {
+  margin: 12px 0 4px;
+  font-size: 15px;
+}
+
+ul.library {
+  margin: 4px 0;
+  padding-left: 1.2em;
+}
+
+ul.library li {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+
+ul.library li > button,
+ul.library li > .confirm {
+  margin-left: 6px;
+}
+
 details.dev {
   margin-top: 24px;
   color: var(--muted);
@@ -690,6 +711,13 @@ details.dev {
 /* S5 曲の持ち込み（m6 .stage5・.grid3・m5 のドロップ領域。M2 の手順 2） */
 .import-entry {
   margin-left: auto;
+}
+
+/* S1 の絞り込み（M2-06。見出しと釦を 1 つの塊に） */
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .drop.over {
