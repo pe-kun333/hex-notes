@@ -14,6 +14,7 @@ import {
   offsetFor,
   parseCalibration,
   parseDevice,
+  parseAudio,
   parseFade,
   parseLimit,
   parseSettings,
@@ -96,7 +97,7 @@ describe('設定 hexnote.settings（v:1）', () => {
       expect(parseSettings(raw)).toEqual(defaultSettings())
   })
 
-  it('既定値（profile beginner・ableton・octave・刻印 auto・正六角・ANSI の段ずれ・ラベル キー/キー）', () => {
+  it('既定値（profile beginner・ableton・octave・刻印 auto・正六角・ANSI の段ずれ・ラベル 鍵盤側 key／ノート側 both〔#60〕・M1 の項目〔#58〕）', () => {
     expect(defaultSettings()).toEqual({
       v: 1,
       profile: 'beginner',
@@ -106,8 +107,70 @@ describe('設定 hexnote.settings（v:1）', () => {
       geometry: 'regular',
       stagger: DEFAULT_STAGGER,
       staggers: [],
-      labels: { kb: 'key', note: 'key' },
+      labels: { kb: 'key', note: 'both' },
+      hints: true,
+      landing: 'cell',
+      audio: { guide: true, metronome: false, keyclick: true, accompVolume: 1 },
+      fx: { budget: 'standard', lowload: 'auto' },
+      imeStop: false,
     })
+  })
+
+  it('M1 の項目（hints・landing・audio・fx・imeStop）が無い M0 の JSON は既定値で読め、版は 1 のまま', () => {
+    const m0 = {
+      v: 1,
+      profile: 'beginner',
+      layout: 'vmpk',
+      fold: 'octave',
+      legend: 'jis',
+      geometry: 'regular',
+      stagger: [0.5, 0.25, 0.5],
+      staggers: [],
+      labels: { kb: 'note', note: 'none' },
+    }
+    const s = parseSettings(m0)
+    expect(s.v).toBe(1)
+    expect(s.layout).toBe('vmpk')
+    expect(s.labels).toEqual({ kb: 'note', note: 'none' })
+    expect(s.hints).toBe(true)
+    expect(s.landing).toBe('cell')
+    expect(s.audio).toEqual({ guide: true, metronome: false, keyclick: true, accompVolume: 1 })
+    expect(s.fx).toEqual({ budget: 'standard', lowload: 'auto' })
+    expect(s.imeStop).toBe(false)
+  })
+
+  it('M1 の項目は項目ごとに検査し、悪い物（文字の真偽・範囲外・知らない値）だけ既定値', () => {
+    const s = parseSettings({
+      v: 1,
+      hints: 'yes',
+      landing: 'line',
+      audio: { guide: false, metronome: 1, keyclick: true, accompVolume: 1.5 },
+      fx: { budget: 'none', lowload: 'sometimes' },
+      imeStop: true,
+    })
+    expect(s.hints).toBe(true)
+    expect(s.landing).toBe('line')
+    expect(s.audio).toEqual({ guide: false, metronome: false, keyclick: true, accompVolume: 1 })
+    expect(s.fx).toEqual({ budget: 'none', lowload: 'auto' })
+    expect(s.imeStop).toBe(true)
+    expect(parseSettings({ v: 1, audio: 'loud', fx: [], landing: 'cells' })).toEqual(
+      defaultSettings(),
+    )
+    expect(parseSettings({ v: 1, audio: { accompVolume: 0 } }).audio.accompVolume).toBe(0)
+    expect(parseSettings({ v: 1, audio: { accompVolume: -0.1 } }).audio.accompVolume).toBe(1)
+    expect(parseSettings({ v: 1, audio: { accompVolume: NaN } }).audio.accompVolume).toBe(1)
+    for (const bad of ['0.5', true, null, [0.5], {}])
+      expect(parseSettings({ v: 1, audio: { accompVolume: bad } }).audio.accompVolume).toBe(1)
+  })
+
+  it('accompVolume の境界（0 と 1 を含む）は既定と違う base で固定する', () => {
+    const base = { ...defaultSettings().audio, accompVolume: 0.5 }
+    expect(parseAudio({ accompVolume: 1 }, base).accompVolume).toBe(1)
+    expect(parseAudio({ accompVolume: 0 }, base).accompVolume).toBe(0)
+    expect(parseAudio({ accompVolume: 1.000001 }, base).accompVolume).toBe(0.5)
+    expect(parseAudio({ accompVolume: -1e-9 }, base).accompVolume).toBe(0.5)
+    expect(parseAudio({ accompVolume: '1' }, base).accompVolume).toBe(0.5)
+    expect(parseAudio('loud', base)).toBe(base)
   })
 
   it('項目ごとに悪い物だけ既定値。別名 garage → ableton・fl → vmpk。知らない項目は捨てる', () => {
@@ -137,7 +200,12 @@ describe('設定 hexnote.settings（v:1）', () => {
       geometry: 'fallback',
       stagger: DEFAULT_STAGGER,
       staggers: [{ name: 'mine', v: [0.25, 0.25, 0.25] }],
-      labels: { kb: 'none', note: 'key' },
+      labels: { kb: 'none', note: 'both' },
+      hints: true,
+      landing: 'cell',
+      audio: { guide: true, metronome: false, keyclick: true, accompVolume: 1 },
+      fx: { budget: 'standard', lowload: 'auto' },
+      imeStop: false,
     })
     expect(parseSettings({ v: 1, layout: 'garage' }).layout).toBe('ableton')
     expect(parseSettings({ v: 1, layout: 'constructor' }).layout).toBe('ableton')
@@ -150,6 +218,11 @@ describe('設定 hexnote.settings（v:1）', () => {
       layout: 'wicki' as const,
       stagger: [0.5, 0.5, 0.5] as const,
       staggers: [{ name: 'u01', v: [0.47, 0.26, 0.52] as const }],
+      hints: false,
+      landing: 'line' as const,
+      audio: { guide: false, metronome: true, keyclick: false, accompVolume: 0.4 },
+      fx: { budget: 'light' as const, lowload: 'on' as const },
+      imeStop: true,
     }
     expect(saveSettings(k, s)).toBe(true)
     expect(loadSettings(k)).toEqual(s)

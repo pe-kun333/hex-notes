@@ -1,7 +1,8 @@
 // localStorage の記録（M0-09、手順 11）。出どころ: design.md §4.3（hexnote.settings v:1・hexnote.calibration 音源種別ごと・
 // hexnote.device {limit, at, layoutMapOk, tsResolution}・hexnote.fade）・§1.3 S6（設定の中身）、decisions #25
 // （tsResolution は推定できない間は書かない）・#40（校正は ±120・1 ms 丸め、音源種別ごと）・#41（足場外しの α）・
-// #42（段ずれ parseStagger）・#45（hexnote.settings.geometry）・#52（仮）。
+// #42（段ずれ parseStagger）・#45（hexnote.settings.geometry）・#52（仮）・#58（M1 の項目は M1-02 で型と既定値だけ足し、画面は
+// M1-07。版は上げない）・#60（ラベルの既定は 鍵盤側 key・ノート側 both）。
 // モックの読み方（m0 L444–448 の項目ごとの範囲検査、m1' L269 の上限、m3 L665 の ±120）を、項目ごとに検査して悪い項目
 // だけ既定値に戻す形に揃えた。上限の丸めは m1' の 2..6 → 2..4。壊れた JSON・版違いは既定値（storageFail にはしない。
 // 置き場の例外ではないので）。読み書きは fallback.ts の KvStore を通す。
@@ -10,6 +11,7 @@ import { clampOffset } from '../judge/calibration-offset.ts'
 import { initialFade, type FadeState, type LabelSides } from '../judge/self-rate.ts'
 import { DEFAULT_GEOMETRY, parseGeometry, type GeometryMode } from '../layout/fallback.ts'
 import type { LegendKind } from '../layout/legend.ts'
+import { DEFAULT_LANDING, LANDING_MODES, type LandingMode } from '../render/hex/landing.ts'
 import { DEFAULT_STAGGER, parseStagger, type Stagger } from '../layout/stagger.ts'
 import {
   CHORD_LIMITS,
@@ -71,9 +73,29 @@ export interface NamedStagger {
   readonly v: Stagger
 }
 
+/** 演出の予算（§1.3 S6「標準／控えめ／なし」。閃光の上限 FLASH_MAX 3／1／0 に対応、m1-kickoff.md §7-11、仮） */
+export type FxBudget = 'standard' | 'light' | 'none'
+export const FX_BUDGETS: readonly FxBudget[] = ['standard', 'light', 'none']
+/** 低負荷モード（§1.3 S6「自動／ON／OFF」。auto は lowload.ts の段、on は段 3 固定、off は段 0 固定） */
+export type LowLoadChoice = 'auto' | 'on' | 'off'
+export const LOWLOAD_CHOICES: readonly LowLoadChoice[] = ['auto', 'on', 'off']
+
+/** 音（§1.3 S6）。accompVolume は伴奏の部の音量（#47 (d)）に掛ける 0..1 の比（1 ＝ 既定の音量、仮） */
+export interface AudioSettings {
+  readonly guide: boolean
+  readonly metronome: boolean
+  readonly keyclick: boolean
+  readonly accompVolume: number
+}
+
+export interface FxSettings {
+  readonly budget: FxBudget
+  readonly lowload: LowLoadChoice
+}
+
 /**
- * 設定 v:1。項目は §1.3 S6 のうち M0 の層が使う物だけ（音・演出・低負荷などは M1-07 で足す。足した項目は
- * 無ければ既定値なので版は上げない）。
+ * 設定 v:1。M0 の層が使う項目（#52 (a)）に、M1 の手順 1（M1-02）で型と既定値だけ足した項目（hints・landing・audio・
+ * fx・imeStop。画面は M1-07）。足した項目は無ければ既定値なので版は上げない（#58）。
  */
 export interface Settings {
   readonly v: 1
@@ -86,11 +108,23 @@ export interface Settings {
   /** 自己申告の段ずれ（decisions #42） */
   readonly stagger: Stagger
   readonly staggers: readonly NamedStagger[]
-  /** ラベル 9 マス（鍵盤側・ノート側） */
+  /** ラベル 9 マス（鍵盤側・ノート側）。既定は 鍵盤側 key・ノート側 both（decisions #60） */
   readonly labels: LabelSides
+  /** 辺ヒント（§2.2「入門者のみ」。プロファイルの既定は src/app/profile.ts） */
+  readonly hints: boolean
+  /** 着地の方式（decisions #3。段別が既定、一本線は対照） */
+  readonly landing: LandingMode
+  readonly audio: AudioSettings
+  readonly fx: FxSettings
+  /** IME 検知時に曲を止める（§1.3 S6、既定 OFF） */
+  readonly imeStop: boolean
 }
 
-/** 既定値。profile は m6 L548、layout・fold は m5 L371（garage → ableton）、labels は m4 L298 */
+/**
+ * 既定値（入門者のプロファイルの既定と同じ。src/app/profile.ts の applyProfileDefaults）。profile は m6 L548、
+ * layout・fold は m5 L371（garage → ableton）、labels は 鍵盤側 key・ノート側 both（#60。m4 L298 の key/key を改めた）、
+ * 音は ガイド音 ON（#48 の「正しい押下は鳴らさない」の前提）・メトロノーム OFF・空打ち ON（m6 L924。m1-kickoff §7-18、仮）。
+ */
 export function defaultSettings(): Settings {
   return {
     v: 1,
@@ -101,7 +135,12 @@ export function defaultSettings(): Settings {
     geometry: DEFAULT_GEOMETRY,
     stagger: DEFAULT_STAGGER,
     staggers: [],
-    labels: { kb: 'key', note: 'key' },
+    labels: { kb: 'key', note: 'both' },
+    hints: true,
+    landing: DEFAULT_LANDING,
+    audio: { guide: true, metronome: false, keyclick: true, accompVolume: 1 },
+    fx: { budget: 'standard', lowload: 'auto' },
+    imeStop: false,
   }
 }
 
@@ -130,6 +169,29 @@ export function parseLabels(x: unknown, base: LabelSides): LabelSides {
   }
 }
 
+const parseBool = (x: unknown, base: boolean): boolean => (typeof x === 'boolean' ? x : base)
+/** 0..1 の有限の数。外は既定値 */
+const parseUnit = (x: unknown, base: number): number =>
+  typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 1 ? x : base
+
+export function parseAudio(x: unknown, base: AudioSettings): AudioSettings {
+  if (!isRec(x)) return base
+  return {
+    guide: parseBool(x['guide'], base.guide),
+    metronome: parseBool(x['metronome'], base.metronome),
+    keyclick: parseBool(x['keyclick'], base.keyclick),
+    accompVolume: parseUnit(x['accompVolume'], base.accompVolume),
+  }
+}
+
+export function parseFx(x: unknown, base: FxSettings): FxSettings {
+  if (!isRec(x)) return base
+  return {
+    budget: oneOf(FX_BUDGETS, x['budget']) ?? base.budget,
+    lowload: oneOf(LOWLOAD_CHOICES, x['lowload']) ?? base.lowload,
+  }
+}
+
 /** 外から来た値を設定に。v が 1 でなければ全て既定値、項目ごとに悪い物だけ既定値。知らない項目は捨てる */
 export function parseSettings(raw: unknown): Settings {
   const d = defaultSettings()
@@ -144,6 +206,11 @@ export function parseSettings(raw: unknown): Settings {
     stagger: parseStagger(raw['stagger']) ?? d.stagger,
     staggers: raw['staggers'] === undefined ? d.staggers : parseNamedStaggers(raw['staggers']),
     labels: parseLabels(raw['labels'], d.labels),
+    hints: parseBool(raw['hints'], d.hints),
+    landing: oneOf(LANDING_MODES, raw['landing']) ?? d.landing,
+    audio: parseAudio(raw['audio'], d.audio),
+    fx: parseFx(raw['fx'], d.fx),
+    imeStop: parseBool(raw['imeStop'], d.imeStop),
   }
 }
 

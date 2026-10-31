@@ -7,6 +7,7 @@ import type { GridCell, KeyboardGrid } from './grid.ts'
 
 /** 着地の方式。cell ＝ 段別（セルが自分の鍵に重なった瞬間が押し時、既定）、line ＝ 一本線（対照オプション） */
 export type LandingMode = 'cell' | 'line'
+export const LANDING_MODES: readonly LandingMode[] = ['cell', 'line']
 export const DEFAULT_LANDING: LandingMode = 'cell'
 
 /** 一本線と鍵盤図の上端の隙間（R 単位。m0 LINE_GAP L196、m1' yLine L374） */

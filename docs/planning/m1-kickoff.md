@@ -66,10 +66,11 @@
 ### 手順 1: 入門者プロファイル（M1-02、S）
 
 - 元: `src/judge/windows.ts` PROFILES（手順 8）、`src/storage/local.ts` defaultSettings（手順 11、decisions #52 (a)）、`src/render/hex/sizing.ts` TRAVEL_MS、m6 renderS6 の「着地と判定」L919、renderS2 L827。
-- 作る: `src/app/profile.ts`（プロファイル → 判定の規則・流れる時間・辺ヒント・NEAR・ラベルの既定・HUD の項目を束ねる純関数。値は各層の定数から引き、ここに数値を書かない）。Settings v:1 に M1 の項目を足す（`hints`・`landing`・`audio {guide, metronome, keyclick, accompGain}`・`fx {budget, lowload}`・`imeStop`。無ければ既定値なので版は上げない、decisions #52 (a)）。
+- 作る: `src/app/profile.ts`（プロファイル → 判定の規則・流れる時間・辺ヒント・NEAR・ラベルの既定・HUD の項目を束ねる純関数。値は各層の定数から引き、ここに数値を書かない）。Settings v:1 に M1 の項目を足す（`hints`・`landing`・`audio {guide, metronome, keyclick, accompVolume}`・`fx {budget, lowload}`・`imeStop`。無ければ既定値なので版は上げない、decisions #52 (a)・#58）。accompVolume は伴奏の部の音量（#47 (d) の 0.45）に掛ける 0..1 の比で 1 が既定（当初 accompGain と書いたが §1.3 S6 の「伴奏の音量」に合わせて改名、仮）。
 - 手直し: m6 の「プロファイル 切替」（L302・L916）→ M1 では隠す（§5.2 M1-08「プロファイル切替は隠す」。音ゲー向けは M2-05）。m6 S6 の「ガイド音 OFF・メトロノーム OFF・空打ち発音 ON」（L924）→ **ガイド音は ON**（decisions #48 は「正しい押下は鳴らさない（旋律を先読みで予約してあるため）」が前提なので、OFF だと入門者の正しい押下が無音になる。m6 の OFF は採らない、仮。§7-18）、メトロノーム OFF・空打ち発音 ON はそのまま（仮）。伴奏は常に鳴らす（§2.9）。ラベルの既定は m6 の 9 マス「既定 kk」（L886）・decisions #52 の key/key → **鍵盤側 key・ノート側 both**（§2.5 L131「入門者の both」、decisions #30 (d)「both（入門者の既定）」。§7-4 → decisions #60）。描画層のラベルは今は全体で 1 つの LabelMode（commands.ts の FrameInput.labels を鍵盤図と落ちるセルの両方に渡す、#41 の帰結）なので、鍵盤側／ノート側の 2 モードを受ける手直しは手順 3 で行う。settings の M1 の項目をここ（M1-02）で足すのは #52 (a)「M1-07 で足す」の読み替え（型と既定値だけ先に、画面は手順 10。decisions #58 の帰結）。
 - 期待値: 入門者 ＝ 窓 24／100／180・遅れ側 ×1.3・NEAR 1・ゲージなし（PROFILES、検算済 手順 8）、流れる時間 1,500 ms、辺ヒント ON、着地 cell、上限の既定 2（decisions #7）、ラベル kb key／note both（仮）。defaultSettings に足した項目が無い旧 JSON を読んでも既定値で読める（parseSettings）。音ゲー向けの項目（ランク・ゲージ・コンボ・FAST／SLOW）は入門者の HUD の項目の表に無い。
 - 完了条件: 「既定値が §2 と一致」（§5.2 L233）。
+- 実際に取った手順（2026-10-31、手順 1、ブランチ `m1-01-profile`）: `src/app/profile.ts`（profileOf: 窓・NEAR・ゲージは PROFILES、流れる時間は TRAVEL_MS、辺ヒントは入門者だけ、着地 cell、上限の既定は `DEFAULT_CHORD_LIMIT`〔src/shared/types.ts に足した〕、ラベル、HUD の項目、failOnGauge。applyProfileDefaults は profile・labels・hints だけを入れ替え、着地など他の項目は利用者の選択を保つ）。`src/storage/local.ts` に M1 の項目と項目ごとの検査（parseAudio・parseFx）、`src/render/hex/landing.ts` に LANDING_MODES。音ゲー向けのラベル（鍵盤側 key・ノート側 key）は R2 の screens 草稿の写しで仮（M2-05）。「疑う」2 観点はワークフロー（読み手 2 人＋反証役 2 人）で回した: (a) 仕様適合は accompGain → accompVolume の改名が手順書に無かった（本書を直した）、(b) 変異 51 個のうち意味の変わる 4 個が残り（accompVolume の上限の境界 1、数でない値の強制変換、音ゲー向けのラベルの取り違え 2 つ）、それを落とす試験を足した。applyProfileDefaults が landing も戻す指摘は反証されたが、対照オプション（decisions #3）を利用者の選択として残す方が §1.3 S6 の「切替で既定値を一括」の読みとして安全なので外した。試験 823 → 832 件。
 
 ### 手順 2: 帯と退避、起動と画面の骨組み（M1-13、S）
 
@@ -177,7 +178,7 @@
 
 | 物 | M0 の形 | M1 で足す物 | 決定 |
 |---|---|---|---|
-| `hexnote.settings` v:1 | profile・layout・fold・legend・geometry・stagger・staggers・labels（#52 (a)） | hints・landing・audio {guide, metronome, keyclick, accompGain}・fx {budget, lowload}・imeStop。版は上げない | 手順 1（型と既定値。画面は手順 10。decisions #58 の帰結） |
+| `hexnote.settings` v:1 | profile・layout・fold・legend・geometry・stagger・staggers・labels（#52 (a)） | hints・landing・audio {guide, metronome, keyclick, accompVolume}・fx {budget, lowload}・imeStop。版は上げない | 手順 1（型と既定値。画面は手順 10。decisions #58 の帰結） |
 | ResultRecord | §4.3 の 15 項目 | `skipped`（数。完走・自己ベストは 0 の回だけ。取り込みで無ければ 0）。途中終了（M2-05）の `aborted` は M2 | decisions #63 |
 | Variant.metrics | 型だけ（§3.2） | density・leap・leapMax・chord・rowCross（同梱曲の各版に書く） | §7-9（手順 6 の着手時） |
 | telemetry onboard／quit | 型だけ（rows.ts） | S0a〜S0d の step・seconds・left | 手順 9 |
