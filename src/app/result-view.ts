@@ -3,8 +3,9 @@
 // （比較は同じ譜面版の中だけ）・§4.4（完走、decisions #63 の「中断あり」）、decisions #31 (e)（内訳の言葉 ぴったり／よい／
 // おしい／となり／はずれ）・#62・#67（ずれの言葉）、m1-kickoff 手順 5（完了条件「同じ譜面版だけで比較する旨が画面にある」、
 // 譜面版 id を見出しに出す）。音ゲー向けの節（ランク以外の点・ゲージ・コンボ・FAST／SLOW）は M2-05、「練習室で弾く」は
-// M2-03、称号は手順 11。純関数（DOM は screens/result.ts）。
+// M2-03、称号は手順 11。鍵数制限の回（手順 7）は「練習の結果」（m6 L837）。純関数（DOM は screens/result.ts）。
 
+import { KEYSET_NAMES, type KeysetId } from '../chart/keyset.ts'
 import { LAYOUTS } from '../layout/presets.ts'
 import { JUDGE_WORDS } from '../render/canvas/feedback.ts'
 import { isFinished } from '../results/record.ts'
@@ -74,19 +75,27 @@ export function resultView(p: FinishedPlay): ResultView {
     [w.miss, String(c.miss)],
   ]
   if (r.skipped > 0) rows.push(['判定なし（再開の猶予の中）', String(r.skipped)])
-  rows.push([
-    '完走',
-    finished
-      ? 'はい（固定テンポ・1.0 倍・全鍵）'
-      : r.skipped > 0
-        ? 'いいえ（中断あり。自己ベストと完走の対象外）'
-        : 'いいえ（練習の条件。自己ベストと完走の対象外）',
-  ])
+  // 練習記録（鍵数制限。M2 で待ち・テンポ≠1.0 も）は条件と残すものを出す（m6 renderS3 L846–847）
+  const practice = r.keyset !== 'all'
+  if (practice)
+    rows.push(
+      ['条件', `固定テンポ・1.0 倍・${KEYSET_NAMES[r.keyset as KeysetId] ?? r.keyset}`],
+      ['残すもの', '精度%と自力率だけ（自己ベスト・完走・オフセット提案の対象外）'],
+    )
+  else
+    rows.push([
+      '完走',
+      finished
+        ? 'はい（固定テンポ・1.0 倍・全鍵）'
+        : r.skipped > 0
+          ? 'いいえ（中断あり。自己ベストと完走の対象外）'
+          : 'いいえ（練習の条件。自己ベストと完走の対象外）',
+    ])
   const j = p.judge
   const ch = p.chords
   const accuracy = accuracyText(j)
   return {
-    title: '結果',
+    title: practice ? '練習の結果' : '結果',
     scope: `成績の比較は同じ譜面版（${r.variantId}）の中だけです。`,
     song: `${p.name} ・ ${variantText(r.variantId)} ・ ${PROFILE_NAMES[r.profile]} ・ 自前音源`,
     accuracy,

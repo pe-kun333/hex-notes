@@ -31,7 +31,7 @@ import { feedFrame, initialLowLoad, type LowLoadState } from '../../render/canva
 import { regionsOf } from '../../render/canvas/primitives.ts'
 import { buildKeyboardGrid, type KeyboardGrid } from '../../render/hex/grid.ts'
 import type { Sizing } from '../../render/hex/sizing.ts'
-import type { KeyCode } from '../../shared/types.ts'
+import type { KeyCode, LayoutId } from '../../shared/types.ts'
 import { offsetFor } from '../../storage/local.ts'
 import { playRow } from '../../telemetry/collect.ts'
 import { hudOf } from '../hud.ts'
@@ -80,7 +80,9 @@ export function playScreen(ctx: ScreenContext): ScreenView {
   const settings = ctx.settings()
   const prof = profileOf(settings.profile)
   const entry = ctx.song()
-  const rows = LAYOUTS[settings.layout].rowsUsed
+  const keyset = ctx.keyset()
+  // 鍵盤図の配列は演奏する譜面版の配列（読むまでは設定の配列。チュートリアル曲は Ableton 型だけ、songs.ts の variantFor）
+  let layoutId: LayoutId = settings.layout
 
   let run: Run | null = null
   let sizing: Sizing | null = null
@@ -156,7 +158,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     const vh = window.innerHeight
     let st: Stage
     try {
-      st = stageOf({ w: vw, h: vh }, rows, prof.travelMs)
+      st = stageOf({ w: vw, h: vh }, LAYOUTS[layoutId].rowsUsed, prof.travelMs)
     } catch (e) {
       // 箱が R 24 の鍵盤図より低い（decisions #24 (e)）。描かずに知らせ、resize で組み直す
       sizing = null
@@ -177,7 +179,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     canvas.width = Math.round(box.width * dpr)
     canvas.height = Math.round(box.height * dpr)
     sizing = st.sizing
-    grid = buildKeyboardGrid(settings.layout, sizing.R, { left: sizing.kbLeft, top: sizing.kbTop }, legend)
+    grid = buildKeyboardGrid(layoutId, sizing.R, { left: sizing.kbLeft, top: sizing.kbTop }, legend)
     show()
   } // prettier-ignore
 
@@ -361,7 +363,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
       return
     }
     // 隣は六角の位置だけで決まる（R に依らない）ので、鍵盤図が入らない窓でも規則を作れる
-    const byCode = buildKeyboardGrid(settings.layout, 1, { left: 0, top: 0 }).byCode
+    const byCode = buildKeyboardGrid(song.variant.layout, 1, { left: 0, top: 0 }).byCode
     const opts: RunOptions = {
       rules: rulesOf(prof.rules, {
         neighbor: neighborOf(byCode),
@@ -371,8 +373,13 @@ export function playScreen(ctx: ScreenContext): ScreenView {
       fade: ctx.booted.fade,
       sound: { melody: settings.audio.guide, accomp: true, click: settings.audio.metronome },
       keyclick: settings.audio.keyclick,
+      keyset,
     }
     run = newRun(song, opts)
+    if (song.variant.layout !== layoutId) {
+      layoutId = song.variant.layout
+      layout()
+    }
     showHud(run)
     show()
   } // prettier-ignore

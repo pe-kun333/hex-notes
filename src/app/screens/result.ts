@@ -52,12 +52,13 @@ function proposalBand(ctx: ScreenContext, last: PlayResult): { el: HTMLElement |
 
 export function resultScreen(ctx: ScreenContext): ScreenView {
   const { doc } = ctx
-  const f = frame(ctx, '結果', { gear: true })
   const last = ctx.lastPlay()
+  const v = last === null ? null : resultView(last)
+  const f = frame(ctx, v?.title ?? '結果', { gear: true })
   let leave = (): void => {}
-  if (last === null) f.body.append(h(doc, 'p', { className: 'note', text: '結果がありません。' }))
+  if (last === null || v === null)
+    f.body.append(h(doc, 'p', { className: 'note', text: '結果がありません。' }))
   else {
-    const v = resultView(last)
     const scope = h(doc, 'p', { className: 'note scope', text: v.scope })
     f.root.insertBefore(scope, f.bandSlot)
     const table = h(doc, 'table', { className: 't' })

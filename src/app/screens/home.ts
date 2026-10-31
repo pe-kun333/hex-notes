@@ -4,7 +4,9 @@
 
 import { DEFAULT_CHORD_LIMIT } from '../../shared/types.ts'
 import { offsetFor } from '../../storage/local.ts'
+import { KEYSET_NAMES, TUTORIAL_KEYSETS } from '../../chart/keyset.ts'
 import { signedMs } from '../calibration.ts'
+import { TUTORIAL_SONG_ID } from '../songs.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { button, frame, h } from './frame.ts'
 
@@ -62,6 +64,8 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
         ),
       ),
     )
+  // dev: チュートリアル曲の 3 段階（鍵数制限、手順 7）を直接試す。製品の入口は S0d（手順 9）
+  const tutorial = ctx.songs.find((s) => s.id === TUTORIAL_SONG_ID)
   if (ctx.devPages.length > 0)
     f.body.append(
       h(
@@ -69,6 +73,26 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
         'details',
         { className: 'dev' },
         h(doc, 'summary', { text: '開発ページ' }),
+        ...(tutorial === undefined
+          ? []
+          : [
+              h(
+                doc,
+                'div',
+                { className: 'btnrow' },
+                ...TUTORIAL_KEYSETS.map((k) =>
+                  button(
+                    doc,
+                    `${tutorial.name}: ${KEYSET_NAMES[k]}`,
+                    () => {
+                      ctx.pickSong(tutorial, k)
+                      ctx.go('S2')
+                    },
+                    'small',
+                  ),
+                ),
+              ),
+            ]),
         h(
           doc,
           'ul',
