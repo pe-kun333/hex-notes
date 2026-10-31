@@ -11,7 +11,7 @@ import { playScreen } from './app/screens/play.ts'
 import { resultScreen } from './app/screens/result.ts'
 import { settingsScreen } from './app/screens/settings.ts'
 import { startShell, type DevPage, type ScreenFactory, type Shell } from './app/shell.ts'
-import { FIXTURE_SONGS, type SongEntry } from './app/songs.ts'
+import { BUNDLED_SONGS, FIXTURE_SONGS, type SongEntry } from './app/songs.ts'
 import type { StorageFailure } from './storage/fallback.ts'
 import { openIdb } from './storage/idb.ts'
 
@@ -27,8 +27,11 @@ const DEV_PAGES: readonly DevPage[] = import.meta.env.DEV
     ]
   : []
 
-// 手順 3 の曲はフィクスチャ 6 曲（vite dev が tests/ を配る）。build では空（同梱曲は M1 の手順 6・8）
-const SONGS: readonly SongEntry[] = import.meta.env.DEV ? FIXTURE_SONGS : []
+// 同梱曲（M1 の手順 6）。dev ではフィクスチャ 6 曲（vite dev が tests/ を配る）を「試験:」を付けて後ろに足す
+const SONGS: readonly SongEntry[] = [
+  ...BUNDLED_SONGS,
+  ...(import.meta.env.DEV ? FIXTURE_SONGS.map((s) => ({ ...s, name: `試験: ${s.name}` })) : []),
+]
 
 const SCREENS: Readonly<Record<ScreenId, ScreenFactory>> = {
   S0: onboardScreen,

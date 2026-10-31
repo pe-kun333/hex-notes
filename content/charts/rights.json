@@ -1,3 +1,34 @@
 {
-  "entries": []
+  "entries": [
+    {
+      "file": "tutorial/hajime.json",
+      "title": "はじめの六角",
+      "composerDied": "-",
+      "arrangerDied": "-",
+      "source": "自作（tools/charts/bundle-songs.ts の HAJIME。M1 手順 6、m1-kickoff §7-17。チュートリアル用に主担当が作った、仮）",
+      "license": "own",
+      "checkedOn": "2026-11-01",
+      "owner": "hihumi（主担当が下書き。U-03 で確かめる）"
+    },
+    {
+      "file": "pd/twinkle.json",
+      "title": "きらきら星",
+      "composerDied": "anonymous",
+      "arrangerDied": "-",
+      "source": "フランス民謡（18 世紀）。旋律は公有。採譜は原曲のまま（tools/charts/mel-songs.ts の手採譜。U-03 の代替、m1-kickoff §5）",
+      "license": "PD",
+      "checkedOn": "2026-11-01",
+      "owner": "hihumi（主担当が下書き。U-03 で確かめる）"
+    },
+    {
+      "file": "pd/ode.json",
+      "title": "歓喜の歌",
+      "composerDied": "1827",
+      "arrangerDied": "-",
+      "source": "ベートーヴェン 交響曲第 9 番 第 4 楽章の主題（1824 年）。採譜は主題の旋律のまま（tools/charts/mel-songs.ts の手採譜。U-03 の代替、m1-kickoff §5）",
+      "license": "PD",
+      "checkedOn": "2026-11-01",
+      "owner": "hihumi（主担当が下書き。U-03 で確かめる）"
+    }
+  ]
 }
