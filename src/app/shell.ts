@@ -10,7 +10,7 @@ import type { VariantSpec } from '../chart/variants.ts'
 import type { InputEvent } from '../input/keyboard.ts'
 import type { DeviceInfo, SyncKind } from '../shared/types.ts'
 import type { OnboardState, TutorialRun } from './onboard-flow.ts'
-import { BOOTED_KEY } from '../storage/session.ts'
+import { BOOTED_KEY, isFirstRun } from '../storage/session.ts'
 import {
   LOCAL_KEYS,
   loadCalibration,
@@ -34,7 +34,7 @@ import type { Booted } from './boot.ts'
 import { attachKeyboard } from './dom-input.ts'
 import type { FinishedPlay } from './play-runner.ts'
 import { navigate, type Route, type ScreenId } from './router.ts'
-import type { SongEntry } from './songs.ts'
+import { localSong, type SongEntry } from './songs.ts'
 import { INITIAL_UPDATE, type UpdateState } from './sw-update.ts'
 
 /** 開発ページへの導線（dev のときだけ S1 に出す。build では空） */
@@ -56,6 +56,11 @@ export interface ScreenContext {
   saveDevice(d: DeviceInfo): void
   /** 端末プロファイルの初期化（S6 → S0。hexnote.device と hexnote.booted を消し、次は初回の導線、§1.3 S6） */
   resetDevice(): void
+  /**
+   * 初回か（端末プロファイルが無く、このタブで導線を通していない）。呼ぶたびに評価し直す（S1 の「曲を持ち込む」とフィルタ。
+   * 起動時の booted.first は同じタブで導線を終えた後も真のままなので使わない、m2-kickoff §7-27）
+   */
+  isFirst(): boolean
   /** S0d のチュートリアル曲の段階（S2 をまたいで持つ。導線の外は null） */
   tutorial(): TutorialRun | null
   setTutorial(t: TutorialRun | null): void
@@ -73,8 +78,11 @@ export interface ScreenContext {
   /** 帯への知らせ（低負荷・予約の遅れなど。IME と保存の失敗は殻が受ける） */
   band(ev: BandEvent): void
   readonly devPages: readonly DevPage[]
-  /** 選べる曲（手順 3 は dev のフィクスチャ 6 曲。同梱曲は手順 6・8） */
-  readonly songs: readonly SongEntry[]
+  /**
+   * 選べる曲（同梱曲〔dev はフィクスチャも〕の後に持ち込み曲〔IndexedDB の charts、曲名の順〕）。S1 を開くたびに読む
+   * （decisions #71 (f)。持ち込み曲が読めなければ同梱曲だけ）
+   */
+  songs(): Promise<readonly SongEntry[]>
   /** 選んだ曲（S1 で選び S2 が読む。S3 の「もう一度」も同じ曲・同じ鍵数制限） */
   song(): SongEntry | null
   /** 選んだ鍵数制限（既定 all。S0d の段階 1・2 は d・dfjk、手順 7・9） */
@@ -232,6 +240,7 @@ export function startShell(opts: ShellOptions): Shell {
       booted.session.remove(BOOTED_KEY)
       device = null
     },
+    isFirst: () => isFirstRun(booted.local, booted.session),
     tutorial: () => tutorial,
     setTutorial: (t) => {
       tutorial = t
@@ -246,7 +255,7 @@ export function startShell(opts: ShellOptions): Shell {
           .filter((s) => s.id.startsWith('bundled:'))
           .map(async (s) => {
             try {
-              const v = validateChart(await (await fetch(s.url)).json())
+              const v = validateChart(await s.load())
               return v.ok ? v.chart.id : null
             } catch {
               return null
@@ -261,7 +270,13 @@ export function startShell(opts: ShellOptions): Shell {
     go: (to) => go(to),
     band,
     devPages: opts.devPages ?? [],
-    songs: opts.songs ?? [],
+    songs: async () => {
+      const local = await booted.db.listCharts().catch(() => [])
+      const named = [...local].sort(
+        (a, b) => a.name.localeCompare(b.name, 'ja') || a.id.localeCompare(b.id),
+      )
+      return [...(opts.songs ?? []), ...named.map(localSong)]
+    },
     song: () => song,
     keyset: () => keyset,
     variantSpec: () => spec,

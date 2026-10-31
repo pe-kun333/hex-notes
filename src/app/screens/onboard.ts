@@ -29,7 +29,7 @@ import {
   startOnboard,
   type OnboardLeave,
 } from '../onboard-flow.ts'
-import { TUTORIAL_SONG_ID } from '../songs.ts'
+import { BUNDLED_SONGS, TUTORIAL_SONG_ID } from '../songs.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { button, frame, h } from './frame.ts'
 
@@ -300,7 +300,8 @@ export function onboardScreen(ctx: ScreenContext): ScreenView {
 
   // ---------- S0d チュートリアル曲 ----------
   const stepD = (): StepView => {
-    const entry = ctx.songs.find((s) => s.id === TUTORIAL_SONG_ID)
+    // チュートリアル曲は同梱曲（持ち込み曲を読むまでもない）
+    const entry = BUNDLED_SONGS.find((s) => s.id === TUTORIAL_SONG_ID)
     const start = button(doc, 'チュートリアル曲を始める', () => {
       if (entry === undefined) return
       // 3 段階は S2 が曲末ごとに進め、最後の段階の後に S0d の行と booted を書いて S3 へ（screens/play.ts）

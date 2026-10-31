@@ -6,6 +6,7 @@ import './app/styles.css'
 import { boot } from './app/boot.ts'
 import type { ScreenId } from './app/router.ts'
 import { homeScreen } from './app/screens/home.ts'
+import { importScreen } from './app/screens/import.ts'
 import { onboardScreen } from './app/screens/onboard.ts'
 import { playScreen } from './app/screens/play.ts'
 import { resultScreen } from './app/screens/result.ts'
@@ -39,6 +40,7 @@ const SCREENS: Readonly<Record<ScreenId, ScreenFactory>> = {
   S1: homeScreen,
   S2: playScreen,
   S3: resultScreen,
+  S5: importScreen,
   S6: settingsScreen,
 }
 
