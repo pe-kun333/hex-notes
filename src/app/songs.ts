@@ -45,6 +45,17 @@ export function localSong(chart: Chart): SongEntry {
 }
 
 /**
+ * 選べる曲: 配る曲の後に持ち込み曲（曲名の順、同じ名前は id の順。decisions #84 (f)）。殻の songs() が S1 を開くたびに
+ * listCharts から作る（削除した曲は次に開いた S1 から消える、M2 の手順 4）
+ */
+export function songList(bundled: readonly SongEntry[], local: readonly Chart[]): SongEntry[] {
+  const named = [...local].sort(
+    (a, b) => a.name.localeCompare(b.name, 'ja') || a.id.localeCompare(b.id),
+  )
+  return [...bundled, ...named.map(localSong)]
+}
+
+/**
  * 同梱曲（content/charts/。dev は vite が、build は copyContent が dist/content/ に写して配る。ADR 0003）。今は U-03 の
  * 代替の 3 曲（m1-kickoff §5。チュートリアル曲と PD の 2 曲）。名前は譜面の name。並びと譜面版の自動選択は手順 8
  */

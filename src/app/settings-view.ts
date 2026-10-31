@@ -3,7 +3,8 @@
 // （低負荷は自動では上げない。戻すのは S6）・#42（段ずれ）・#43（刻印）・#45（幾何）・#52（settings）、m1-kickoff 手順 10・§7-11
 // （M1 で出さない物: プロファイル切替・対照 W–H・判定窓と離し窓の変更・持ち込み曲の削除と版の作り直し・オフセット〔YouTube〕。
 // 色は 標準／グレースケール確認 の 2 値、演出の予算 標準／控えめ／なし、低負荷 自動／ON（段 3）／OFF（段 0）、仮）。
-// 選ぶ項目を表で持ち、選んだ値 → 新しい設定の純関数（DOM は screens/settings.ts）。
+// 選ぶ項目を表で持ち、選んだ値 → 新しい設定の純関数（DOM は screens/settings.ts）。持ち込み曲の削除と版の作り直しは
+// M2 の手順 4 で screens/settings.ts のデータの群に足した（選ぶ項目ではないのでこの表には入れない。文言は library-view.ts）。
 
 import { STAGGER_PRESETS, type Stagger } from '../layout/stagger.ts'
 import type { Settings } from '../storage/local.ts'
