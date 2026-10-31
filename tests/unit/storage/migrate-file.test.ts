@@ -293,6 +293,7 @@ const result = (id: string, chartId: string): ResultRecord => ({
   selfRate: { solo: 4, hinted: 8, near: 0, miss: 2 },
   syncUsed: { kind: 'youtube', videoId: 'abcdefghijk', fallbackAt: 1234.5 },
   offsetUsed: -12,
+  skipped: 2,
 })
 
 describe('ファイル名（m5 L435）', () => {
@@ -456,6 +457,11 @@ describe('記録の検査 parseResult（§4.3 results）', () => {
     expect(parseResult({ ...ok, syncUsed: { kind: 'audio' } })?.syncUsed).toEqual({ kind: 'audio' })
   })
 
+  it('skipped が無い旧い記録（M0 の開発ページの控え）は 0 と読む（decisions #63）', () => {
+    const { skipped: _, ...old } = ok
+    expect(parseResult(old)).toEqual({ ...ok, skipped: 0 })
+  })
+
   it.each([
     ['id 空', { id: '' }],
     ['profile', { profile: 'pro' }],
@@ -475,6 +481,10 @@ describe('記録の検査 parseResult（§4.3 results）', () => {
     ['syncUsed kind', { syncUsed: { kind: 'midi' } }],
     ['syncUsed videoId', { syncUsed: { kind: 'youtube', videoId: 5 } }],
     ['syncUsed fallbackAt', { syncUsed: { kind: 'youtube', fallbackAt: -1 } }],
+    ['skipped 負', { skipped: -1 }],
+    ['skipped 小数', { skipped: 0.5 }],
+    ['skipped 文字', { skipped: '2' }],
+    ['skipped null', { skipped: null }],
   ])('%s → null', (_, patch) => {
     expect(parseResult({ ...ok, ...patch })).toBe(null)
   })

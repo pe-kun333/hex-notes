@@ -24,7 +24,7 @@ import {
 } from './bands.ts'
 import type { Booted } from './boot.ts'
 import { attachKeyboard } from './dom-input.ts'
-import type { PlayResult } from './play-runner.ts'
+import type { FinishedPlay } from './play-runner.ts'
 import { navigate, type Route, type ScreenId } from './router.ts'
 import type { SongEntry } from './songs.ts'
 
@@ -54,8 +54,8 @@ export interface ScreenContext {
   song(): SongEntry | null
   pickSong(s: SongEntry): void
   /** 終わった回（S2 が書き S3 が読む。中身の画面は手順 5） */
-  lastPlay(): PlayResult | null
-  setLastPlay(r: PlayResult): void
+  lastPlay(): FinishedPlay | null
+  setLastPlay(r: FinishedPlay): void
   /** 終わった回の校正の提案（段 2）がまだ片付いていないか（S3 を出入りしても calib 行を 1 回だけ書く） */
   proposalOpen(): boolean
   /** 提案を片付けた（適用・見送り・何もせず S3 を離れた・条件を満たさなかった） */
@@ -136,7 +136,7 @@ export function startShell(opts: ShellOptions): Shell {
   const settings = booted.settings
   let view: ScreenView | null = null
   let song: SongEntry | null = null
-  let lastPlay: PlayResult | null = null
+  let lastPlay: FinishedPlay | null = null
   let proposalOpen = false
   let audio: AudioOut | null = null
   let calibration = booted.calibration

@@ -220,6 +220,8 @@ export interface ResultRecord {
   syncUsed: SyncUsed
   /** 適用した校正（ms） */
   offsetUsed: number
+  /** 判定しなかった音の数（再開の猶予に窓が終わった音。0 でない回は完走・自己ベストの対象外。decisions #63） */
+  skipped: number
 }
 
 // ---------- 端末・設定の保存（§4.3 localStorage） ----------
