@@ -59,6 +59,8 @@ describe('音ゲー向け（M2-05 の下地。型と既定だけ）', () => {
     expect(g.travelMs).toBe(1000)
     expect(g.hints).toBe(false)
     expect(g.limit).toBe(2)
+    expect(g.landing).toBe('cell')
+    expect(g.labels).toEqual({ kb: 'key', note: 'key' })
     expect(g.hud).toEqual([
       'title',
       'progress',
@@ -71,7 +73,7 @@ describe('音ゲー向け（M2-05 の下地。型と既定だけ）', () => {
     ])
   })
 
-  it('applyProfileDefaults は profile・labels・hints・landing だけを入れ替え、他は保つ', () => {
+  it('applyProfileDefaults は profile・labels・hints だけを入れ替え、着地など他は利用者の選択を保つ', () => {
     const s = parseSettings({
       ...defaultSettings(),
       layout: 'vmpk',
@@ -82,9 +84,9 @@ describe('音ゲー向け（M2-05 の下地。型と既定だけ）', () => {
     })
     const out = applyProfileDefaults(s, 'gamer')
     expect(out.profile).toBe('gamer')
-    expect(out.labels).toEqual(g.labels)
+    expect(out.labels).toEqual({ kb: 'key', note: 'key' })
     expect(out.hints).toBe(false)
-    expect(out.landing).toBe('cell')
+    expect(out.landing).toBe('line')
     expect(out.layout).toBe('vmpk')
     expect(out.legend).toBe('us')
     expect(out.audio).toEqual({ guide: false, metronome: true, keyclick: false, accompVolume: 0.5 })

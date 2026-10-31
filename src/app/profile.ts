@@ -15,14 +15,7 @@ import type { Settings } from '../storage/local.ts'
 
 /** HUD の項目（§1.3 S2）。入門者は title・progress・accuracy だけ */
 export type HudItem =
-  | 'title'
-  | 'progress'
-  | 'accuracy'
-  | 'rank'
-  | 'gauge'
-  | 'combo'
-  | 'hispeed'
-  | 'fastSlow'
+  'title' | 'progress' | 'accuracy' | 'rank' | 'gauge' | 'combo' | 'hispeed' | 'fastSlow'
 
 const HUD_BEGINNER: readonly HudItem[] = ['title', 'progress', 'accuracy']
 const HUD_GAMER: readonly HudItem[] = [
@@ -77,9 +70,10 @@ export function profileOf(profile: Profile): ProfileDefaults {
 
 /**
  * 設定にプロファイルの既定を一括で入れる（§1.3 S6「切替で既定値を一括」。M1 では切替を隠すので、既定値の作り方と
- * S6 の「既定へ戻す」の部品。M2-05 が切替に使う）。profile・labels・hints・landing を書き換え、他は保つ。
+ * S6 の「既定へ戻す」の部品。M2-05 が切替に使う）。プロファイルで変わる項目（profile・labels・hints）だけを書き換え、
+ * 着地（decisions #3 の対照オプション。両プロファイルで cell）など他の項目は利用者の選択を保つ。
  */
 export function applyProfileDefaults(s: Settings, profile: Profile): Settings {
   const p = profileOf(profile)
-  return { ...s, profile, labels: p.labels, hints: p.hints, landing: p.landing }
+  return { ...s, profile, labels: p.labels, hints: p.hints }
 }

@@ -14,6 +14,7 @@ import {
   offsetFor,
   parseCalibration,
   parseDevice,
+  parseAudio,
   parseFade,
   parseLimit,
   parseSettings,
@@ -158,6 +159,18 @@ describe('設定 hexnote.settings（v:1）', () => {
     expect(parseSettings({ v: 1, audio: { accompVolume: 0 } }).audio.accompVolume).toBe(0)
     expect(parseSettings({ v: 1, audio: { accompVolume: -0.1 } }).audio.accompVolume).toBe(1)
     expect(parseSettings({ v: 1, audio: { accompVolume: NaN } }).audio.accompVolume).toBe(1)
+    for (const bad of ['0.5', true, null, [0.5], {}])
+      expect(parseSettings({ v: 1, audio: { accompVolume: bad } }).audio.accompVolume).toBe(1)
+  })
+
+  it('accompVolume の境界（0 と 1 を含む）は既定と違う base で固定する', () => {
+    const base = { ...defaultSettings().audio, accompVolume: 0.5 }
+    expect(parseAudio({ accompVolume: 1 }, base).accompVolume).toBe(1)
+    expect(parseAudio({ accompVolume: 0 }, base).accompVolume).toBe(0)
+    expect(parseAudio({ accompVolume: 1.000001 }, base).accompVolume).toBe(0.5)
+    expect(parseAudio({ accompVolume: -1e-9 }, base).accompVolume).toBe(0.5)
+    expect(parseAudio({ accompVolume: '1' }, base).accompVolume).toBe(0.5)
+    expect(parseAudio('loud', base)).toBe(base)
   })
 
   it('項目ごとに悪い物だけ既定値。別名 garage → ableton・fl → vmpk。知らない項目は捨てる', () => {
