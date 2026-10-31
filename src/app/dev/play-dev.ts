@@ -66,7 +66,7 @@ import {
   type PlayCollect,
 } from '../../telemetry/collect.ts'
 import { calibRow, deviceRow } from '../../telemetry/rows.ts'
-import { attachKeyboard } from './dom-input.ts'
+import { attachKeyboard } from '../dom-input.ts'
 import { matchPress, summarize, type NoteOutcome, type ReadabilitySummary } from './readability.ts'
 
 /** 開始から拍 0 までの予備 ms（m1' LEAD 2.2 s を丸めた値） */

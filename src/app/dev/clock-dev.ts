@@ -19,7 +19,7 @@ import {
   type SessionStep,
 } from '../../play/session.ts'
 import type { PlayEvent } from '../../play/state.ts'
-import { attachKeyboard } from './dom-input.ts'
+import { attachKeyboard } from '../dom-input.ts'
 
 /** グラフの横幅 ms と縦の範囲 ±ms */
 const TRACE_MS = 8000

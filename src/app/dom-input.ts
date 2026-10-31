@@ -1,15 +1,11 @@
-// DOM のキー入力を入力層（src/input/）へ渡す薄い部分（M0-04、手順 5）。手順 6 の play-dev も使う。
+// DOM のキー入力を入力層（src/input/）へ渡す薄い部分（M0-04、手順 5）。手順 6 の play-dev と、M1 の製品の殻（shell.ts。
+// M1 の手順 2 で src/app/dev/ からここへ移した）が使う。
 // KeyboardEvent → KeyEventRecord の写し、文字入力欄の素通し、select からの焦点の取り戻し、blur・visibilitychange・
 // contextmenu の信号、iframe からの焦点の取り戻し。状態は attachKeyboard の閉包に持つ（グローバルに置かない）。
 // performance.now の直呼びは src/app/ だけ（src/README.md）。ここは試験の外なので、開発ページ input.html で手で確かめる。
 
-import type {
-  InputEvent,
-  InputState,
-  KeyEventRecord,
-  KeyboardOptions,
-} from '../../input/keyboard.ts'
-import { emptyInputState, handleFocus, handleKey, releaseAll } from '../../input/keyboard.ts'
+import type { InputEvent, InputState, KeyEventRecord, KeyboardOptions } from '../input/keyboard.ts'
+import { emptyInputState, handleFocus, handleKey, releaseAll } from '../input/keyboard.ts'
 
 export function toKeyRecord(e: KeyboardEvent): KeyEventRecord {
   return {

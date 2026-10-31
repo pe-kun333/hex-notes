@@ -9,26 +9,21 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
     <style>
-      :root {
-        --bg: #111318;
-        --fg: #e8e9ec;
-      }
+      /* 読み込む前の地の色（画面の見た目は src/app/styles.css） */
       body {
         margin: 0;
-        background: var(--bg);
-        color: var(--fg);
-        font: 16px/1.6 system-ui, sans-serif;
-      }
-      main {
-        padding: 24px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
+        background: #111318;
+        color: #e8e9ec;
+        font:
+          16px/1.6 system-ui,
+          sans-serif;
       }
     </style>
   </head>
   <body>
-    <main id="app">
-      <h1>ヘクサノート</h1>
-      <p>M0 整備中。開発ページは <code>src/app/dev/</code> に手順ごとに増える。</p>
-    </main>
+    <div id="app" tabindex="-1">
+      <noscript><p>ヘクサノートは JavaScript を使います。</p></noscript>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

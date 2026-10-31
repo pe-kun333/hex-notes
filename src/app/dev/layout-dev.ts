@@ -35,7 +35,7 @@ import {
 import { noteName } from '../../render/canvas/cells.ts'
 import { ROW_OFF, SQ3, hexVertices, isBlackKey, rotationOf } from '../../render/hex/hex.ts'
 import { LAYOUT_IDS, type KeyCode, type LayoutId } from '../../shared/types.ts'
-import { attachKeyboard } from './dom-input.ts'
+import { attachKeyboard } from '../dom-input.ts'
 
 const ROW_NAMES = ['数字段', 'Q 段', 'A 段', 'Z 段'] as const
 const GEOMETRY_NAMES: Readonly<Record<GeometryMode, string>> = {
