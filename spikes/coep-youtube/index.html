@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>COEP × YouTube（spike）</title>
+    <!--
+      M0-11（kickoff 手順 14）の spike。出どころ: m3 `loadYT` L461–475（IFrame API の読込・10 秒の待ち・onReady／onError・
+      世代番号）、spikes/coep-youtube/README.md・headers.md、decisions #57（仮）。製品のコードではない（src/ から辿らない）。
+      ヘッダは serve.ts が ?coep= で付ける。?iframe=credentialless で <iframe credentialless>（Chromium 110 以後）にする。
+      iframe は両方の型ともこのページが作り（違いは credentialless の属性だけ）、YT.Player をその iframe に付ける。
+    -->
+    <style>
+      :root {
+        --bg: #111318;
+        --fg: #e8e9ec;
+        --dim: #8a8f99;
+        --line: #2a2e37;
+        --ok: #7fd18b;
+        --ng: #f08a8a;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          15px/1.5 system-ui,
+          sans-serif;
+      }
+      main {
+        padding: 16px;
+        max-width: 1000px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      p.note {
+        color: var(--dim);
+        margin: 0 0 12px;
+      }
+      a {
+        color: inherit;
+      }
+      a.cur {
+        font-weight: 700;
+        text-decoration: none;
+        outline: 1px solid var(--dim);
+        padding: 0 4px;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        align-items: center;
+        margin: 8px 0;
+      }
+      table {
+        border-collapse: collapse;
+        margin: 8px 0 12px;
+      }
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 4px 8px;
+        text-align: left;
+        font-variant-numeric: tabular-nums;
+        vertical-align: top;
+      }
+      th {
+        color: var(--dim);
+        font-weight: 500;
+      }
+      .ok {
+        color: var(--ok);
+      }
+      .ng {
+        color: var(--ng);
+      }
+      #host {
+        width: 480px;
+        max-width: 100%;
+        aspect-ratio: 16 / 9;
+        border: 1px solid var(--line);
+      }
+      #host iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+      textarea {
+        width: 100%;
+        height: 220px;
+        font:
+          12px/1.4 ui-monospace,
+          monospace;
+        background: transparent;
+        color: inherit;
+        border: 1px solid var(--line);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>COEP × YouTube の可否（M0-11 の spike）</h1>
+      <p class="note">
+        ヘッダ（COEP）と iframe の型を選び、「読み込む」→
+        再生（ミュートの再生ボタンか、プレイヤーの再生ボタン）。読込（onReady）・再生（PLAYING）・getCurrentTime
+        （最初の PLAYING から 10 秒）の 3
+        点と、crossOriginIsolated・SharedArrayBuffer・時刻の刻みを記録する。結果の JSON を RESULT.md
+        に写す。
+      </p>
+      <div class="controls" id="modes"></div>
+      <div class="controls">
+        <label>動画 ID <input id="vid" value="M7lc1UVf-VE" size="14" /></label>
+        <button id="load" type="button">読み込む</button>
+        <button id="play" type="button" disabled>再生（ミュート）</button>
+        <span id="status"></span>
+      </div>
+      <div id="host"></div>
+      <table>
+        <tbody id="checks"></tbody>
+      </table>
+      <p class="note">
+        ページの上でポインタを動かすかキーを押すと、Event.timeStamp の刻みも測る（20 件で確定）。
+      </p>
+      <textarea id="out" readonly></textarea>
+    </main>
+    <script type="module">
+      const $ = (id) => document.getElementById(id)
+      const q = new URLSearchParams(location.search)
+      const coep = ['require-corp', 'credentialless'].includes(q.get('coep'))
+        ? q.get('coep')
+        : 'none'
+      const iframeMode = q.get('iframe') === 'credentialless' ? 'credentialless' : 'normal'
+
+      // ---- 組の切り替え（3 ヘッダ × 2 iframe） ----
+      for (const c of ['none', 'require-corp', 'credentialless'])
+        for (const f of ['normal', 'credentialless']) {
+          const a = document.createElement('a')
+          a.href = `?coep=${c}&iframe=${f}`
+          a.textContent = `COEP ${c} × iframe ${f}`
+          if (c === coep && f === iframeMode) a.className = 'cur'
+          $('modes').append(a)
+        }
+
+      /** 整数の最大公約数 */
+      const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b))
+      /** 値の刻み（µs）: µs に丸めた値の最大公約数（Chromium は 100 µs、隔離で 5 µs に粗くする） */
+      const grainUs = (xs) =>
+        xs.map((x) => Math.round(x * 1000)).reduce((g, x) => gcd(g, Math.abs(x)), 0)
+
+      // ---- 環境 ----
+      const nowSamples = []
+      for (let i = 0, last = performance.now(); i < 2e6 && nowSamples.length < 400; i++) {
+        const t = performance.now()
+        if (t !== last) nowSamples.push(t)
+        last = t
+      }
+      let sabOk = false
+      try {
+        sabOk = new SharedArrayBuffer(8).byteLength === 8
+      } catch {
+        sabOk = false
+      }
+      const ua = navigator.userAgentData
+        ? navigator.userAgentData.brands.map((b) => `${b.brand} ${b.version}`).join(', ')
+        : navigator.userAgent
+      const result = {
+        at: new Date().toISOString(),
+        coep,
+        coop: coep === 'none' ? 'none' : 'same-origin',
+        iframe: iframeMode,
+        iframeCredentiallessSupported: 'credentialless' in HTMLIFrameElement.prototype,
+        ua,
+        crossOriginIsolated: self.crossOriginIsolated === true,
+        sharedArrayBuffer: sabOk,
+        perfNowGrainUs: grainUs(nowSamples),
+        timeStampGrainUs: null,
+        videoId: null,
+        apiScript: null,
+        iframeLoad: null,
+        ready: null,
+        error: null,
+        states: [],
+        playing: null,
+        currentTime: null,
+      }
+
+      // ---- Event.timeStamp の刻み ----
+      const stamps = []
+      const onStamp = (e) => {
+        if (stamps.length >= 20) return
+        stamps.push(e.timeStamp)
+        if (stamps.length === 20) {
+          result.timeStampGrainUs = grainUs(stamps)
+          render()
+        }
+      }
+      addEventListener('pointermove', onStamp, { passive: true })
+      addEventListener('keydown', onStamp)
+
+      // ---- 表示 ----
+      const mark = (v) => (v === null ? '—' : v ? '✓' : '✗')
+      const cls = (v) => (v === null ? '' : v ? 'ok' : 'ng')
+      function render() {
+        const rows = [
+          ['ヘッダ', `COOP ${result.coop}・COEP ${result.coep}`, null],
+          ['iframe', `${result.iframe}（credentialless 属性の対応: ${result.iframeCredentiallessSupported ? '有り' : '無し'}）`, null],
+          ['ブラウザ', result.ua, null],
+          ['crossOriginIsolated', mark(result.crossOriginIsolated), result.crossOriginIsolated],
+          ['SharedArrayBuffer', mark(result.sharedArrayBuffer), result.sharedArrayBuffer],
+          ['performance.now の刻み', `${result.perfNowGrainUs} µs`, null],
+          ['Event.timeStamp の刻み', result.timeStampGrainUs === null ? `測り中（${stamps.length}/20）` : `${result.timeStampGrainUs} µs`, null],
+          ['iframe_api の読込', result.apiScript === null ? '—' : result.apiScript, result.apiScript === null ? null : result.apiScript === 'ok'],
+          ['iframe の load 事象', result.iframeLoad === null ? '—' : `${result.iframeLoad} ms`, null],
+          ['① 読込（onReady）', result.ready === null ? '—' : result.ready ? `✓（${result.readyMs} ms）` : `✗ ${result.error ?? ''}`, result.ready],
+          ['② 再生（PLAYING）', mark(result.playing), result.playing],
+          ['③ getCurrentTime（10 秒）', result.currentTime === null ? '—' : `${result.currentTime.ok === null ? '測れない（読む間にページが非表示）' : result.currentTime.ok ? '✓' : '✗'} 傾き ${result.currentTime.slope}・${result.currentTime.wallMs} ms で ${result.currentTime.advancedMs} ms 進む・自分で止まった ${result.currentTime.selfPaused} 回・${result.currentTime.distinct} 値／${result.currentTime.n} 回`, result.currentTime === null ? null : result.currentTime.ok],
+          ['状態の列', result.states.join(' → ') || '—', null],
+        ] // prettier-ignore
+        $('checks').replaceChildren(
+          ...rows.map(([k, v, ok]) => {
+            const tr = document.createElement('tr')
+            const th = document.createElement('th')
+            const td = document.createElement('td')
+            th.textContent = k
+            td.textContent = v
+            td.className = cls(ok)
+            tr.append(th, td)
+            return tr
+          }),
+        )
+        $('out').value = JSON.stringify(result, null, 1)
+      }
+      render()
+
+      // ---- プレイヤー（m3 loadYT L461–475 の形: 10 秒の待ち、世代番号で遅れた事象を捨てる） ----
+      const NAMES = {
+        '-1': 'unstarted',
+        0: 'ended',
+        1: 'playing',
+        2: 'paused',
+        3: 'buffering',
+        5: 'cued',
+      }
+      let gen = 0
+      let player = null
+      let timer = 0
+      const setStatus = (s) => ($('status').textContent = s)
+
+      function apiReady() {
+        if (window.YT && window.YT.Player) return Promise.resolve('ok')
+        return new Promise((resolve) => {
+          const prev = window.onYouTubeIframeAPIReady
+          window.onYouTubeIframeAPIReady = () => {
+            prev?.()
+            resolve('ok')
+          }
+          const sc = document.createElement('script')
+          sc.src = 'https://www.youtube.com/iframe_api'
+          sc.onerror = () => resolve('error（読込の失敗。ブロック・オフライン・COEP）')
+          document.head.append(sc)
+          setTimeout(() => resolve('timeout（10 秒）'), 10000)
+        })
+      }
+
+      /** 最初の PLAYING から 10 秒、getCurrentTime を読む（間隔は 100 ms を狙うが、傾きは読んだ時刻で取るので間引かれても使える） */
+      const SAMPLE_MS = 10000
+      function sampleTime(g) {
+        const pts = []
+        const t0 = performance.now()
+        let hiddenSeen = document.hidden
+        const tick = () => {
+          if (g !== gen || !player) return
+          hiddenSeen ||= document.hidden
+          pts.push([performance.now(), player.getCurrentTime() * 1000])
+          if (performance.now() - t0 < SAMPLE_MS) return void setTimeout(tick, 100)
+          const n = pts.length
+          const mx = pts.reduce((s, p) => s + p[0], 0) / n
+          const my = pts.reduce((s, p) => s + p[1], 0) / n
+          const sxy = pts.reduce((s, p) => s + (p[0] - mx) * (p[1] - my), 0)
+          const sxx = pts.reduce((s, p) => s + (p[0] - mx) ** 2, 0)
+          const slope = Math.round((sxy / sxx) * 1000) / 1000
+          const distinct = new Set(pts.map((p) => p[1])).size
+          const first = pts[0] ?? [0, 0]
+          const last = pts[n - 1] ?? first
+          const advancedMs = Math.round(last[1] - first[1])
+          const wallMs = Math.round(last[0] - first[0])
+          // このページは pauseVideo を呼ばないので、PLAYING の後の paused はプレイヤーが自分で止めた数
+          const selfPaused = result.states
+            .slice(result.states.indexOf('playing'))
+            .filter((s) => s === 'paused').length
+          // 非表示のページでは動画が止められ、タイマーも間引かれる（Claude アプリの browser pane は窓が隠れると hidden）。
+          // 読んだ間に一度でも hidden なら ③ は測れていない（null）
+          result.currentTime = {
+            ok: hiddenSeen ? null : slope > 0.9 && slope < 1.1 && advancedMs > 0.9 * wallMs,
+            hiddenDuringSample: hiddenSeen,
+            slope,
+            advancedMs,
+            wallMs,
+            distinct,
+            n,
+            selfPaused,
+          }
+          render()
+        }
+        tick()
+      }
+
+      $('load').addEventListener('click', async () => {
+        const g = ++gen
+        clearTimeout(timer)
+        player?.destroy?.()
+        player = null
+        const id = $('vid').value.trim()
+        Object.assign(result, {
+          videoId: id,
+          apiScript: null,
+          iframeLoad: null,
+          ready: null,
+          error: null,
+          states: [],
+          playing: null,
+          currentTime: null,
+        })
+        $('play').disabled = true
+        setStatus('IFrame API を読み込み中…')
+        render()
+        const t0 = performance.now()
+        result.apiScript = await apiReady()
+        if (g !== gen) return
+        render()
+        if (result.apiScript !== 'ok') {
+          result.ready = false
+          result.error = 'iframe_api が読めない'
+          setStatus('失敗')
+          return render()
+        }
+        const f = document.createElement('iframe')
+        f.id = 'ytPlayer'
+        if (iframeMode === 'credentialless') f.credentialless = true
+        f.allow = 'autoplay; encrypted-media'
+        f.addEventListener('load', () => {
+          if (g !== gen) return
+          result.iframeLoad = Math.round(performance.now() - t0)
+          render()
+        })
+        f.src = `https://www.youtube.com/embed/${encodeURIComponent(id)}?enablejsapi=1&playsinline=1&rel=0&origin=${encodeURIComponent(location.origin)}`
+        $('host').replaceChildren(f)
+        timer = setTimeout(() => {
+          if (g !== gen || result.ready) return
+          result.ready = false
+          result.error ??= '10 秒以内に onReady なし（埋め込み不可・ブロック・COEP）'
+          setStatus('失敗')
+          render()
+        }, 10000)
+        player = new window.YT.Player('ytPlayer', {
+          events: {
+            onReady: () => {
+              if (g !== gen) return
+              clearTimeout(timer)
+              result.ready = true
+              result.readyMs = Math.round(performance.now() - t0)
+              $('play').disabled = false
+              setStatus('読み込んだ。再生してください')
+              render()
+            },
+            onError: (e) => {
+              if (g !== gen) return
+              result.error = `onError code ${e?.data}`
+              render()
+            },
+            onStateChange: (e) => {
+              if (g !== gen) return
+              result.states.push(NAMES[e.data] ?? String(e.data))
+              if (e.data === 1 && !result.playing) {
+                result.playing = true
+                setStatus('再生中。getCurrentTime を 10 秒読む')
+                sampleTime(g)
+              }
+              render()
+            },
+          },
+        })
+      })
+
+      $('play').addEventListener('click', () => {
+        player?.mute?.()
+        player?.playVideo?.()
+      })
+    </script>
+  </body>
+</html>

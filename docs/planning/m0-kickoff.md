@@ -236,6 +236,16 @@ LICENSE と `content/samples/salamander/LICENSE`。README の帰属と「参照�
 
 元: m3 `loadYT` L461–475。作る: `spikes/coep-youtube/index.html`、`headers.md`、`RESULT.md`。試験: require-corp／credentialless × Chromium／Firefox。Firefox 列は手順 5 の分と合わせて M0 末に U-05 で埋める（§5.6 L282）。完了条件: 「tech-08 の箱だけ決める」（§5.1 L215、§6.2 L309）。
 
+- 試験の結果（2026-10-31、Chromium 152 の browser pane）: COEP の 2 組では、普通の iframe の埋め込みは読めない（10 秒で onReady なし）。`<iframe credentialless>` なら読込・再生・getCurrentTime の 3 点 ✓（隔離・SharedArrayBuffer あり、刻み 5 µs）。COEP なしは 2 つの型とも ✓（刻み 100 µs）。原因は、YouTube の埋め込みの文書が COEP を report-only でしか付けないこと（spikes/coep-youtube/headers.md・RESULT.md）。Firefox 列は U-05（M1-14）で埋める。MDN の対応表では、`<iframe credentialless>` は Firefox・Safari に無い。
+- 完了条件の結果: 「tech-08 の箱だけ決める」 → 2026-10-31、見送りに確定した（decisions #57）。COEP の要らない OffscreenCanvas の Worker 描画は、M-7 で長いタスクが問題になったら新しい案として出す。製品は COEP を足さない（ADR 0004 を確定）。
+- 着手時の裁定（2026-10-31。新たな相談はしなかった）: decisions #57（測り方、6 組に広げた、動画 ID、結果、tech-08 と pipeline-06 の箱）。
+- 実際に取った手順（2026-10-31、手順 14、ブランチ `m0-14-coep`）
+  - 置いた物: spikes/coep-youtube/ に serve.ts（問い合わせで COOP・COEP を付ける Node のサーバ）、index.html（6 組を切り替えて 3 点と隔離・時刻の刻みを記録し、JSON で出す）、headers.md、RESULT.md。README を書き直した（当初の 3 枚の HTML を 1 枚と問い合わせに改めた）。
+  - サーバのヘッダは tests/unit/spikes/coep-serve.test.ts で確かめた。.claude/launch.json に coep-spike を足し、tsconfig の include に spikes を足した。
+  - browser pane で 6 組を通した。最初の試しは、Claude アプリの窓が隠れてページが hidden になっていた。YouTube が自分で止まり続け、credentialless の iframe のせいに見えた。③ に hiddenDuringSample を足し、窓を表に出して全て測り直した。
+  - 「疑う」2 観点はこのセッションのモデルで回した。(a) 仕様適合: kickoff の 2 組に、基準（COEP なし）と iframe の型を足した。YouTube の応答のヘッダを curl で読み、MDN の対応表を確かめた。(b) 厳しさ: 非表示の取り違えを、計測の中で検知するようにした。
+  - 試験 820 → 823 件。これで M0 の 14 手順が済んだ。
+
 ## 3. 譜面形式の移行
 
 | 項目 | m5 内部（入力） | m5 JSON（照合、L417–424） | m1' 読込（L478–485） | /1（§3.2） | 変換器 |

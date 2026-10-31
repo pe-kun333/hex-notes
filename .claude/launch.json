@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--port", "5173", "--strictPort"],
       "port": 5173
+    },
+    {
+      "name": "coep-spike",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["spikes/coep-youtube/serve.ts", "--port", "5180"],
+      "port": 5180
     }
   ]
 }
