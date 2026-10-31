@@ -1,8 +1,8 @@
 // S6 設定（M1-07、M1 の手順 10。骨組みは手順 2、校正の欄は手順 4）。出どころ: design.md §1.3 S6（群・「既定へ戻す」・
 // 同時押し上限「テストをやり直す」・校正・データ〔記録の削除・書き出し／取り込み・端末プロファイルの初期化〕・クレジット）、
 // m6 S6 L520–525・renderS6 L907–931（S6 は来た画面へ戻る）、decisions #29 (c)・#45・#50・#52・#53（取り込み）・#55 (b)・#67・
-// #72、m1-kickoff 手順 10・§7-11。選ぶ項目は settings-view.ts（純関数）、同時押しテストと校正は部品（手順 9・4）。
-// 計測盤は手順 12、SW の更新は手順 13、持ち込み曲の削除と版の作り直しは M2、オフセット（YouTube）は M3-08。
+// #72、m1-kickoff 手順 10・§7-11。選ぶ項目は settings-view.ts（純関数）、同時押しテスト・校正・計測盤は部品（手順 9・4・
+// 12。計測盤は m6 の順でデータの前）。SW の更新は手順 13、持ち込み曲の削除と版の作り直しは M2、オフセット（YouTube）は M3-08。
 
 import { validateChart } from '../../chart/validate.ts'
 import { defaultLegendKind, legendOf } from '../../layout/legend.ts'
@@ -20,6 +20,7 @@ import { chordTestPanel, saveDeviceLimit, type ChordTestPanel } from '../chord-t
 import { downloadText } from '../file-io.ts'
 import { SETTING_GROUPS, type Control } from '../settings-view.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
+import { telemetryPanel } from '../telemetry-panel.ts'
 import { button, frame, h } from './frame.ts'
 import { calibText, limitText } from './home.ts'
 
@@ -52,6 +53,8 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
   const f = frame(ctx, '設定', { gear: false })
   let chordPanel: ChordTestPanel | null = null
   let alive = true
+  // 計測盤（手順 12）。校正と同時押しテストが行を足したら読み直す
+  const tele = telemetryPanel(ctx)
 
   // ---------- 選ぶ項目 ----------
   const groups = h(doc, 'div', { className: 'groups' })
@@ -121,6 +124,7 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
           saveDeviceLimit(ctx, limit, true)
           closeRetest()
           showLimit()
+          tele.refresh()
         },
         skip: { text: 'やめる（今のまま）', onSkip: () => closeRetest() },
       })
@@ -153,7 +157,12 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
     calibState.textContent = calibText(c.audio === undefined ? null : offsetFor(c, 'audio'))
   }
   showCalib()
-  const calib = calibrationPanel(ctx, { onDone: showCalib })
+  const calib = calibrationPanel(ctx, {
+    onDone: () => {
+      showCalib()
+      tele.refresh()
+    },
+  })
   const calibGroup = h(
     doc,
     'section',
@@ -267,6 +276,7 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
     reset,
     limitGroup,
     calibGroup,
+    tele.el,
     dataGroup,
     credits,
     h(
@@ -287,6 +297,7 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
       alive = false
       chordPanel?.unmount()
       calib.unmount()
+      tele.unmount()
     },
   }
 }

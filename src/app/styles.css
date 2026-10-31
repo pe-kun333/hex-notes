@@ -652,6 +652,31 @@ button.song.sel {
   margin-left: 9em;
 }
 
+/* S6 の計測盤（最近の行は横に長いので枠の中で巻く） */
+.telemetry h3 {
+  margin: 12px 0 4px;
+  font-size: 15px;
+}
+
+.telemetry .scroll {
+  max-height: 20em;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.telemetry table.rows td {
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.telemetry table.rows td.brief {
+  white-space: normal;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 .confirm {
   display: inline-flex;
   gap: 4px;

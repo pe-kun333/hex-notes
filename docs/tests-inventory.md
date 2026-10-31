@@ -168,6 +168,6 @@
 | M1 手順 10 | 設定と記録の鍵 | ラベル・辺ヒント・着地・幾何・刻印・音・演出を変える、上限を変える、「既定へ戻す」、端末の初期化 | 自己ベストの鍵 (chartId, variantId, profile, clock) は同じ、譜面版が変わり別の鍵、defaultSettings と一致、isFirstRun 真 | design §4.3、decisions #52・#73、m1-kickoff 手順 10 | 検算済（tests/unit/app/settings-view.test.ts） |
 | M1 手順 10 | 物理せん断の鍵盤図 `buildKeyboardGrid(rowOff)` | vmpk・R 28・段ずれ ANSI [0.5, 0.25, 0.5] | 段・列・cy は正六角と同じ、段の間の x の差 0.5／0.25／0.5 セル、両端の余りが左右で同じ、正六角はスナップショットのまま | decisions #45 (d)・#73 | 検算済（settings-view.test.ts、frames.test.ts） |
 | M1 手順 11 | 称号・ストリーク `awards.ts` | audio・fallbackAt 無し／video、keyset dfjk、同じ譜面版の 2 回目の完走、ローカル日付 10/29・10/30・10/31／10/29・10/31／同じ日に 2 回、10 曲／9 曲の完走 | 対象／対象外、完走でない、初クリアでない、3 日／1 日／1 日、「同梱 10 曲完走」／無し | design §4.4、decisions #63・#74、m6 L859–868 | 検算済（tests/unit/results/awards.test.ts） |
-| M1 手順 12 | 計測盤 | 1,001 行、書き出し | 先頭が消える、hexnote-telemetry/1 | telemetry.test.ts（手順 12 で検算済） | 検算済 |
+| M1 手順 12 | 計測盤 `telemetry-view.ts` | 保存層（memoryDb）に 1,001 行、書き出し、0 行、7 種類の行 | 先頭が消え 1,000 行・最近の行は新しい 20 行、hexnote-telemetry/1 の {format, exportedAt, rows}（先頭は 2 行目）、「貯まった行 0 行」と全種類 0、種類ごとの 1 行の要約 | m1-kickoff 手順 12、m6 L926、decisions #55 (d)・#75 | 検算済（tests/unit/app/telemetry-view.test.ts、telemetry.test.ts） |
 | M1 手順 13 | PWA の precache | build | sw.js の precache に content/charts/**/*.json の 10 件、`npm run size` は殻＋チュートリアル曲のまま | decisions #64、ADR 0004 の改訂 | 未検算 |
 | M1 手順 14 | 通し検証 | Chromium＋Firefox × 3 視口、初回導線 | コンソールのエラー 0、onboard 行の秒の和 ≤ 300、R・v が手順 3 の表のとおり、Firefox の tsResolution | design §5.2 M1-14・§6.3 M-2・M-4 | 未検算（手で） |
