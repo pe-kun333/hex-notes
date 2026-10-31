@@ -22,5 +22,5 @@
 決まり:
 
 - グローバル状態を持たない。DOM と Canvas は層の外。時刻は ms。`performance.now` の直呼びは `clock/clock-source.ts`（`perfNow`）と `app/` だけ（他は `NowFn` か now の値を受け取る。kickoff §2・decisions #32。入力層は `app/` がハンドラの冒頭で 1 回読んだ now を値で受ける。decisions #25）。
-- 相対 import は必ず `.ts` 拡張子を付ける（`tools/` は Node が型剥がしで直接実行し、拡張子なし・パス別名は解決しない）。`tools/` から import する `src/` の部品は DOM と `vite/client` に触れない。
+- 相対 import は必ず `.ts` 拡張子を付ける（`tools/` は Node が型剥がしで直接実行し、拡張子なし・パス別名は解決しない）。`tools/` から import する `src/` の部品は DOM と `vite/client` に触れない。回帰ハーネス `tools/harness/`（手順 13、decisions #56）は `play/session.ts`・`clock/`・`judge/`・`render/canvas/commands.ts`（frameNotes）・`render/hex/grid.ts` を Node で直に回すので、これらが読み込みの時に DOM に触れると `npm run harness:check` が落ちる。判定・時計の結果が変わる変更は、`npm run harness` で期待の表（`tests/harness/expected/m0-10.json`）を作り直して PR の差分で見せる。
 - tsconfig は 1 つで `DOM` と `node` の両方の型を見る。`setTimeout` の戻りは `ReturnType<typeof setTimeout>` で受ける（`number` に入れない）。

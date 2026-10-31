@@ -92,7 +92,7 @@
 | 8 | 採点 `addJudgment` | 音ゲー向け perfect 1 つ、p・g・g・m・p、60 連続、ゲージ 9 回の miss、入門者 | 1010、点の和・コンボ 1・最大 3、上限 50 の倍率、2 → 0 で failed（1 回）・以後クリアなし、点・ゲージを動かさない | 設計 §2.3、m1' `judge` L320–322・`miss` L325、decisions #41（仮） | 検算済（tests/unit/judge/windows-score.test.ts、tests/unit/judge/judge.test.ts） |
 | 8 | まとめ `summarizeJudge` | dt 10・40・−50 と NEAR 1、sd [1,2,3,4] | 平均 0・SD √2100・UR ×10・ヒストグラム 10 ms の階級・NEAR 率 0.25（NEAR は時刻の標本に入れない）、1.2909944 | 設計 §4.6、m3 `sd` L248、decisions #39 (e)（仮） | 検算済（tests/unit/judge/windows-score.test.ts、tests/unit/judge/judge.test.ts） |
 | 8 | 校正のオフセット | 段 1: 24 打の遅れ 20（±5）・23 打・SD ≥30・2 回続けて、段 2: dt 平均 15 で used 0／−10、7 件、平均 9／9.9／10、SD 大、used 110、平均 −125 | −20・count・sd・どちらも −20（前のオフセットに依らない）、−15／−25・count・small／small／−10・sd・95・120 | 設計 §2.7、m3 `finishCal` L456・`onEnd` L396、decisions #40（仮） | 検算済（tests/unit/judge/self-rate-calibration.test.ts） |
-| 8 | 精度% | 人工ジッタ SD 0→5→10→20→40→80 ms（種 7、4 鍵 200 音。手順 13 で本測） | 入門者 100／100／99.85／94.00／85.60／71.20%、音ゲー向け 100／100／99.70／95.20／85.75／70.15%（10 ms からは真に下がる） | 設計 §5.1 M0-06、手順書 手順 13、decisions #38 | 下見の検算済（tests/unit/judge/judge.test.ts。本測は手順 13） |
+| 8 | 精度% | 人工ジッタ SD 0→5→10→20→40→80 ms（種 7、4 鍵 200 音。手順 13 で本測） | 入門者 100／100／99.85／94.00／85.60／71.20%、音ゲー向け 100／100／99.70／95.20／85.75／70.15%（10 ms からは真に下がる） | 設計 §5.1 M0-06、手順書 手順 13、decisions #38 | 下見の検算済（tests/unit/judge/judge.test.ts）。本測は手順 13 の回帰ハーネス（6 曲×2 プロファイル×2 配列の平均 100／100／99.83／95.07／85.82／72.31%、decisions #56） |
 | 9 | 段ずれ `physOffFor` | [0.5, 0.25, 0.5] と 8 通りの段ずれ | [0, 0.5, 0.75, 1.25]、m2 と同じ | m2 `physOffFor` L208（行番号で切り出して照合）、ADR 0001 | 検算済（tests/unit/layout/stagger-phase.test.ts） |
 | 9 | 位相 `layoutPhase`・`phaseLevel` | ANSI×ableton／ANSI×vmpk、0〜2 u の 0.005 刻み、境界 0.375・0.374・0.875・0.876、1/4u 刻み 0・1/4・1/2・3/4、ortholinear × 4 配列、vmpk の Q–A 0 | mid／ok、m2 の段と同じ、ok・mid・mid・ng、ng・mid・ok・mid、genshin だけ null で他は ng、継ぎ目を見ず ok | m2 `updatePhase` L455、`gaps` L212–219（閾 0.125／0.375、decisions #42、仮） | 検算済（tests/unit/layout/stagger-phase.test.ts） |
 | 9 | 赤い組 `redPairs`・`gapDevs` | 8 通りの段ずれ、ANSI、均等 1/2u | m2 と同じ組・ずれ・格子との差、Q–A の 19 組（ずれ 1/4u）、0 組 | m2 `redPairs` L264–265・`gapDevs` L266–267（conv qw。線 0.2u は m2 の写し、仮） | 検算済（tests/unit/layout/stagger-phase.test.ts） |
@@ -120,8 +120,8 @@
 | 11 | 通知（完了条件） | storage.html の ?deny=1・?quota=1・「容量超過を起こす」 | 置き場ごとに storageFail 1 回と帯、メモリ内で続く | §5.1 M0-09 | ?deny=1・?quota=1 は 2026-10-31 browser pane で確かめた。本物の容量超過は Claude アプリの Chromium で 32 MB 入れても起きず未確認（U-05） |
 | 10 | 初回読込 | `npm run build && npm run size` | 11,652 バイト（0.01 MB）≤ 10 MB。合成した Salamander を置いても変わらない（遅延読込） | 決定 #10・#49 | 検算済（2026-10-31 の実測。U-03 の後に測り直す） |
 | 10 | 伴奏付きで鳴る | 開発ページ audio.html で canon（旋律＋ベース） | 合成音と Salamander（合成した 30 音の Opus を 30/30 復号）で予約・一時停止・−5 秒 | 設計 §5.1 M0-08 | 確認済（2026-10-31、browser pane は隠れていて耳では聞いていない。実物の Salamander は配置の後） |
-| 11 | 上限の丸め | '7' | 4（2..4 に丸める） | m1' L269（2..6 を直す）、決定 #7 | 未検算 |
-| 11 | 保存の失敗 | setItem が例外 | storageFail 1 回、処理は続く | 設計 §4.1、§4.3 | 未検算 |
+| 11 | 上限の丸め | '7' | 4（2..4 に丸める） | m1' L269（2..6 を直す）、決定 #7 | 検算済（tests/unit/storage/local-session.test.ts。2026-10-31 手順 13 で状態を直した） |
+| 11 | 保存の失敗 | setItem が例外 | storageFail 1 回、処理は続く | 設計 §4.1、§4.3 | 検算済（tests/unit/storage/fallback.test.ts。2026-10-31 手順 13 で状態を直した） |
 | 12 | 逐次の SD `welfordSd` | [1,2,3,4]、乱数の列 50 本、1 つ・空 | 1.2909944（m3 の sd・welford・判定層の sampleSd と同じ）、m3 と同じ平均と SD、null（m3 の welford は NaN） | kickoff 手順 12 の期待値、m3 mean／sd L247–248・welford L404（行番号で切り出して照合） | 検算済（tests/unit/telemetry/telemetry.test.ts） |
 | 12 | リング `pushRing` | 1,001 行、size 3・1・0、保存層の memoryDb と並べて 1,001 行 | 先頭が消え 1,000 行、元を変えない・最後の 1 つ・RangeError、同じ行が残る | kickoff 手順 12 の期待値、decisions #51・#54（仮） | 検算済（tests/unit/telemetry/telemetry.test.ts） |
 | 12 | 時計の集計 `collectClock` | 理由ごとの resync、novideo 2 回、grace・held・locked の dev、ダミー動画（15 ms 切り捨て・60 fps）で飛び 1 回＋2 秒の凍結 | jump・unheld・adEnd だけ数える、最初の t（曲の ms は軸で写す）、locked の dev だけ、再同期 1・切替あり・残差 SD 3.5〜5 | decisions #32 (f)・#54（仮）、tests/unit/clock/clock-source.test.ts の同じ走り | 検算済（tests/unit/telemetry/telemetry.test.ts） |
@@ -130,8 +130,12 @@
 | 12 | 他の行 `uaClass`・`deviceRow`・`calibRow` ほか | UA 13 本（Claude アプリの Chromium を含む）、tsResolution 0.1・0・無し、段 1・段 2 の判定（通る・数が足りない） | ブラウザ/OS の大分類、正の数だけ書く、applied は通ったときだけ・proposed と reason | design.md §4.6、decisions #40・#55（仮） | 検算済（tests/unit/telemetry/telemetry.test.ts） |
 | 12 | 書き出し `telemetryFileText` | 3 行・空・1,005 行 | JSON で読み戻すと同じ・1 行に 1 つ、空でも読める、新しい 1,000 行・名前は日付 | design.md §4.6、decisions #55（仮） | 検算済（tests/unit/telemetry/telemetry.test.ts） |
 | 12 | 行が貯まる（完了条件） | play-dev で 2 曲、telemetry.html | device 1・play 2・calib 2 が IndexedDB に貯まり並ぶ | §5.1 M0-12 | 2026-10-31 browser pane で確かめた（1 曲目は pane が隠れていたのでフレーム間隔は null） |
-| 12 | 統計 `sd` | [1, 2, 3, 4] | 1.2909944 | m3 `sd` L248 | 未検算 |
-| 12 | リング `ring` | 1,001 行目 | 先頭が消える（1,000 行） | 設計 §4.3、手順書 手順 12 | 未検算 |
-| 13 | ハーネス `run` | 同じ種（mulberry32） | 差分 0 | m3 `mulberry32` L244、`gauss` L245 | 未検算 |
-| 13 | ハーネス `jitter` | SD 0／5／10 ms | SD 0→5→10 で precision が単調に下がる | m3 `gauss` L245、手順書 手順 13 | 未検算 |
-| 13 | 差分表 | 6 曲×2 プロファイル×2 配列×3 SD | 72 行 | 手順書 手順 13 | 未検算 |
+| 12 | 統計 `sd` | [1, 2, 3, 4] | 1.2909944 | m3 `sd` L248 | 検算済（tests/unit/telemetry/telemetry.test.ts。2026-10-31 手順 13 で状態を直した） |
+| 12 | リング `ring` | 1,001 行目 | 先頭が消える（1,000 行） | 設計 §4.3、手順書 手順 12 | 検算済（tests/unit/telemetry/telemetry.test.ts。2026-10-31 手順 13 で状態を直した） |
+| 13 | ハーネス `run` | 同じ種（mulberry32） | 差分 0 | m3 `mulberry32` L244、`gauss` L245 | 検算済（tests/unit/tools/harness.test.ts: 表を 2 回作って差分 0、種を変えれば差分が出る） |
+| 13 | ハーネス `jitter` | SD 0／5／10 ms | SD 0→5→10 で precision が単調に下がる | m3 `gauss` L245、手順書 手順 13 | 検算済（24 組とも上がらない。0 と 5 は 100% で等しく、平均が真に下がるのは 10 ms から。decisions #56） |
+| 13 | 差分表 | 6 曲×2 プロファイル×2 配列×3 SD | 72 行 | 手順書 手順 13 | 検算済（SD を 6 段にして 144 行、うち SD 0／5／10 が 72 行。decisions #56） |
+| 13 | 揺れ `jitterZ` | 種 99 の列、m3 buildNotes L358–360 を行番号で切り出した z、m4 gauss L316 を 200,000 回 | m3 の z と同じ列、m4 の SD は 0.7071 で sampleAuto の「× 0.028」は実際 19.8 ms、m3 の gauss は SD 1 | m3 L244–245・L358–360、m4 L316・L377、kickoff 手順 13、decisions #56（仮） | 検算済（tests/unit/tools/harness.test.ts） |
+| 13 | 押す・離す時刻 `planActions` | 揺れ ＋7・−3、同じ鍵が続く（次を早く押す）、1 ms 未満で続く、揺れで順が入れ替わる | 着地・終わりの実時刻 ＋ 揺れ、次の押下の 1 ms 前に離す、押した時刻に離す（押す → 離す）、時刻の順で次を見る | decisions #56（仮） | 検算済（tests/unit/tools/harness.test.ts） |
+| 13 | 自動で通す `runAutoplay` | 揺れ 0、＋40・−20・＋300、猶予の中の音（−1,950・−1,900 ms）、ホールドの次を −170・−280 ms 早める | 全て PERFECT・押す実時刻 3,000・フレーム数、GREAT・PERFECT・MISS で dt はそのまま、skipped 1 と猶予の終わりに判定、ok／early | design.md §2.3・§2.6、play-dev の流れ、decisions #39・#56（仮） | 検算済（tests/unit/tools/harness.test.ts） |
+| 13 | 表と差分 `buildTable`・`diffTables`・`run.ts` | 6 曲の表、PERFECT だけの行、音ゲー向け SD 0、入れ子・無い行・増えた行・−0・null、子プロセスで書く・--check・期待の表が違う・無い・不明な引数 | 144 行の順と種 99＋k、平均と UR が z × SD から直に計算した値、点 ＝ Σ1000×(1＋min(コンボ,50)/100)・ゲージ、counts.great のように点でつなぐ、exit 0・1・2 と diff.md | design.md §5 M0-10、kickoff §1.3 の 5・手順 13、decisions #56（仮） | 検算済（tests/unit/tools/harness.test.ts。入れた表 tests/harness/expected/m0-10.json と差分 0） |

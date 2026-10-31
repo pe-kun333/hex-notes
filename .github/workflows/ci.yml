@@ -27,14 +27,18 @@ jobs:
         run: npm test
       - name: 譜面の検査（hexnote-chart/1）
         run: npm run charts:validate
+      - name: 回帰ハーネス（M0-10。期待の表と比べ、今の表と差分表を tests/harness/out/ に書く）
+        run: npm run harness:check
       - name: ビルド
         run: npm run build
       - name: 初回読込の大きさ（≤ 10 MB、decisions #10）
         run: npm run size
-      - name: 回帰ハーネスの差分表（M0-10 から）
+      - name: 回帰ハーネスの差分表（M0-10。期待の表・今の表・差分表）
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: harness-diff
-          path: tests/harness/expected/
+          path: |
+            tests/harness/expected/
+            tests/harness/out/
           if-no-files-found: ignore
