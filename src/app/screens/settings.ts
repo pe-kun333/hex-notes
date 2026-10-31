@@ -2,7 +2,7 @@
 // 同時押し上限「テストをやり直す」・校正・データ〔記録の削除・書き出し／取り込み・端末プロファイルの初期化〕・クレジット）、
 // m6 S6 L520–525・renderS6 L907–931（S6 は来た画面へ戻る）、decisions #29 (c)・#45・#50・#52・#53（取り込み）・#55 (b)・#67・
 // #72、m1-kickoff 手順 10・§7-11。選ぶ項目は settings-view.ts（純関数）、同時押しテスト・校正・計測盤は部品（手順 9・4・
-// 12。計測盤は m6 の順でデータの前）。SW の更新は手順 13、持ち込み曲の削除と版の作り直しは M2、オフセット（YouTube）は M3-08。
+// 12。計測盤は m6 の順でデータの前）。オフラインと更新（SW、手順 13）はデータの後、持ち込み曲の削除と版の作り直しは M2、オフセット（YouTube）は M3-08。
 
 import { validateChart } from '../../chart/validate.ts'
 import { defaultLegendKind, legendOf } from '../../layout/legend.ts'
@@ -21,6 +21,7 @@ import { downloadText } from '../file-io.ts'
 import { SETTING_GROUPS, type Control } from '../settings-view.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { telemetryPanel } from '../telemetry-panel.ts'
+import { updatePanel } from '../update-panel.ts'
 import { button, frame, h } from './frame.ts'
 import { calibText, limitText } from './home.ts'
 
@@ -246,6 +247,16 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
     dataMsg,
   ) // prettier-ignore
 
+  // ---------- オフラインと更新（手順 13） ----------
+  const upd = updatePanel(ctx, 'S6')
+  const updateGroup = h(
+    doc,
+    'section',
+    { className: 'group' },
+    h(doc, 'h2', { text: 'オフラインと更新' }),
+    upd.el,
+  )
+
   // ---------- クレジット ----------
   const songList = h(doc, 'ul', {}, h(doc, 'li', { className: 'note', text: '読み込み中…' }))
   void (async () => {
@@ -278,6 +289,7 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
     calibGroup,
     tele.el,
     dataGroup,
+    updateGroup,
     credits,
     h(
       doc,
@@ -293,6 +305,7 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
       chordPanel?.onInput(events)
       calib.onInput(events)
     },
+    onUpdate: upd.refresh,
     unmount: () => {
       alive = false
       chordPanel?.unmount()

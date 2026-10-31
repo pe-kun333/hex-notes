@@ -177,6 +177,7 @@
 - 手直し: ADR 0004 の「runtime cache-first は `/content/charts/*.json`」→ 同梱曲は precache、持ち込み曲（M2）は IndexedDB なので runtime の規則は音源（opus）だけに（仮）。Salamander は実物が無いので合成音のまま（オフラインでも鳴る）。
 - 期待値: build の sw.js の precache に `content/charts/**/*.json` の 10 件がある。`npm run size` は殻＋チュートリアル曲のまま。manifest は standalone・landscape・icons 192／512／svg（M0-01 のまま）。
 - 完了条件: 「オフラインで 10 曲」（§5.2 L240）。
+- 実際に取った手順（2026-11-01、手順 13、ブランチ `m1-13-pwa`）: precache を `content/charts/**/*.json` に、runtime は音源だけ。`src/app/sw-register.ts`（injectRegister は false にして登録はここだけ）、状態の純関数 `sw-update.ts`、S6 の群「オフラインと更新」と S3 の「更新する」（`update-panel.ts`）。検査 `npm run pwa:check`（`tools/pwa/`、CI）。同梱曲は U-03 の代替の 3 曲なので、オフラインの確かめは 3 曲（9 曲を足せば検査がそのまま 10 件を見る）。DevTools の offline の代わりに vite preview を止めて確かめた。decisions #76、ADR 0004 の改訂。試験 1,007 → 1,014 件、初回読込 170,018 → 174,760 バイト。
 
 ### 手順 14: 通し検証（M1-14、S）
 

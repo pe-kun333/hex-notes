@@ -10,6 +10,7 @@ import { resultView, rewardView } from '../result-view.ts'
 import { awardsFor, localDay } from '../../results/awards.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { calibRow } from '../../telemetry/rows.ts'
+import { updatePanel } from '../update-panel.ts'
 import { button, frame, h } from './frame.ts'
 
 /**
@@ -111,6 +112,9 @@ export function resultScreen(ctx: ScreenContext): ScreenView {
       reward.replaceChildren(h(doc, 'h3', { text: '称号・ストリーク' }), ...(rv.pills.length > 0 ? [pills] : []), ...rv.lines.map((t, i) => h(doc, 'p', { className: i === 0 ? '' : 'note', text: t })))
     })()
   }
+  // 新しい版が待っていれば「更新する」（プレイの合間。手順 13、ADR 0004）
+  const upd = updatePanel(ctx, 'S3')
+  f.body.append(upd.el)
   if (last?.onboardEnd === true)
     f.body.append(h(doc, 'p', { className: 'note', text: '初回導線はここで終わります。「ホームへ」で曲一覧に進みます。' }))
   f.body.append(
@@ -127,6 +131,7 @@ export function resultScreen(ctx: ScreenContext): ScreenView {
   return {
     root: f.root,
     bandSlot: f.bandSlot,
+    onUpdate: upd.refresh,
     unmount: () => {
       alive = false
       leave()

@@ -21,6 +21,7 @@
     "charts:validate": "node tools/charts/validate-charts.ts content/charts",
     "charts:rights": "node tools/charts/check-rights.ts content/charts",
     "size": "node tools/size/check-initial-load.ts dist",
+    "pwa:check": "node tools/pwa/check-precache.ts dist content/charts",
     "check": "npm run licenses && npm run licenses:files && npm run charts:rights && npm run typecheck && npm test && npm run charts:bundle:check && npm run charts:validate && npm run harness:check",
     "charts:bundle": "node tools/charts/bundle-run.ts",
     "charts:bundle:check": "node tools/charts/bundle-run.ts --check",

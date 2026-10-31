@@ -23,3 +23,8 @@ PWA の殻（§1.4）に SW が要る。自前（`src/sw/sw.ts` を手で書く�
 - precache を 殻＋チュートリアル曲 から 殻＋同梱曲全部（`content/charts/**/*.json`。design.md §2.9 の 10 曲 ＝ チュートリアル 1 曲＋入門 9 曲）に広げる。M1-09 の完了条件「オフラインで 10 曲」は cache-first（一度読んだ物だけ残る）では満たせないため。runtime の CacheFirst は音源（`*.opus|mp3|ogg`）だけに絞る。
 - 初回読込の数え方（decisions #49: 殻＋チュートリアル曲、生のバイト数）は変えない。precache はページの読込の後に背景で落ちる。
 - 持ち込み曲（M2）は IndexedDB に入るので SW の外。実装は M1 の手順 13（`vite.config.ts` の `globPatterns` と `runtimeCaching`）。
+
+## 改訂（2026-11-01、decisions #76、M1 の手順 13）
+
+- `injectRegister` を `'script-defer'` から `false` に変えた（`registerSW.js` を出さない）。登録は `src/app/sw-register.ts` が `virtual:pwa-register` の `registerSW` で行い、`onNeedRefresh` を S6 の群「オフラインと更新」と S3 の「更新する」に出す。S2 には出さない。
+- 同梱曲が全部 precache にあることは `npm run pwa:check`（`tools/pwa/check-precache.ts`、CI はビルドの後）で見る。

@@ -35,6 +35,7 @@ import { attachKeyboard } from './dom-input.ts'
 import type { FinishedPlay } from './play-runner.ts'
 import { navigate, type Route, type ScreenId } from './router.ts'
 import type { SongEntry } from './songs.ts'
+import { INITIAL_UPDATE, type UpdateState } from './sw-update.ts'
 
 /** 開発ページへの導線（dev のときだけ S1 に出す。build では空） */
 export interface DevPage {
@@ -90,6 +91,10 @@ export interface ScreenContext {
   closeProposal(): void
   /** 音の出力（最初の呼び出しで作る。自動再生の制限があるので利用者の操作の中で呼ぶ。画面をまたいで 1 つ） */
   audio(): AudioOut
+  /** アプリの更新とオフラインの状態（手順 13。変わったら画面の onUpdate が呼ばれる） */
+  update(): UpdateState
+  /** 待っている版に入れ替えてページを読み直す（S6・S3 の「更新する」。S2 には出さない、ADR 0004） */
+  applyUpdate(): void
 }
 
 /** 画面の DOM と受け口 */
@@ -103,6 +108,8 @@ export interface ScreenView {
   onInput?(events: readonly InputEvent[]): void
   /** 視口が変わった */
   onResize?(): void
+  /** アプリの更新とオフラインの状態が変わった（ctx.update() を読み直す） */
+  onUpdate?(): void
   unmount(): void
 }
 
@@ -116,11 +123,15 @@ export interface ShellOptions {
   readonly screens: Readonly<Record<ScreenId, ScreenFactory>>
   readonly devPages?: readonly DevPage[]
   readonly songs?: readonly SongEntry[]
+  /** SW の登録（sw-register.ts。無ければ SW を使わない扱い） */
+  readonly updates?: { state(): UpdateState; apply(): void }
 }
 
 export interface Shell {
   band(ev: BandEvent): void
   route(): Route
+  /** アプリの更新とオフラインの状態が変わった（今の画面に知らせる） */
+  updated(): void
 }
 
 function bandElement(doc: Document, b: Band, onDismiss: () => void): HTMLElement {
@@ -269,6 +280,11 @@ export function startShell(opts: ShellOptions): Shell {
       proposalOpen = false
     },
     audio: () => (audio ??= createAudioOut()),
+    update: () => opts.updates?.state() ?? { ...INITIAL_UPDATE, off: 'unsupported' },
+    applyUpdate: () => {
+      // プレイ中は入れ替えない（S2 は釦を出さないが、念のため殻でも止める。ADR 0004）
+      if (route.screen !== 'S2') opts.updates?.apply()
+    },
   }
 
   const mount = (): void => {
@@ -307,5 +323,5 @@ export function startShell(opts: ShellOptions): Shell {
   })
 
   mount()
-  return { band, route: () => route }
+  return { band, route: () => route, updated: () => view?.onUpdate?.() }
 }
