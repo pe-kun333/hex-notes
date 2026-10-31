@@ -8,6 +8,7 @@
 import { KEYSET_NAMES, type KeysetId } from '../chart/keyset.ts'
 import { LAYOUTS } from '../layout/presets.ts'
 import { JUDGE_WORDS } from '../render/canvas/feedback.ts'
+import type { Awards } from '../results/awards.ts'
 import { isFinished } from '../results/record.ts'
 import type { LayoutId, Profile, SelfRate } from '../shared/types.ts'
 import { leanWord, signedMs } from './calibration.ts'
@@ -117,3 +118,18 @@ export function resultView(p: FinishedPlay): ResultView {
         : `ミスが集まった${p.weak.from === p.weak.to ? '小節' : ' 2 小節'}: ${p.weak.from === p.weak.to ? p.weak.from : `${p.weak.from}〜${p.weak.to}`} 小節（はずれ ${p.weak.misses}）`,
   }
 }
+
+/** S3 の称号・ストリークの節（m6 renderS3 L859–868。M1 は動画の回が無いので、対象外の文は練習記録の物だけ） */
+export function rewardView(a: Awards): { readonly pills: readonly string[]; readonly lines: readonly string[] } {
+  if (!a.counted) return { pills: [], lines: ['練習記録は称号・ストリークの対象になりません。'] }
+  const rest = a.total - a.done
+  return {
+    pills: a.titles,
+    lines: [
+      `ストリーク ${a.streak} 日（自前音源のプレイがある日の連続）。${
+        a.total === 0 ? '' : rest > 0 ? `同梱 ${a.total} 曲完走まであと ${rest} 曲。` : `同梱 ${a.total} 曲をすべて完走しました。`
+      }`,
+      '対象プレイ ＝ 開始から動画を使っていない回だけ。',
+    ],
+  }
+} // prettier-ignore
