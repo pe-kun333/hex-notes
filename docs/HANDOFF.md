@@ -1,10 +1,10 @@
 # 引き継ぎ（次のセッションが最初に読む）
 
-2026-10-31、M1 の手順 2（M1-13 帯と退避、起動と画面の骨組み）の PR を出した時点で更新。読む順は docs/decisions.md → design.md → planning/m1-kickoff.md（M1 の手順書。M0 の記録は planning/m0-kickoff.md）→ tests-inventory.md → src/README.md → planning/consult/README.md。
+2026-10-31、M1 の手順 1・2（PR #23・#24）を main に取り込んだ時点で更新。読む順は docs/decisions.md → design.md → planning/m1-kickoff.md（M1 の手順書。M0 の記録は planning/m0-kickoff.md）→ tests-inventory.md → src/README.md → planning/consult/README.md。
 
-- 済んだ手順: M0 の 1〜14 全て（main の先頭は PR #21）。M1 の着手手順書 docs/planning/m1-kickoff.md を起草した（14 手順・累積 24 日、§2 の順序、各手順の元・作る・手直し・期待値・完了条件、§7 の提案と未決 22 件。うち 7 件は decisions #58〜#64 で閉じた）。試験 823 件、初回読込 11,652 バイト。
-- 手順 1（M1-02 入門者プロファイル）: ブランチ m1-01-profile で実装し PR #23 を出した（src/app/profile.ts、settings v:1 の M1 の項目、試験 832 件。CI 通過）。取り込みは利用者の指示を待つ。
-- 手順 2（M1-13 帯と退避、起動と画面の骨組み）: ブランチ m1-02-bands（m1-01-profile の上に積んだ）で実装し PR を出した。製品の入口 src/main.ts → boot（保存層・移行・記録・初回の判定）→ shell（画面の差し替え・帯・Enter）→ screens/（S0・S1・S3・S6 は骨組み、S2 は曲なしで時計と状態機械と Pause だけ）。裁定は decisions #65（S2 の帯は左列の矩形と HUD の下に 1 行、S2 は歯車なし、一時停止中の Esc は何もしない など）。試験 883 件、初回読込 53,021 バイト。取り込みは利用者の指示を待つ（#23 を先に取り込み、m1-02-bands の PR の base を main に付け替える）。
+- 済んだ手順: M0 の 1〜14 全て、M1 の手順 1・2（main の先頭は PR #24）。M1 の着手手順書 docs/planning/m1-kickoff.md を起草した（14 手順・累積 24 日、§2 の順序、各手順の元・作る・手直し・期待値・完了条件、§7 の提案と未決 22 件。うち 7 件は decisions #58〜#64 で閉じた）。試験 823 件、初回読込 11,652 バイト。
+- 手順 1（M1-02 入門者プロファイル）: ブランチ m1-01-profile、PR #23 で取り込んだ（src/app/profile.ts、settings v:1 の M1 の項目、試験 832 件）。
+- 手順 2（M1-13 帯と退避、起動と画面の骨組み）: ブランチ m1-02-bands、PR #24 で取り込んだ（#23 の上に積み、#23 の取り込み後に main の上へ付け替えた）。製品の入口 src/main.ts → boot（保存層・移行・記録・初回の判定）→ shell（画面の差し替え・帯・Enter）→ screens/（S0・S1・S3・S6 は骨組み、S2 は曲なしで時計と状態機械と Pause だけ）。裁定は decisions #65（S2 の帯は左列の矩形と HUD の下に 1 行、S2 は歯車なし、一時停止中の Esc は何もしない など）。試験 883 件、初回読込 53,021 バイト。
 - 次: 手順 3（M1-03 プレイ画面 S2 動画なし形態、m1-kickoff.md §2）に入る。src/app/screens/play.ts の骨組みに、play-dev.ts の流れ（曲の読込・判定・描画・音・計測）を play-runner.ts として移し、FrameInput.labels を {kb, note} に分ける。申し送り: 待機中の S2 から出る道が Space → Esc → やめる だけ（曲名と一緒に「ホームへ」を置くか決める）、frame の中で画面を移るときは alive を見る（play.ts の形）。利用者が採用した 6 件は decisions #58〜#64（順序 #58 は主担当の裁定で仮）、design.md §1.3 S0d・§2.5・§2.7・§4.3・§4.4・§5.2・§5.3 と ADR 0004 に写し、tests-inventory に「M1 手順 1〜14」の行を写した。§7 の残り（3 左列の幅、9 難度 4 軸、10 版の自動選択、11 S6 の項目、13 同時押しテストの細部 …）は各手順の着手時に主担当が裁定し decisions #66 以降に書く（手順 2 の裁定は #65）。ブランチは m1-01-profile のように手順ごと（クラウドの作業環境で指定ブランチがあればそれ）。手順の型は M0 と同じ（実装 → 「疑う」2 観点 → PR → CI → 利用者に取り込むかを聞く）。
 - 相談（docs/planning/consult/）: A → #24、B → #27〜#31、C → #32〜#37、D は確定、E → #25。M0 の手順 8〜14 は相談なしで主担当が裁定した。M1 で相談に値する論点は今のところ無い（§7 は主担当の裁定で足りる見込み）。次の決定の行は #66 以降。
 - 回帰ハーネス: 判定・時計・譜面・配列・play/session を変えて `npm run harness:check` が落ちたら、tests/harness/out/diff.md で差分を見る。意図した変化なら `npm run harness` で期待の表を作り直し、PR の差分で見せる（decisions #56）。M1 の手順 5（ResultRecord の skipped）・7（鍵数制限）はここに効きうる。
