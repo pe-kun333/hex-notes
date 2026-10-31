@@ -334,6 +334,8 @@ export function runOutcome(r: Run): PlayResult {
 /** 保存した記録を持つ終わった回（S3 へ） */
 export interface FinishedPlay extends PlayResult {
   readonly record: ResultRecord
+  /** 初回導線（S0d）の最後の段階で、導線がここで終わる（S3 の注記） */
+  readonly onboardEnd?: boolean
 }
 
 /**

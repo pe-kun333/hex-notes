@@ -56,6 +56,10 @@ import { profileOf } from '../profile.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { songOf } from '../songs.ts'
 import { stageOf, type Stage } from '../stage.ts'
+import { TUTORIAL_TIPS, nextTutorial, secondsSince, tutorialKeyset } from '../onboard-flow.ts'
+import { KEYSET_NAMES, TUTORIAL_KEYSETS } from '../../chart/keyset.ts'
+import { markBooted } from '../../storage/session.ts'
+import { onboardRow } from '../../telemetry/rows.ts'
 import { newRecordId } from '../../results/record.ts'
 import { button, h } from './frame.ts'
 import { pauseOverlay } from './pause.ts'
@@ -129,7 +133,24 @@ export function playScreen(ctx: ScreenContext): ScreenView {
   const accuracy = hudRow('精度')
   accuracy.className = 'big'
   const status = h(doc, 'p', { className: 'status', text: '読み込み中…' })
-  const home = button(doc, 'ホームへ', () => ctx.go('S1'), 'small')
+  const home = button(doc, 'ホームへ', () => goHome(), 'small')
+  // S0d のチュートリアル曲（手順 9）: 段階の並びと吹き出し 3 つを左列に出す
+  const stages = h(doc, 'ol', { className: 'steps tutorial' })
+  const tips = h(
+    doc,
+    'ul',
+    { className: 'tips' },
+    ...TUTORIAL_TIPS.map((t) => h(doc, 'li', { text: t })),
+  )
+  const tutorialBox = h(doc, 'div', { className: 'tutorial-box' }, stages, tips)
+  const showStages = (): void => {
+    const t = ctx.tutorial()
+    tutorialBox.hidden = t === null
+    stages.replaceChildren(
+      ...TUTORIAL_KEYSETS.map((k, i) => h(doc, 'li', { className: t !== null && i === t.stage ? 'on' : t !== null && i < t.stage ? 'done' : '', text: KEYSET_NAMES[k] })),
+    )
+  } // prettier-ignore
+  showStages()
   const bandSlot = h(doc, 'div', { className: 'bands' })
   bandSlot.setAttribute('role', 'status')
   bandSlot.setAttribute('aria-live', 'polite')
@@ -140,6 +161,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     player,
     hud,
     status,
+    tutorialBox,
     h(doc, 'div', { className: 'btnrow' }, home),
     bandSlot,
   )
@@ -187,7 +209,12 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     if (run === null) return
     const phase = runPhase(run)
     // 鍵盤図が入らない窓の知らせは残す
-    if (sizing !== null) status.textContent = PHASE_TEXT[phase]
+    const t = ctx.tutorial()
+    if (sizing !== null)
+      status.textContent =
+        t !== null && phase === 'idle'
+          ? `段階 ${t.stage + 1}／${TUTORIAL_KEYSETS.length}: ${KEYSET_NAMES[tutorialKeyset(t)]} ― Space で開始`
+          : PHASE_TEXT[phase]
     home.hidden = phase !== 'idle'
     if (phase === 'paused') pause.show()
     else if (!pause.el.hidden) {
@@ -239,7 +266,7 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     const now = perfNow()
     const r = runControl(run, now, i, { imeStop: settings.imeStop })
     if (r.go !== null) {
-      ctx.go(r.go)
+      goHome()
       return
     }
     if (r.step === null) return
@@ -280,8 +307,43 @@ export function playScreen(ctx: ScreenContext): ScreenView {
     )
     void ctx.booted.db.putResult(o.record).catch(() => {})
     void ctx.booted.db.appendTelemetry(row).catch(() => {})
+    // S0d: 段階 1・2 の曲末は次の段階をこの画面のまま待機に（Space で開始）。最後の段階の後に導線を終えて S3 へ
+    const t = ctx.tutorial()
+    if (t !== null) {
+      const next = nextTutorial(t)
+      if (next !== null) {
+        const k = tutorialKeyset(next)
+        ctx.setTutorial(next)
+        const entry = ctx.song()
+        if (entry !== null) ctx.pickSong(entry, k)
+        run = newRun(r.song, { ...r.opts, keyset: k })
+        lateShown = false
+        ctx.band({ kind: 'audioLate', on: false })
+        effects = []
+        showStages()
+        show()
+        return
+      }
+      endTutorial(false)
+      ctx.setLastPlay({ ...o, onboardEnd: true })
+    }
     ctx.go('S3')
   } // prettier-ignore
+
+  /** S0d を閉じる（onboard 行の S0d・booted。left は途中でやめた） */
+  function endTutorial(left: boolean): void {
+    const t = ctx.tutorial()
+    if (t === null) return
+    ctx.setTutorial(null)
+    void ctx.booted.db.appendTelemetry(onboardRow('S0d', secondsSince(t.enteredAt, perfNow()), left, new Date().toISOString())).catch(() => {})
+    markBooted(ctx.booted.session)
+  } // prettier-ignore
+
+  /** S1 へ（「ホームへ」と Pause の「やめる」。S0d の途中なら離脱として閉じる） */
+  function goHome(): void {
+    endTutorial(true)
+    ctx.go('S1')
+  }
 
   const draw = (now: number): void => {
     if (g2d === null || sizing === null || grid === null || run === null) return

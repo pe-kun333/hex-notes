@@ -3,13 +3,13 @@
 // m6 S1 L298–324（上帯・並び・曲カード・譜面版の箱）、m1-kickoff 手順 8 の手直し（device が無ければ「未診断（2）」。
 // プロファイル切替・持ち込み・絞り込み・動画の切替は M1 では出さない）。開発ページへの導線は dev のときだけ（src/main.ts が渡す）。
 
-import { KEYSET_NAMES, TUTORIAL_KEYSETS } from '../../chart/keyset.ts'
 import { validateChart } from '../../chart/validate.ts'
 import { LAYOUTS } from '../../layout/presets.ts'
 import {
   DEFAULT_CHORD_LIMIT,
   type Chart,
   type ChordLimit,
+  type DeviceInfo,
   type LayoutId,
 } from '../../shared/types.ts'
 import { offsetFor } from '../../storage/local.ts'
@@ -28,9 +28,13 @@ import { TUTORIAL_SONG_ID, type SongEntry } from '../songs.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { button, frame, h } from './frame.ts'
 
-/** 上帯の端末の上限（診断が無ければ既定の 2 で「未診断」） */
-export function limitText(limit: number | null): string {
-  return limit === null ? `未診断（${DEFAULT_CHORD_LIMIT}）` : `${limit}（同時押しテスト済み）`
+/** 上帯の端末の上限（診断が無いか飛ばしたなら既定の 2 で「未診断」） */
+export function limitText(
+  device: { readonly limit: number; readonly diagnosed?: boolean } | null,
+): string {
+  return device === null || device.diagnosed === false
+    ? `未診断（${DEFAULT_CHORD_LIMIT}）`
+    : `${device.limit}（同時押しテスト済み）`
 }
 
 /** 上帯の校正（自前音源のオフセット。未校正は印だけ） */
@@ -46,14 +50,14 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
   const { doc, booted } = ctx
   const f = frame(ctx, 'ホーム', { gear: true })
   const settings = ctx.settings()
-  const deviceLimit = booted.device?.limit ?? null
+  const deviceLimit = ctx.device()?.limit ?? null
   const calibration = ctx.calibration()
   const audio = calibration.audio
   const top = h(
     doc,
     'div',
     { className: 'topband' },
-    h(doc, 'span', {}, '端末の上限 ', h(doc, 'b', { text: limitText(deviceLimit) })),
+    h(doc, 'span', {}, '端末の上限 ', h(doc, 'b', { text: limitText(ctx.device()) })),
     h(doc, 'span', {}, h(doc, 'b', { text: calibText(audio === undefined ? null : offsetFor(calibration, 'audio')) })),
   )
   f.root.insertBefore(top, f.bandSlot)
@@ -194,8 +198,7 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
     showList()
   })()
 
-  // dev: チュートリアル曲の 3 段階（鍵数制限、手順 7）を直接試す。製品の入口は S0d（手順 9）
-  const tutorial = ctx.songs.find((s) => s.id === TUTORIAL_SONG_ID)
+  // 開発ページへの導線（dev のときだけ）
   if (ctx.devPages.length > 0)
     f.body.append(
       h(
@@ -203,16 +206,6 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
         'details',
         { className: 'dev' },
         h(doc, 'summary', { text: '開発ページ' }),
-        ...(tutorial === undefined
-          ? []
-          : [
-              h(doc, 'div', { className: 'btnrow' }, ...TUTORIAL_KEYSETS.map((k) =>
-                button(doc, `${tutorial.name}: ${KEYSET_NAMES[k]}`, () => {
-                  ctx.pickSong(tutorial, k)
-                  ctx.go('S2')
-                }, 'small'),
-              )),
-            ]),
         h(doc, 'ul', {}, ...ctx.devPages.map((p) => {
           const a = h(doc, 'a', { text: p.label })
           a.href = p.href
