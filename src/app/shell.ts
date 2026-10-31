@@ -7,10 +7,13 @@ import { createAudioOut, type AudioOut } from '../audio/context.ts'
 import type { KeysetId } from '../chart/keyset.ts'
 import type { VariantSpec } from '../chart/variants.ts'
 import type { InputEvent } from '../input/keyboard.ts'
-import type { SyncKind } from '../shared/types.ts'
+import type { DeviceInfo, SyncKind } from '../shared/types.ts'
+import type { OnboardState, TutorialRun } from './onboard-flow.ts'
 import {
   loadCalibration,
   saveCalibration,
+  saveDevice,
+  saveSettings,
   type CalibEntry,
   type Calibration,
   type Settings,
@@ -41,6 +44,18 @@ export interface ScreenContext {
   readonly doc: Document
   readonly booted: Booted
   settings(): Settings
+  /** 設定を保存する（hexnote.settings。S0a の刻印と配列、S6 は手順 10） */
+  saveSettings(s: Settings): void
+  /** 端末プロファイル（同時押しテストの結果。無ければ null ＝ 未診断） */
+  device(): DeviceInfo | null
+  /** 端末プロファイルを保存する（S0b の終わり。device 行は呼ぶ側、decisions #55 (b)） */
+  saveDevice(d: DeviceInfo): void
+  /** S0d のチュートリアル曲の段階（S2 をまたいで持つ。導線の外は null） */
+  tutorial(): TutorialRun | null
+  setTutorial(t: TutorialRun | null): void
+  /** 初回導線の今の段（S6 へ行って戻っても続きから。始める前は null） */
+  onboard(): OnboardState | null
+  setOnboard(s: OnboardState | null): void
   /** 校正（起動で読んだ値に、この後の保存を重ねた物。S1 の上帯・S2 の判定が読む） */
   calibration(): Calibration
   /** 1 つの音源種別の校正を保存する（hexnote.calibration。置き場が壊れていてもメモリ内で続く、decisions #50） */
@@ -139,7 +154,10 @@ export function startShell(opts: ShellOptions): Shell {
   const { doc, host, booted } = opts
   let route = booted.route
   let bands: BandsState = initialBands()
-  const settings = booted.settings
+  let settings = booted.settings
+  let device = booted.device
+  let tutorial: TutorialRun | null = null
+  let onboard: OnboardState | null = null
   let view: ScreenView | null = null
   let song: SongEntry | null = null
   let keyset: KeysetId = 'all'
@@ -181,6 +199,23 @@ export function startShell(opts: ShellOptions): Shell {
     doc,
     booted,
     settings: () => settings,
+    saveSettings: (s) => {
+      saveSettings(booted.local, s)
+      settings = s
+    },
+    device: () => device,
+    saveDevice: (d) => {
+      saveDevice(booted.local, d)
+      device = d
+    },
+    tutorial: () => tutorial,
+    setTutorial: (t) => {
+      tutorial = t
+    },
+    onboard: () => onboard,
+    setOnboard: (s) => {
+      onboard = s
+    },
     calibration: () => calibration,
     saveCalibration: (kind, entry) => {
       saveCalibration(booted.local, kind, entry)

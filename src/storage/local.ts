@@ -303,6 +303,7 @@ export function parseDevice(raw: unknown): DeviceInfo | null {
     limit,
     at: raw['at'],
     layoutMapOk: raw['layoutMapOk'] === true,
+    ...(raw['diagnosed'] === false ? { diagnosed: false } : {}),
     ...(typeof q === 'number' && Number.isFinite(q) && q > 0 ? { tsResolution: q } : {}),
   }
 }

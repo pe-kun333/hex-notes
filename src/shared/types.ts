@@ -230,6 +230,8 @@ export interface DeviceInfo {
   limit: ChordLimit
   at: string
   layoutMapOk: boolean
+  /** 同時押しテストを通した（S0b の「スキップ」「あとで」は偽で limit 2。無ければ通した扱い ＝ M1 の手順 9 より前の記録） */
+  diagnosed?: boolean
   /** Event.timeStamp の刻み（ms）。実際の keydown・keyup から推定（src/input/resolution.ts、decisions #25）。推定できない間は無い */
   tsResolution?: number
 }

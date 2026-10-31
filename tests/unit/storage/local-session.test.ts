@@ -291,6 +291,23 @@ describe('端末 hexnote.device', () => {
   })
 
   it('limit か at が読めなければ null（診断をやり直す）。layoutMapOk は true だけ true', () => {
+    // 同時押しテストを飛ばした印（M1 の手順 9）。偽だけ残し、真や他の値は書かない（無い ＝ 通した扱い）
+    expect(parseDevice({ limit: 2, at: AT, diagnosed: false })).toEqual({
+      limit: 2,
+      at: AT,
+      layoutMapOk: false,
+      diagnosed: false,
+    })
+    expect(parseDevice({ limit: 3, at: AT, diagnosed: true })).toEqual({
+      limit: 3,
+      at: AT,
+      layoutMapOk: false,
+    })
+    expect(parseDevice({ limit: 3, at: AT, diagnosed: 'no' })).toEqual({
+      limit: 3,
+      at: AT,
+      layoutMapOk: false,
+    })
     expect(parseDevice(null)).toBe(null)
     expect(parseDevice({ limit: 'x', at: AT })).toBe(null)
     expect(parseDevice({ limit: 3 })).toBe(null)

@@ -100,6 +100,8 @@ export function resultScreen(ctx: ScreenContext): ScreenView {
     offset.append(h(doc, 'h3', { text: '苦手区間' }), h(doc, 'p', { text: v.weak ?? 'はずれはありませんでした。' }))
     f.body.append(h(doc, 'div', { className: 'grid2' }, main, side), offset)
   }
+  if (last?.onboardEnd === true)
+    f.body.append(h(doc, 'p', { className: 'note', text: '初回導線はここで終わります。「ホームへ」で曲一覧に進みます。' }))
   f.body.append(
     h(
       doc,

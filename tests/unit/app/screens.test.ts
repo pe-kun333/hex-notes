@@ -8,7 +8,10 @@ import { ONBOARD_STEPS } from '../../../src/app/screens/onboard.ts'
 describe('S1 の上帯', () => {
   it('端末の上限: 診断が無ければ「未診断（2）」、あれば数', () => {
     expect(limitText(null)).toBe('未診断（2）')
-    expect(limitText(3)).toBe('3（同時押しテスト済み）')
+    expect(limitText({ limit: 3 })).toBe('3（同時押しテスト済み）')
+    expect(limitText({ limit: 3, diagnosed: true })).toBe('3（同時押しテスト済み）')
+    // S0b を飛ばした（limit 2 のまま保存、M1 の手順 9）
+    expect(limitText({ limit: 2, diagnosed: false })).toBe('未診断（2）')
   })
 
   it('校正: 無ければ「未校正」、あれば符号付きの ms（＋・−・±）', () => {
