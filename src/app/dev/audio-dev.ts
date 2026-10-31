@@ -31,7 +31,7 @@ import { createClockSource, type ClockSource } from '../../clock/clock-source.ts
 import type { ClockOutput } from '../../clock/types.ts'
 import { midiOf } from '../../layout/presets.ts'
 import type { Chart, Note } from '../../shared/types.ts'
-import { attachKeyboard } from './dom-input.ts'
+import { attachKeyboard } from '../dom-input.ts'
 
 const SONGS = ['canon', 'twinkle', 'ode', 'scale', 'chroma', 'duet'] as const
 const RATES = [0.5, 0.6, 0.75, 0.9, 1, 1.1, 1.25] as const

@@ -19,8 +19,11 @@ export interface PlayState {
   readonly source: ClockMode
 }
 
-/** 一時停止の要求の理由（Escape の role pause と、入力層の pause イベントの blur・hidden・iframe） */
-export type PlayPauseReason = 'escape' | PauseReason
+/**
+ * 一時停止の要求の理由（Escape の role pause と、入力層の pause イベントの blur・hidden・iframe。ime は S6 の
+ * 「IME 検知時に曲を止める」が ON のときの IME の検知。M1 の手順 2）
+ */
+export type PlayPauseReason = 'escape' | 'ime' | PauseReason
 
 export type PlayEvent =
   /** Space の開始（動画なし。動画ありの開始は利用者の click-to-play で、時計の resync(start) が来る） */

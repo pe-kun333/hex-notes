@@ -1,0 +1,307 @@
+/*
+ * 製品の画面の見た目（M1 の手順 2）。M0 の index.html の暗い配色（--bg #111318）を基にする（m1-kickoff の共通の手直し:
+ * m6 の色トークンは使わない、色に頼らない）。フォントは system-ui（同梱しない）。S2 の寸法は src/render/hex/sizing.ts の
+ * PAD 12・GAP 12 と同じ（左列 12 px、右列は columnBox の値を style で入れる）。
+ */
+:root {
+  --bg: #111318;
+  --fg: #e8e9ec;
+  --muted: #a3a7b1;
+  --panel: #1b1e25;
+  --line: #333845;
+  --accent: #e8e9ec;
+  --band: #222632;
+  --band-err: #3a2126;
+  --pad: 12px;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font:
+    16px/1.6 system-ui,
+    sans-serif;
+}
+
+#app {
+  min-height: 100%;
+  outline: none;
+}
+
+.screen {
+  box-sizing: border-box;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--pad) max(16px, env(safe-area-inset-right)) 24px
+    max(16px, env(safe-area-inset-left));
+  outline: none;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 20px;
+  flex: 1 1 auto;
+}
+
+.topband {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  padding: 8px 0;
+  color: var(--muted);
+}
+
+.topband b {
+  color: var(--fg);
+}
+
+.note {
+  color: var(--muted);
+}
+
+.btnrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+button {
+  font: inherit;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+button.primary {
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+button.small {
+  padding: 2px 10px;
+  font-size: 14px;
+}
+
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+kbd {
+  font:
+    12px/1 ui-monospace,
+    monospace;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+a {
+  color: var(--fg);
+}
+
+/* 帯（上帯の直下。S2 は左列の HUD の下。decisions #65） */
+.bands {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.bands:empty {
+  display: none;
+}
+
+.band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  background: var(--band);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.band span {
+  flex: 1 1 12em;
+  color: var(--muted);
+}
+
+.band-storageFail {
+  background: var(--band-err);
+}
+
+/* S2: 左右分割。左列 ＝ プレイヤー矩形・HUD・案内・帯、右列 ＝ 箱（位置と寸法は columnBox を style で） */
+.screen.play {
+  position: fixed;
+  inset: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.play .left {
+  position: absolute;
+  left: var(--pad);
+  top: var(--pad);
+  bottom: var(--pad);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.play .player {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.play .source {
+  display: grid;
+  gap: 4px;
+  text-align: center;
+}
+
+.play .source span {
+  color: var(--muted);
+}
+
+.play .hud {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 0;
+}
+
+.play .hud dt {
+  color: var(--muted);
+}
+
+.play .hud dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.play .status {
+  margin: 0;
+  color: var(--muted);
+}
+
+.play .bands {
+  flex: 1 1 auto;
+  min-height: 0;
+  /* 列を左列の幅に収める（auto の列は 1 行に詰めた帯の中身の幅まで広がる） */
+  grid-template-columns: minmax(0, 1fr);
+  overflow: auto;
+  align-content: start;
+  margin: 0;
+}
+
+/*
+ * S2 の帯は 1 行に詰める（見出しと「閉じる」を残し、本文は省いて title に全文。内側 1093×514 では帯の場所が約 90 px
+ * しかなく、本文を折り返すと 2 件目が隠れるため。decisions #65）
+ */
+.play .band {
+  flex-wrap: nowrap;
+}
+
+.play .band b {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.play .band span {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.play .band button {
+  flex: 0 0 auto;
+}
+
+.play .stage {
+  position: absolute;
+  box-sizing: border-box;
+  background: #0b0c10;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.play .stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Pause の覆い（右列だけを覆う。矩形の外） */
+.pause {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(11, 12, 16, 0.82);
+}
+
+.pause[hidden] {
+  display: none;
+}
+
+.pause .card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 20px;
+  max-width: 28em;
+  text-align: center;
+}
+
+.pause h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.pause .btnrow {
+  justify-content: center;
+}
+
+.steps {
+  padding-left: 1.5em;
+}
+
+details.dev {
+  margin-top: 24px;
+  color: var(--muted);
+}

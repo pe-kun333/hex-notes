@@ -27,9 +27,11 @@ export interface StorageFailure {
 /** 失敗を受け取る口（app/ が帯 S7d と storageFail の行にする）。置き場ごとに最初の 1 回だけ呼ばれる */
 export type FailReport = (f: StorageFailure) => void
 
-/** 帯 S7d の文言（m6 L941・L457） */
-export const STORAGE_FAIL_BAND_TEXT =
-  '保存できません。メモリ内で続けます（ページを閉じると消えます）。譜面と記録は *.hexnote.json に書き出せます。'
+/** 帯 S7d の文言（m6 L941・L457）。見出しと本文（製品の帯 src/app/bands.ts は 2 つに分けて出す） */
+export const STORAGE_FAIL_BAND_TITLE = '保存できません'
+export const STORAGE_FAIL_BAND_DETAIL =
+  'メモリ内で続けます（ページを閉じると消えます）。譜面と記録は *.hexnote.json に書き出せます。'
+export const STORAGE_FAIL_BAND_TEXT = `${STORAGE_FAIL_BAND_TITLE}。${STORAGE_FAIL_BAND_DETAIL}`
 
 const QUOTA_NAMES = new Set(['QuotaExceededError', 'NS_ERROR_DOM_QUOTA_REACHED'])
 const DENIED_NAMES = new Set(['SecurityError', 'NotAllowedError'])

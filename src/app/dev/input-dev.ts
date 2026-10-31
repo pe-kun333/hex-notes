@@ -10,7 +10,7 @@ import { estimateTsResolution, isCoarse } from '../../input/resolution.ts'
 import { median } from '../../input/timestamp.ts'
 import { qwertyLabel } from '../../layout/legend.ts'
 import { KEY_ROWS } from '../../layout/presets.ts'
-import { attachKeyboard } from './dom-input.ts'
+import { attachKeyboard } from '../dom-input.ts'
 
 const LOG_MAX = 200
 /** 刻みの推定に使う直近の timeStamp の数 */
