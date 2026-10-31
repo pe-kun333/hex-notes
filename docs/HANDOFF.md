@@ -1,9 +1,9 @@
 # 引き継ぎ（次のセッションが最初に読む）
 
-2026-10-31、M1 の着手手順書を起草した時点で更新。読む順は docs/decisions.md → design.md → planning/m1-kickoff.md（M1 の手順書。M0 の記録は planning/m0-kickoff.md）→ tests-inventory.md → src/README.md → planning/consult/README.md。
+2026-10-31、M1 の着手手順書を起草し、§7 の重い 6 件を利用者が採用した（decisions #58〜#64）時点で更新。読む順は docs/decisions.md → design.md → planning/m1-kickoff.md（M1 の手順書。M0 の記録は planning/m0-kickoff.md）→ tests-inventory.md → src/README.md → planning/consult/README.md。
 
 - 済んだ手順: M0 の 1〜14 全て（main の先頭は PR #21）。M1 の着手手順書 docs/planning/m1-kickoff.md を起草した（14 手順・累積 24 日、§2 の順序、各手順の元・作る・手直し・期待値・完了条件、§7 の提案と未決 22 件）。試験 823 件、初回読込 11,652 バイト。
-- 次: 利用者に m1-kickoff.md を見せ、§7 の提案（1 順序、2 SMF の道具の前倒し、3 動画なし形態の左列、4 入門者のラベル、5 S0d の音待ち、6 提案の符号、7 skipped と ResultRecord、8 同梱曲の precache、9 難度 4 軸、10 版の自動選択 …）の採否を聞く。採った物を decisions #58 以降と design.md §5.2 の注記に書き、tests-inventory に「M1 手順 n」の行を写してから手順 1（M1-02 入門者プロファイル）に入る。ブランチは m1-01-profile のように手順ごと（クラウドの作業環境で指定ブランチがあればそれ）。
+- 次: 手順 1（M1-02 入門者プロファイル、m1-kickoff.md §2）に入る。利用者が採用した 6 件は decisions #58〜#64（順序 #58 は主担当の裁定で仮）、design.md §1.3 S0d・§2.5・§2.7・§4.3・§4.4・§5.2・§5.3 と ADR 0004 に写し、tests-inventory に「M1 手順 1〜14」の行を写した。§7 の残り（3 左列の幅、9 難度 4 軸、10 版の自動選択、11 S6 の項目、13 同時押しテストの細部 …）は各手順の着手時に主担当が裁定し decisions #65 以降に書く。ブランチは m1-01-profile のように手順ごと（クラウドの作業環境で指定ブランチがあればそれ）。手順の型は M0 と同じ（実装 → 「疑う」2 観点 → PR → CI → 利用者に取り込むかを聞く）。
 - 相談（docs/planning/consult/）: A → #24、B → #27〜#31、C → #32〜#37、D は確定、E → #25。M0 の手順 8〜14 は相談なしで主担当が裁定した。M1 で相談に値する論点は今のところ無い（§7 は主担当の裁定で足りる見込み）。次の決定の行は #58 以降。
 - 回帰ハーネス: 判定・時計・譜面・配列・play/session を変えて `npm run harness:check` が落ちたら、tests/harness/out/diff.md で差分を見る。意図した変化なら `npm run harness` で期待の表を作り直し、PR の差分で見せる（decisions #56）。M1 の手順 7（鍵数制限）・11（skipped の欄）はここに効きうる。
 - Salamander の実物はまだ置いていない（manifest の files は空、合成音だけで鳴る）。利用者の許しを得てから、archive.org の SalamanderGrandPianoV3_44.1khz16bit.tar.bz2（466.1 MB）を一時ディレクトリに落として展開し、`node tools/salamander/thin-salamander.ts --src <展開先>` で 30 音の Opus・manifest・ATTRIBUTION を書き、聞いて速度層・長さ・ビットレートを見直し、初回読込と合わせて記録する（元の FLAC はリポジトリに入れない）。

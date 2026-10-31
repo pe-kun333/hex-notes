@@ -1,6 +1,6 @@
 # 試験の台帳
 
-モックには試験節・assert が無い（docs/planning/m0-kickoff.md §0）。各手順の「期待値（手計算）」をここに写し、単体試験に落としたら状態を更新する。状態は **未検算**（手計算のみ）／**仮**（出どころが本書以外に無い）／**検算済**（試験が通った）。行番号は手順書の「元」の欄のとおり（m1'＝m1-geometry）。
+モックには試験節・assert が無い（docs/planning/m0-kickoff.md §0）。各手順の「期待値（手計算）」をここに写し、単体試験に落としたら状態を更新する。 M1 の行は「M1 手順 n」（docs/planning/m1-kickoff.md §2 の番号。2026-10-31 に写した。出所の m6 は m6-flow.html）。状態は **未検算**（手計算のみ）／**仮**（出どころが本書以外に無い）／**検算済**（試験が通った）。行番号は手順書の「元」の欄のとおり（m1'＝m1-geometry）。
 
 | 手順 | 対象 | 入力 | 期待値 | 出所（モック・関数・行） | 状態 |
 |---|---|---|---|---|---|
@@ -141,3 +141,25 @@
 | 13 | 表と差分 `buildTable`・`diffTables`・`run.ts` | 6 曲の表、PERFECT だけの行、音ゲー向け SD 0、入れ子・無い行・増えた行・−0・null、子プロセスで書く・--check・期待の表が違う・無い・不明な引数 | 144 行の順と種 99＋k、平均と UR が z × SD から直に計算した値、点 ＝ Σ1000×(1＋min(コンボ,50)/100)・ゲージ、counts.great のように点でつなぐ、exit 0・1・2 と diff.md | design.md §5 M0-10、kickoff §1.3 の 5・手順 13、decisions #56（仮） | 検算済（tests/unit/tools/harness.test.ts。入れた表 tests/harness/expected/m0-10.json と差分 0） |
 | 14 | spike のサーバ `serve.ts` | ?coep=none・知らない値・空、require-corp・credentialless（＋iframe=credentialless）、他のパス・POST | COOP・COEP なし、COOP same-origin と COEP がその値・index.html の中身、404 | kickoff 手順 14、spikes/coep-youtube/headers.md、decisions #57（仮） | 検算済（tests/unit/spikes/coep-serve.test.ts。子プロセス） |
 | 14 | COEP × YouTube の 3 点（完了条件） | COEP なし／require-corp／credentialless × 普通／credentialless の iframe、動画 M7lc1UVf-VE、窓を表に出して | COEP の 2 組の普通の iframe は ✗（onReady なし）、他の 4 組は読込・再生・getCurrentTime（10 秒の傾き 0.999〜1.000）✓、隔離の 4 組は SharedArrayBuffer あり・刻み 5 µs | §5.1 M0-11、kickoff 手順 14、decisions #57（仮） | 2026-10-31 browser pane（Chromium 152）で確かめた（spikes/coep-youtube/RESULT.md）。Firefox 列は U-05（M1-14） |
+| M1 手順 1 | 入門者プロファイル `profileOf` | beginner | 窓 24／100／180・遅れ側 ×1.3・NEAR 1・ゲージなし・流れる時間 1,500・辺ヒント ON・着地 cell・上限の既定 2・ラベル kb key／note both | PROFILES（src/judge/windows.ts、手順 8 で検算済）、TRAVEL_MS、decisions #7・#60 | 未検算 |
+| M1 手順 1 | 設定 v:1 の M1 の項目 `parseSettings` | hints・landing・audio・fx・imeStop が無い旧 JSON、知らない値 | 既定値で読める（版は上げない） | decisions #52 (a)、m1-kickoff §3 | 未検算 |
+| M1 手順 2 | 帯 `bandsOf` | ime の検知 → 演奏の keydown、storageFail が同じ置き場で 2 回、lowLoad の段が上がる、audioLate | IME 帯 1 件が消える、S7d の帯 1 回、低負荷の帯、予約の遅れの帯 | decisions #26 (5)・#50 (a)・#29 (c)・#47 (c)、m6 L790–803 | 未検算 |
+| M1 手順 2 | Pause メニューと起動 | 待機中の pause iframe、再生中の pause、一時停止中の hidden＋blur、「やめる」、isFirstRun | 待機のまま／一時停止／一時停止のまま（手順 7 で検算済）、S1 へ記録なし、device か booted があれば偽（手順 11 で検算済） | decisions #35、#52 (e)、m6 L347–353・L627–642 | 未検算（画面の部分） |
+| M1 手順 3 | S2 の箱 `sizeForViewport`・`visibleMs` | 内側 1366×668／1280×620／1093×514、プレイヤー 480×270 | ableton R 28・v 0.3587／0.3267／0.2560・最下段 1,695／1,714／1,773 ms、vmpk R 28／28／27・v 0.3027／0.2707／0.2043・最下段 2,009／2,069／2,227 ms、limited null | decisions #24、m1-kickoff 手順 3（2026-10-31 に node で検算） | 検算済（手順 4 の sizing の試験に最下段の行を足す） |
+| M1 手順 3 | 一時停止 → 再開の skipped | 着地の直後に一時停止、5 s 後に再開 | 再開の猶予 300 ms に窓が終わる音は skipped（miss でない）、猶予の後の最初の音は普通に判定、曲末 ＋1,200 ms で chartEnd | decisions #39 (a)(b)、judge.test.ts・harness.test.ts（検算済） | 検算済（判定層）／未検算（S2 のループ） |
+| M1 手順 4 | 校正タップ `calibration-tap` | 予備 4＋24 打、タップがクリックから 310 ms、クリック 0〜3 へのタップ、同じクリックへ 2 つ目、23 打で終わる | 対応しない／数えない／捨てる／不足（count） | m3 calTap L449–451・finishCal L454、decisions #40 (b) | 仮 |
+| M1 手順 4 | 校正の結果と提案 `tapOffset`・`proposeOffset` | 24 打が全て ＋18、SD 41、dt の平均 −12・n 118・SD 21・使った 0 | オフセット −18、拒否（sd）、提案 ＋12（文言「平均 −12 ms（少し早め）→ ＋12 ms」） | decisions #40・#62、self-rate-calibration.test.ts | 検算済（式）／未検算（符号の文言） |
+| M1 手順 5 | 結果 S3 `analysis` | 4/4・resolution 240 で miss が拍 64〜71、和音 18 拍のうち 14 拍が全部当たり、meanMs −12／＋12／±4 | 苦手区間「17〜18 小節」、同時押しが合った割合 78%、「少し早め」「少し遅め」「ちょうど」 | m6 L374・L383・L386、m1-kickoff 手順 5 | 仮 |
+| M1 手順 5 | ResultRecord `record` | summarizeJudge ＋ メタ、skipped 0／2 | id・15 項目＋skipped、skipped 0 は完走、2 は「中断あり」で対象外 | decisions #63、design §4.3 | 未検算 |
+| M1 手順 6 | SMF の読み取り `smf.ts` | 形式 0 の 2 音（on 60 vel 100 @0、off @480、on 64 @480、off @960、tempo 500000、PPQ 480） | notes [{60,0,1,100},{64,1,1,100}]、tempo [{0,120}]、vel は整数のまま | m5 parseMidi L263–314、decisions #59、m0-kickoff §7-22 | 仮 |
+| M1 手順 6 | 同梱曲の道具 `bundle.ts`・権利表 | 10 曲＋チュートリアル曲、rights.json の欠け 1 件、PD の没年 | 44 版が validate を通る、charts:rights が fail、checkedOn の年 − 没年 > 70 | ADR 0005、check-rights（手順 1 で検算済）、decisions #23 | 未検算 |
+| M1 手順 7 | 鍵数制限 `keyset.ts` | `d`・`dfjk`・`8`・`all` | 集合に無い音が判定・描画から消え miss にならない、all は何も消えない、同じ chartId・variantId から 3 段階、keyset ≠ all の記録は自己ベストに入らない | design §3.2・§2.3、m6 L734、decisions #17 | 未検算 |
+| M1 手順 8 | 難度 4 軸 `metrics.ts`・おすすめの並び | フィクスチャ 6 曲 ableton/2/octave | 密度 twinkle 1.40・ode 1.70・canon 1.79・duet 2.40・chroma 2.98・scale 3.67 音/秒、並びはこの順 | m1-kickoff 手順 8（2026-10-31 に node で検算）、m6 L743 | 検算済（密度）／未検算（跳躍・同時押し率・段またぎ率） |
+| M1 手順 8 | 版の自動選択・自己ベスト `best.ts` | duet（ableton 版 null 1、vmpk 版 null 0）、端末の上限 2／3、keyset dfjk の記録 | vmpk を推奨、版 3・4 が選べない／4 だけ選べない、自己ベストに入らない | m1-kickoff §7-10、design §4.3、m6 L771 | 仮 |
+| M1 手順 9 | 同時押しテスト `chord-test.ts` | 6 組通過＋矩形 1 組落ち、10 組通過、同段 1 組落ち、999 ms で離す、余分な鍵、最初の keydown が 229 | 3、4、2、通過でない、落ち、ime 1 件で同じ組のまま | design §2.4、m6 L264・L727、decisions #26、m1-kickoff §7-13 | 仮 |
+| M1 手順 9 | 「あとで」とスキップ | 4 段とも「あとで」、S0b でスキップ | 設定は既定値・device.limit 2・未校正・S1 へ、limit 2 のまま | design §1.3 S0、m6 L955–957 | 未検算 |
+| M1 手順 10 | 設定と記録の鍵 | ラベル・辺ヒント・着地・幾何・刻印・音・演出を変える、上限を変える、「既定へ戻す」、端末の初期化 | 自己ベストの鍵 (chartId, variantId, profile, clock) は同じ、譜面版が変わり別の鍵、defaultSettings と一致、isFirstRun 真 | design §4.3、decisions #52、m1-kickoff 手順 10 | 未検算 |
+| M1 手順 11 | 称号・ストリーク `awards.ts` | audio・fallbackAt 無し／video、keyset dfjk、同じ譜面版の 2 回目の完走、ローカル日付 10/29・10/30・10/31／10/29・10/31／同じ日に 2 回、10 曲／9 曲の完走 | 対象／対象外、完走でない、初クリアでない、3 日／1 日／1 日、「同梱 10 曲完走」／無し | design §4.4、decisions #63、m6 L859–868 | 仮 |
+| M1 手順 12 | 計測盤 | 1,001 行、書き出し | 先頭が消える、hexnote-telemetry/1 | telemetry.test.ts（手順 12 で検算済） | 検算済 |
+| M1 手順 13 | PWA の precache | build | sw.js の precache に content/charts/**/*.json の 11 件、`npm run size` は殻＋チュートリアル曲のまま | decisions #64、ADR 0004 の改訂 | 未検算 |
+| M1 手順 14 | 通し検証 | Chromium＋Firefox × 3 視口、初回導線 | コンソールのエラー 0、onboard 行の秒の和 ≤ 300、R・v が手順 3 の表のとおり、Firefox の tsResolution | design §5.2 M1-14・§6.3 M-2・M-4 | 未検算（手で） |

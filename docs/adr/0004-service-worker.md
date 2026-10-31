@@ -17,3 +17,9 @@ PWA の殻（§1.4）に SW が要る。自前（`src/sw/sw.ts` を手で書く�
 
 - 自前に切り替えるときは `src/sw/` に書き、`vite.config.ts` の VitePWA を `injectManifest` に変える。本 ADR を改訂する。
 - prompt の UI は M1 の S6 で作る。M0 では `registerType` の値だけ置く。
+
+## 改訂（2026-10-31、decisions #64）
+
+- precache を 殻＋チュートリアル曲 から 殻＋同梱曲全部（`content/charts/**/*.json`、チュートリアル曲を含む 11 曲）に広げる。M1-09 の完了条件「オフラインで 10 曲」は cache-first（一度読んだ物だけ残る）では満たせないため。runtime の CacheFirst は音源（`*.opus|mp3|ogg`）だけに絞る。
+- 初回読込の数え方（decisions #49: 殻＋チュートリアル曲、生のバイト数）は変えない。precache はページの読込の後に背景で落ちる。
+- 持ち込み曲（M2）は IndexedDB に入るので SW の外。実装は M1 の手順 13（`vite.config.ts` の `globPatterns` と `runtimeCaching`）。
