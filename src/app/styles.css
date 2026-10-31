@@ -634,6 +634,29 @@ button.song.sel {
   color: var(--muted);
 }
 
+/* S6 の項目（見出し・選ぶボタン・注記を 1 行に。狭い窓では折り返す） */
+.group .row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 4px 0;
+}
+
+.group .row .label {
+  min-width: 9em;
+}
+
+.group .row .note {
+  flex-basis: 100%;
+  margin-left: 9em;
+}
+
+.confirm {
+  display: inline-flex;
+  gap: 4px;
+}
+
 details.dev {
   margin-top: 24px;
   color: var(--muted);

@@ -7,17 +7,6 @@
 
 import { TUTORIAL_KEYSETS, KEYSET_NAMES } from '../../chart/keyset.ts'
 import { perfNow } from '../../clock/clock-source.ts'
-import {
-  CHORD_GROUPS,
-  chordDone,
-  chordHold,
-  chordLimit,
-  chordResultText,
-  chordStep,
-  chordTick,
-  initialChordTest,
-  type ChordTestState,
-} from '../../input/chord-test.ts'
 import type { InputEvent } from '../../input/keyboard.ts'
 import {
   defaultLegendKind,
@@ -28,15 +17,11 @@ import {
 import { keyboardCommands } from '../../render/canvas/cells.ts'
 import { flush } from '../../render/canvas/flush.ts'
 import { buildKeyboardGrid } from '../../render/hex/grid.ts'
-import {
-  DEFAULT_CHORD_LIMIT,
-  type ChordLimit,
-  type KeyCode,
-  type LayoutId,
-} from '../../shared/types.ts'
+import { DEFAULT_CHORD_LIMIT, type KeyCode, type LayoutId } from '../../shared/types.ts'
 import { markBooted } from '../../storage/session.ts'
-import { deviceRow, onboardRow } from '../../telemetry/rows.ts'
+import { onboardRow } from '../../telemetry/rows.ts'
 import { calibrationPanel, type CalibPanel } from '../calibration-panel.ts'
+import { chordTestPanel, saveDeviceLimit } from '../chord-test-panel.ts'
 import {
   ONBOARD_IDS,
   TUTORIAL_TIPS,
@@ -272,83 +257,31 @@ export function onboardScreen(ctx: ScreenContext): ScreenView {
 
   // ---------- S0b 同時押しテスト ----------
   const stepB = (): StepView => {
-    const legend = legendOf(null, defaultLegendKind(navigator.language)).legend
-    let test: ChordTestState = initialChordTest(perfNow())
-    const count = h(doc, 'span', { className: 'num', text: '0' })
-    const groupText = h(doc, 'dd')
-    const keys = h(doc, 'div', { className: 'keys' })
-    const hold = h(doc, 'i')
-    const result = h(doc, 'p', { className: 'note' })
-    const next = button(doc, '次へ', () => save(chordLimit(test.results), false), 'primary')
-    next.disabled = true
-    const board = h(doc, 'div', { className: 'chord-test' })
-    board.tabIndex = -1
-    board.append(
-      h(doc, 'dl', { className: 'kv' }, h(doc, 'dt', { text: '進捗' }), h(doc, 'dd', {}, count, ' / 10'), h(doc, 'dt', { text: 'いまの組' }), groupText),
-      keys,
-      h(doc, 'div', { className: 'hold' }, hold),
-    )
-    const label = (c: KeyCode): string => legend.get(c) ?? c
-    const show = (now: number): void => {
-      const done = chordDone(test)
-      count.textContent = String(test.results.length)
-      const g = CHORD_GROUPS[test.index]
-      groupText.textContent = done || g === undefined
-        ? '終わりました'
-        : test.startedAt === null
-          ? '押しているキーを全部離してください'
-          : `${g.codes.map(label).join('・')} を同時に押して、1 秒そのまま`
-      keys.replaceChildren(...(g === undefined ? [] : g.codes.map((c) => {
-        const k = h(doc, 'span', { text: label(c) })
-        if (test.down.has(c)) k.className = 'on'
-        return k
-      })))
-      hold.style.width = `${chordHold(test, now) * 100}%`
-      result.textContent = done ? chordResultText(test.results) : ''
-      next.disabled = !done
-      if (done && doc.activeElement === board) next.focus({ preventScroll: true })
-    } // prettier-ignore
-    const timer = setInterval(() => {
-      if (!alive) return
-      const now = perfNow()
-      test = chordTick(test, now)
-      show(now)
-    }, 50)
-    /** 端末プロファイルを保存し（上限が上がるのは診断を通したときだけ）、device 行を足して次の段へ */
-    const save = (limit: ChordLimit, skipped: boolean): void => {
-      const kbApi = (navigator as Navigator & { keyboard?: { getLayoutMap?: unknown } }).keyboard
-      const at = iso()
-      const device = { ...(ctx.device() ?? {}), limit, at, layoutMapOk: typeof kbApi?.getLayoutMap === 'function', diagnosed: !skipped }
-      ctx.saveDevice(device)
-      void booted.db
-        .appendTelemetry(deviceRow({ ua: navigator.userAgent, screenPx: [screen.width, screen.height], dpr: window.devicePixelRatio || 1, device }, at))
-        .catch(() => {})
-      leave(skipped)
-    } // prettier-ignore
-    show(perfNow())
+    const panel = chordTestPanel(ctx, {
+      legend: legendOf(null, defaultLegendKind(navigator.language)).legend,
+      doneText: '次へ',
+      onDone: (limit) => {
+        saveDeviceLimit(ctx, limit, true)
+        leave(false)
+      },
+      // 飛ばしたら 2 のまま保存（上限が上がるのは診断を通したときだけ）
+      skip: {
+        text: `スキップ（${DEFAULT_CHORD_LIMIT} つのまま）`,
+        onSkip: () => {
+          saveDeviceLimit(ctx, DEFAULT_CHORD_LIMIT, false)
+          leave(true)
+        },
+      },
+    })
     const el = h(
       doc,
       'div',
       {},
       h(doc, 'h2', { text: 'S0b 同時押しテスト' }),
       h(doc, 'p', { text: '10 組のキーを順に、押したまま 1 秒そのままにします。端末が何キーまで同時に読めるかを測り、譜面の同時押し上限（既定 2）を決めます。' }),
-      board,
-      h(doc, 'p', { className: 'note', text: '組の内訳: 同段 3 キー（Z X C／A S D／Q W E）、3u 離れた和音（A D G／S F J／D G K）、矩形 4 キー（Q W A S／E R D F）、両手 2＋2（A S K L／Z X , .）。同段 3 組と和音 3 組を全部通せば 3、矩形と両手も通せば 4。日本語入力が ON なら帯を出して組をやり直します。' }),
-      result,
-      h(doc, 'div', { className: 'btnrow' }, next, button(doc, `スキップ（${DEFAULT_CHORD_LIMIT} つのまま）`, () => save(DEFAULT_CHORD_LIMIT, true))),
+      panel.el,
     )
-    return {
-      el,
-      focus: board,
-      onInput: (events) => {
-        for (const ev of events) {
-          if (ev.kind === 'press' || ev.kind === 'release') test = chordStep(test, { kind: ev.kind, code: ev.code, tsPerf: ev.tsPerf })
-          else if (ev.kind === 'ime') test = chordStep(test, { kind: 'ime', tsPerf: ev.tsPerf })
-        }
-        show(perfNow())
-      },
-      unmount: () => clearInterval(timer),
-    }
+    return { el, focus: panel.focus, onInput: panel.onInput, unmount: panel.unmount }
   } // prettier-ignore
 
   // ---------- S0c 校正 ----------

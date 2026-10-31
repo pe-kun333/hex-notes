@@ -6,7 +6,7 @@
 import { QWERTY_LEGEND, type Legend } from '../../layout/legend.ts'
 import { KEY_ROWS, LAYOUTS, midiOf } from '../../layout/presets.ts'
 import type { KeyCode, LayoutId } from '../../shared/types.ts'
-import { ROW_OFF, SQ3, gridX } from './hex.ts'
+import { ROW_OFF, SQ3 } from './hex.ts'
 
 /** 鍵盤図の 1 セル */
 export type GridCell = {
@@ -51,13 +51,16 @@ export type KeyboardGrid = {
 }
 
 /** 幅の係数（セル幅単位）: 使う段の gx の最大 − 最小 + 1（m0 kbW L220） */
-export function widthUnits(rowsUsed: readonly number[]): number {
+export function widthUnits(
+  rowsUsed: readonly number[],
+  rowOff: readonly number[] = ROW_OFF,
+): number {
   if (rowsUsed.length === 0) throw new RangeError('grid: 使う段が無い')
   const cols = KEY_ROWS[0]?.length ?? 10
   let minGx = Number.POSITIVE_INFINITY
   let maxGx = Number.NEGATIVE_INFINITY
   for (const r of rowsUsed) {
-    const off = ROW_OFF[r]
+    const off = rowOff[r]
     if (off === undefined) throw new RangeError(`grid: 段 ${r} は 0〜3 の外`)
     if (off < minGx) minGx = off
     if (off + cols - 1 > maxGx) maxGx = off + cols - 1
@@ -81,6 +84,7 @@ export function buildKeyboardGrid(
   R: number,
   origin: { readonly left: number; readonly top: number },
   legend: Legend = QWERTY_LEGEND,
+  rowOff: readonly number[] = ROW_OFF,
 ): KeyboardGrid {
   if (!(R > 0)) throw new RangeError(`grid: R ${R} は正の数でない`)
   const preset = LAYOUTS[layout]
@@ -88,12 +92,15 @@ export function buildKeyboardGrid(
   const hexW = SQ3 * R
   const wU = widthUnits(rowsUsed)
   const hU = heightUnits(rowsUsed)
-  const minGx = Math.min(...rowsUsed.map((r) => gridX({ row: r, col: 0 })))
+  // 物理せん断（rowOff ＝ 段ずれの物理座標、decisions #45 (d)）は正六角の幅の中に左右の真ん中で置く。段・列（NEAR・
+  // 辺ヒント・和音の塊）は正六角のまま、変えるのはセルの x だけ
+  const shift = (wU - widthUnits(rowsUsed, rowOff)) / 2
+  const minGx = Math.min(...rowsUsed.map((r) => rowOff[r] ?? 0)) - shift
   const cells: GridCell[] = []
   rowsUsed.forEach((row, rowIndex) => {
     const codes = KEY_ROWS[row] ?? []
     codes.forEach((code, col) => {
-      const gx = gridX({ row, col })
+      const gx = (rowOff[row] ?? 0) + col
       cells.push({
         code,
         row,

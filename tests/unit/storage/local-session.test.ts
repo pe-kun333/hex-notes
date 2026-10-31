@@ -113,6 +113,7 @@ describe('設定 hexnote.settings（v:1）', () => {
       audio: { guide: true, metronome: false, keyclick: true, accompVolume: 1 },
       fx: { budget: 'standard', lowload: 'auto' },
       imeStop: false,
+      grayscale: false,
     })
   })
 
@@ -206,6 +207,7 @@ describe('設定 hexnote.settings（v:1）', () => {
       audio: { guide: true, metronome: false, keyclick: true, accompVolume: 1 },
       fx: { budget: 'standard', lowload: 'auto' },
       imeStop: false,
+      grayscale: false,
     })
     expect(parseSettings({ v: 1, layout: 'garage' }).layout).toBe('ableton')
     expect(parseSettings({ v: 1, layout: 'constructor' }).layout).toBe('ableton')
@@ -223,6 +225,7 @@ describe('設定 hexnote.settings（v:1）', () => {
       audio: { guide: false, metronome: true, keyclick: false, accompVolume: 0.4 },
       fx: { budget: 'light' as const, lowload: 'on' as const },
       imeStop: true,
+      grayscale: true,
     }
     expect(saveSettings(k, s)).toBe(true)
     expect(loadSettings(k)).toEqual(s)

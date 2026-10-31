@@ -9,7 +9,9 @@ import type { VariantSpec } from '../chart/variants.ts'
 import type { InputEvent } from '../input/keyboard.ts'
 import type { DeviceInfo, SyncKind } from '../shared/types.ts'
 import type { OnboardState, TutorialRun } from './onboard-flow.ts'
+import { BOOTED_KEY } from '../storage/session.ts'
 import {
+  LOCAL_KEYS,
   loadCalibration,
   saveCalibration,
   saveDevice,
@@ -50,6 +52,8 @@ export interface ScreenContext {
   device(): DeviceInfo | null
   /** 端末プロファイルを保存する（S0b の終わり。device 行は呼ぶ側、decisions #55 (b)） */
   saveDevice(d: DeviceInfo): void
+  /** 端末プロファイルの初期化（S6 → S0。hexnote.device と hexnote.booted を消し、次は初回の導線、§1.3 S6） */
+  resetDevice(): void
   /** S0d のチュートリアル曲の段階（S2 をまたいで持つ。導線の外は null） */
   tutorial(): TutorialRun | null
   setTutorial(t: TutorialRun | null): void
@@ -207,6 +211,11 @@ export function startShell(opts: ShellOptions): Shell {
     saveDevice: (d) => {
       saveDevice(booted.local, d)
       device = d
+    },
+    resetDevice: () => {
+      booted.local.remove(LOCAL_KEYS.device)
+      booted.session.remove(BOOTED_KEY)
+      device = null
     },
     tutorial: () => tutorial,
     setTutorial: (t) => {
