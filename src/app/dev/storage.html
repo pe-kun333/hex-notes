@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>保存層（開発）</title>
+    <style>
+      :root {
+        --bg: #111318;
+        --fg: #e8e9ec;
+        --dim: #8a8f99;
+        --line: #2a2e37;
+        --key: #1c1f26;
+        --band: #3a1a1a;
+        --band-fg: #f6b0a8;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          15px/1.5 system-ui,
+          sans-serif;
+      }
+      main {
+        padding: 16px;
+        max-width: 1100px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 15px;
+        margin: 20px 0 4px;
+      }
+      p.note {
+        color: var(--dim);
+        margin: 0 0 12px;
+      }
+      #band {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        background: var(--band);
+        color: var(--band-fg);
+        padding: 8px 12px;
+        border-radius: 6px;
+        margin-bottom: 12px;
+      }
+      #band[hidden] {
+        display: none;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 2px 12px;
+        margin: 8px 0;
+      }
+      dt {
+        color: var(--dim);
+      }
+      dd {
+        margin: 0;
+        font-variant-numeric: tabular-nums;
+      }
+      table {
+        border-collapse: collapse;
+        margin: 8px 0 12px;
+      }
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 4px 10px;
+        text-align: left;
+        font-variant-numeric: tabular-nums;
+        vertical-align: top;
+      }
+      th {
+        color: var(--dim);
+        font-weight: 500;
+      }
+      .ok {
+        color: #62d4a0;
+      }
+      .ng {
+        color: #f06a6a;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        align-items: center;
+        margin: 8px 0;
+      }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-all;
+        font:
+          12px/1.4 ui-monospace,
+          monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>保存層（手順 11）</h1>
+      <p class="note">
+        localStorage の 4
+        つの記録・sessionStorage・IndexedDB（charts・results・telemetry）・旧鍵の移行・*.hexnote.json
+        の往復を確かめる開発用のページ（製品画面ではない）。「容量超過を起こす」・?quota=1（容量超過の真似）・?deny=1
+        （プライベートウィンドウ・遮断の真似）で、帯と storageFail が置き場ごとに 1
+        回出て、メモリ内で続くことを見る。
+      </p>
+
+      <div id="band" hidden>
+        <span id="bandText"></span>
+        <button id="bandExport" type="button">*.hexnote.json を書き出す</button>
+      </div>
+
+      <h2>置き場</h2>
+      <dl id="modes"></dl>
+
+      <h2>storageFail</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>at</th>
+            <th>where</th>
+            <th>message</th>
+          </tr>
+        </thead>
+        <tbody id="fails"></tbody>
+      </table>
+
+      <h2>localStorage の記録</h2>
+      <div class="controls">
+        <button id="saveSettings" type="button">配列を替えて保存</button>
+        <button id="saveCalib" type="button">校正（audio）を保存</button>
+        <button id="saveDevice" type="button">端末を保存</button>
+        <button id="saveFade" type="button">足場外しを動かして保存</button>
+        <button id="markBooted" type="button">導線を通した印</button>
+        <button id="clearNew" type="button">新しい鍵を消す</button>
+      </div>
+      <table>
+        <tbody id="records"></tbody>
+      </table>
+
+      <h2>失敗を起こす</h2>
+      <div class="controls">
+        <button id="fill" type="button">容量超過を起こす（localStorage を埋めて保存）</button>
+        <button id="unfill" type="button">埋めた分を消して読み直す</button>
+        <a id="denyLink" href="?deny=1">?deny=1 で開き直す</a>
+        <a href="?quota=1">?quota=1 で開き直す</a>
+        <a href="?">普通に開き直す</a>
+      </div>
+      <p class="note" id="fillNote"></p>
+
+      <h2>旧鍵の移行</h2>
+      <div class="controls">
+        <button id="putLegacy" type="button">モックの旧鍵を置く</button>
+        <button id="migrate" type="button">移行する</button>
+      </div>
+      <pre id="migrateOut"></pre>
+
+      <h2>IndexedDB（本物）</h2>
+      <div class="controls">
+        <button id="idbCheck" type="button">別の DB（hexnote-devcheck）で確かめる</button>
+        <button id="idbAdd" type="button">アプリの DB に canon と記録を入れる</button>
+        <button id="idbClear" type="button">アプリの DB を空にする</button>
+      </div>
+      <table>
+        <tbody id="idbOut"></tbody>
+      </table>
+      <dl id="idbCounts"></dl>
+
+      <h2>*.hexnote.json</h2>
+      <div class="controls">
+        <button id="roundTrip" type="button">往復を確かめる（ダウンロードしない）</button>
+        <button id="exportChart" type="button">譜面を書き出す</button>
+        <button id="exportBackup" type="button">控えを書き出す</button>
+        <label
+          >取り込む <input id="importFile" type="file" accept=".json,application/json"
+        /></label>
+      </div>
+      <pre id="fileOut"></pre>
+    </main>
+    <script type="module" src="./storage-dev.ts"></script>
+  </body>
+</html>
