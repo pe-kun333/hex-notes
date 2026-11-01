@@ -8,6 +8,8 @@
 // 未同梱の間は合成音で鳴る（audio/context.ts）。
 // M2 の手順 6: S4 練習室は同じ画面に練習のパネル（practice-panel.ts）を左列のプレイヤー矩形の場所に置いた物（room 真。
 // m2-kickoff §7-9）。練習の設定は殻の practice()（S4 に入るたびに既定、§7-7）。S0d の段階は音待ちで流す（decisions #61・#82）。
+// M2 の手順 9（M2-05）: 音ゲー向けの HUD（ランク・コンボ・ゲージ・ハイスピード・FAST／SLOW を 3 行に。m6 renderS2
+// L823–826）、流れる時間にハイスピード（settings.hispeed。両プロファイル）、ゲージ 0 の途中終了は play-runner が終了にする。
 
 import {
   PART_GAINS,
@@ -40,7 +42,7 @@ import type { Sizing } from '../../render/hex/sizing.ts'
 import type { KeyCode, LayoutId } from '../../shared/types.ts'
 import { offsetFor } from '../../storage/local.ts'
 import { playRow } from '../../telemetry/collect.ts'
-import { hudOf } from '../hud.ts'
+import { gamerHudOf, hudOf } from '../hud.ts'
 import type { ControlInput } from '../play-control.ts'
 import {
   DEFAULT_PRACTICE,
@@ -67,7 +69,7 @@ import {
 import { practicePanel, type PracticePanel } from '../practice-panel.ts'
 import { keysetShown, loopBandText, practiceNote } from '../practice-view.ts'
 import type { KeysetId } from '../../chart/keyset.ts'
-import { profileOf } from '../profile.ts'
+import { profileOf, travelOf } from '../profile.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { songOf } from '../songs.ts'
 import { stageOf, type Stage } from '../stage.ts'
@@ -98,6 +100,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   const { doc } = ctx
   const settings = ctx.settings()
   const prof = profileOf(settings.profile)
+  // 流れる時間（プロファイルの T ÷ ハイスピード。R は変えない、§2.5）
+  const travelMs = travelOf(settings.profile, settings.hispeed)
   const entry = ctx.song()
   // 鍵数制限（S4 は入門者だけ選べる。音ゲー向けは全鍵、M2-07）
   const keyset = room && !keysetShown(settings.profile) ? 'all' : ctx.keyset()
@@ -187,8 +191,24 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   const bar = h(doc, 'i')
   const barText = h(doc, 'span', { text: '0%' })
   hudRow('進行', h(doc, 'span', { className: 'bar' }, bar), barText)
-  const accuracy = hudRow('精度')
-  accuracy.className = 'big'
+  // 音ゲー向け（prof.hud にランク以下の項目があるときだけ）: 精度の行の後ろに「ランク S ・ コンボ 48」（m6 L824 の横並び。
+  // 1093×514 の左列に入るよう行を足さない）、ゲージの棒と数、「×1.0（1.0 s） ・ FAST 37 ／ SLOW 22」
+  const gamerHud = prof.hud.includes('rank')
+  const accuracy = h(doc, 'span')
+  const rank = h(doc, 'b')
+  const combo = h(doc, 'b')
+  const gaugeBar = h(doc, 'i')
+  const gaugeText = h(doc, 'span')
+  const hispeed = h(doc, 'b')
+  const fast = h(doc, 'b')
+  const slow = h(doc, 'b')
+  const t = (x: string): Text => doc.createTextNode(x)
+  const accRow = hudRow('精度', accuracy, ...(gamerHud ? [h(doc, 'small', {}, t(' ランク '), rank, t(' ・ コンボ '), combo)] : [])) // prettier-ignore
+  accRow.className = 'big'
+  if (gamerHud) {
+    hudRow('ゲージ', h(doc, 'span', { className: 'bar' }, gaugeBar), gaugeText)
+    hudRow('ハイスピード', hispeed, t(' ・ FAST '), fast, t(' ／ SLOW '), slow)
+  }
   const status = h(doc, 'p', { className: 'status', text: '読み込み中…' })
   const home = button(doc, 'ホームへ', () => goHome(), 'small')
   // S0d のチュートリアル曲（手順 9）: 段階の並びと吹き出し 3 つを左列に出す
@@ -240,7 +260,7 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     const vh = window.innerHeight
     let st: Stage
     try {
-      st = stageOf({ w: vw, h: vh }, LAYOUTS[layoutId].rowsUsed, prof.travelMs)
+      st = stageOf({ w: vw, h: vh }, LAYOUTS[layoutId].rowsUsed, travelMs)
     } catch (e) {
       // 箱が R 24 の鍵盤図より低い（decisions #24 (e)）。描かずに知らせ、resize で組み直す
       sizing = null
@@ -361,12 +381,27 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     if (el.textContent !== text) el.textContent = text
   }
   const showHud = (r: Run): void => {
-    const v = hudOf(r.song.name, r.t, r.lastEndMs, summarizeJudge(r.judge))
+    const sum = summarizeJudge(r.judge)
+    const v = hudOf(r.song.name, r.t, r.lastEndMs, sum)
     put(title, v.title)
     const w = `${(v.progress * 100).toFixed(1)}%`
     if (bar.style.width !== w) bar.style.width = w
     put(barText, v.progressText)
     put(accuracy, v.accuracy)
+    const g = gamerHud
+      ? gamerHudOf(sum, r.judge.score.combo, settings.profile, settings.hispeed)
+      : null
+    if (g === null) return
+    put(rank, g.rank)
+    put(combo, g.combo)
+    const gw = `${g.gauge.toFixed(1)}%`
+    if (gaugeBar.style.width !== gw) gaugeBar.style.width = gw
+    if (gaugeBar.classList.contains('clear') !== g.clear)
+      gaugeBar.classList.toggle('clear', g.clear)
+    put(gaugeText, g.gaugeText)
+    put(hispeed, g.hispeed)
+    put(fast, g.fast)
+    put(slow, g.slow)
   }
 
   /** 音を出す準備（Space・Pause のボタンの中で。自動再生の制限） */
@@ -435,7 +470,7 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     ctx.setLastPlay(o)
     const row = playRow(
       r.collect,
-      { chartId: o.chartId, variantId: o.variantId, profile: prof.profile, clock: 'novideo', mode: o.mode, rate: o.rate, keyset: o.keyset, ...(o.practice === null ? {} : { practice: o.practice }) },
+      { chartId: o.chartId, variantId: o.variantId, profile: prof.profile, clock: 'novideo', mode: o.mode, rate: o.rate, keyset: o.keyset, ...(o.practice === null ? {} : { practice: o.practice }), aborted: o.aborted },
       o.judge,
       o.audioLateMaxMs,
       at,

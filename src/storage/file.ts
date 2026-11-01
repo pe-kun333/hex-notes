@@ -260,6 +260,9 @@ export function parseResult(x: unknown): ResultRecord | null {
   // looped（M2-03）は無ければ偽。あって真偽値でなければ壊れた記録
   const looped = x['looped']
   if (looped !== undefined && typeof looped !== 'boolean') return null
+  // aborted（M2-05）も無ければ偽
+  const aborted = x['aborted']
+  if (aborted !== undefined && typeof aborted !== 'boolean') return null
   const c = counts(x['counts'], COUNT_KEYS)
   const s = counts(x['selfRate'], SELF_KEYS)
   const u = syncUsed(x['syncUsed'])
@@ -282,5 +285,6 @@ export function parseResult(x: unknown): ResultRecord | null {
     offsetUsed,
     skipped,
     ...(looped === true ? { looped: true } : {}),
+    ...(aborted === true ? { aborted: true } : {}),
   }
 }

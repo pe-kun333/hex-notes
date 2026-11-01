@@ -22,6 +22,7 @@ import { DENSITY_CAUTION, LEAP_CAUTION, variantMetrics } from '../chart/metrics.
 import { buildMsTable } from '../chart/mstable.ts'
 import { bestOf, finishedSong } from '../results/best.ts'
 import type { VariantSpec } from '../chart/variants.ts'
+import { PROFILE_NAMES } from './profile.ts'
 
 /** 注意の目安（§2.4、仮）。定義は chart/metrics.ts（S5 の注意と共有、M2-01） */
 export { DENSITY_CAUTION, LEAP_CAUTION }
@@ -169,8 +170,6 @@ export interface CardContext {
   readonly records: readonly ResultRecord[]
   readonly tutorialId: string
 }
-
-const PROFILE_NAMES: Readonly<Record<Profile, string>> = { beginner: '入門者', gamer: '音ゲー向け' }
 
 export function songCard(id: string, chart: Chart, c: CardContext): SongCard {
   const choice = versionChoice(chart, c.preferred, c.deviceLimit)

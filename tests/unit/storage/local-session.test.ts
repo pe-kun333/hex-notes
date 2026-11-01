@@ -114,6 +114,7 @@ describe('設定 hexnote.settings（v:1）', () => {
       fx: { budget: 'standard', lowload: 'auto' },
       imeStop: false,
       grayscale: false,
+      hispeed: 1,
     })
   })
 
@@ -208,6 +209,7 @@ describe('設定 hexnote.settings（v:1）', () => {
       fx: { budget: 'standard', lowload: 'auto' },
       imeStop: false,
       grayscale: false,
+      hispeed: 1,
     })
     expect(parseSettings({ v: 1, layout: 'garage' }).layout).toBe('ableton')
     expect(parseSettings({ v: 1, layout: 'constructor' }).layout).toBe('ableton')
@@ -226,10 +228,17 @@ describe('設定 hexnote.settings（v:1）', () => {
       fx: { budget: 'light' as const, lowload: 'on' as const },
       imeStop: true,
       grayscale: true,
+      hispeed: 1.5,
     }
     expect(saveSettings(k, s)).toBe(true)
     expect(loadSettings(k)).toEqual(s)
   })
+
+  it('ハイスピード（M2-05、m2-kickoff §7-15）: 1.0／1.25／1.5／2.0 だけ読め、外・文字列・無しは 1.0（版は 1 のまま）', () => {
+    for (const x of [1, 1.25, 1.5, 2]) expect(parseSettings({ v: 1, hispeed: x }).hispeed).toBe(x)
+    for (const x of [1.1, 0, -1, 3, '2', null, Number.NaN]) expect(parseSettings({ v: 1, hispeed: x }).hispeed).toBe(1)
+    expect(parseSettings({ v: 1 }).hispeed).toBe(1)
+  }) // prettier-ignore
 })
 
 describe('校正 hexnote.calibration（音源種別ごと）', () => {

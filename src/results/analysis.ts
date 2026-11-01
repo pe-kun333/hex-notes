@@ -4,14 +4,22 @@
 // 音ごとの結果は判定層（resultsByIndex）から呼ぶ側が作る。仮の所（m1-kickoff §7-18 に足す）: 苦手区間が同じ数なら前の
 // 組、miss が 0 なら無し、1 小節だけの曲はその 1 小節。和音の「当てた」は正しい鍵の perfect・great・good（NEAR は
 // 隣の鍵なので入れない）、skipped の音を含む和音は分母から外す。
+// M2 の手順 9（M2-05）: 和音の形（塊／殻／段またぎ。S3 の音ゲー向けの節）を m1' の和音統計（m1-geometry L296）のとおりに
+// 数える: 塊 ＝ 構成音の鍵が六角距離 1 で全部つながる、殻 ＝ それ以外（塊と殻で全ての和音）、段またぎ ＝ 鍵が 2 段以上に
+// またがる（塊・殻と重なる）。
 
-import type { Judgment, Pulse } from '../shared/types.ts'
+import { keyPosition } from '../layout/presets.ts'
+import { isConnected } from '../render/canvas/chords.ts'
+import type { HexPos } from '../render/hex/hex.ts'
+import type { Judgment, KeyCode, Pulse } from '../shared/types.ts'
 
 /** 1 音の結果（tick ＝ beat × resolution の整数。grade は未判定・skipped なら null） */
 export interface NoteOutcome {
   readonly tick: number
   readonly grade: Judgment | null
   readonly skipped: boolean
+  /** ノートの鍵（和音の形に使う。無ければ形を数えない） */
+  readonly code?: KeyCode
 }
 
 /**
@@ -81,4 +89,32 @@ export function chordRate(notes: readonly NoteOutcome[]): ChordRate {
     if (g.every((n) => HIT.has(n.grade))) hit++
   }
   return { hit, total }
+}
+
+export interface ChordShapes {
+  /** 和音（同じ tick に 2 音以上、鍵の分かる物）の数 */
+  readonly total: number
+  /** 塊（六角距離 1 で全連結）・殻（それ以外）・段またぎ（2 段以上） */
+  readonly cluster: number
+  readonly shell: number
+  readonly cross: number
+}
+
+/** 和音の形の数（m1' の和音統計。skipped も譜面の和音として数える） */
+export function chordShapes(notes: readonly NoteOutcome[]): ChordShapes {
+  const byTick = new Map<number, HexPos[]>()
+  for (const n of notes) {
+    const p = n.code === undefined ? null : keyPosition(n.code)
+    if (p !== null) byTick.set(n.tick, [...(byTick.get(n.tick) ?? []), p])
+  }
+  let total = 0
+  let cluster = 0
+  let cross = 0
+  for (const ks of byTick.values()) {
+    if (ks.length < 2) continue
+    total++
+    if (isConnected(ks)) cluster++
+    if (new Set(ks.map((k) => k.row)).size > 1) cross++
+  }
+  return { total, cluster, shell: total - cluster, cross }
 }

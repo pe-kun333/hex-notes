@@ -9,6 +9,8 @@
 // M2 の手順 5（M2-03 前半）: RunOptions.practice で練習層（src/practice/ の待ち・ループ・テンポ段）を回す。練習層は時計に
 // 触らず、ここが PlayEvent（waitStop・waitHit・seek・setRate）と判定層の judgeWaitHit・judgeRewind に渡す（decisions #80・
 // #81・#87、m2-kickoff 手順 5・§7-3・§7-10・§7-11）。描画は曲時間軸のまま（テンポ段で跳ばない）。
+// M2 の手順 9（M2-05）: 音ゲー向けのゲージ 0（判定層の score.failed）で PlayEvent の abort を出して終了し、記録に aborted
+// を付ける。練習（S4・S0d）は途中終了しない（区間を繰り返す回を止めない。decisions #91、仮）。
 
 import { keyclickFor, type KeyclickPlan } from '../audio/keyclick.ts'
 import {
@@ -88,8 +90,10 @@ import { frameNotes } from '../render/canvas/commands.ts'
 import type { FxIntent } from '../render/canvas/feedback.ts'
 import {
   chordRate,
+  chordShapes,
   weakBars,
   type ChordRate,
+  type ChordShapes,
   type NoteOutcome,
   type WeakBars,
 } from '../results/analysis.ts'
@@ -292,7 +296,7 @@ function judgeEffects(r: Run, out: readonly JudgeOutcome[], realNow: number): Ru
       const plan = keyclickFor(o, (c: KeyCode) => midiOf(layout, c))
       if (plan !== null) fx.push({ kind: 'keyclick', plan })
     }
-    // failed（音ゲー向けのゲージ 0）の途中終了は M2-05。入門者の規則では出ない
+    // failed（音ゲー向けのゲージ 0）の途中終了は runFrame が判定層の状態から出す
   }
   return fx
 }
@@ -606,12 +610,27 @@ export function runFrame(r: Run, now: number, frameMs: number): RunStep {
     const misses = j.out.flatMap((o) => (o.kind === 'miss' ? [o.index] : []))
     next = practiceFrame(next, misses, now, effects)
   }
+  // 音ゲー向けのゲージ 0 は途中終了（押下で落ちた分も次のフレームでここに来る）
+  if (abortsOn(next)) {
+    const end = runInput(next, now, { kind: 'abort' })
+    return { run: end.run, effects: [...effects, ...end.effects] }
+  }
   // ループ中は chartEnd を出さない（区間の終わりで折り返す、§7-10）
   if (next.t > next.endMs && runPhase(next) === 'playing' && next.practice?.loop.range == null) {
     const end = runInput(next, now, { kind: 'chartEnd' })
     return { run: end.run, effects: [...effects, ...end.effects] }
   }
   return { run: next, effects }
+}
+
+/** 途中終了するか: 通常プレイ（練習でない）でゲージが 0 になり、まだ終わっていない（一時停止の間は再開の後） */
+function abortsOn(r: Run): boolean {
+  const phase = runPhase(r)
+  return (
+    r.practice === null &&
+    r.judge.score.failed &&
+    (phase === 'playing' || phase === 'syncing' || phase === 'waiting')
+  )
 }
 
 /** 発音の予約 1 回（PUMP_MS ごと。bridge は同じタスクで読んだ AudioContext の対応点） */
@@ -659,6 +678,10 @@ export interface PlayResult {
   readonly weak: WeakBars | null
   /** 同時押しが合った割合 */
   readonly chords: ChordRate
+  /** 和音の形（塊／殻／段またぎ。S3 の音ゲー向けの節） */
+  readonly shapes: ChordShapes
+  /** 途中終了（音ゲー向けのゲージ 0 の通常プレイ。記録の aborted） */
+  readonly aborted: boolean
 }
 
 /** 練習の要約（m6 L451「測ること」: ループの回数・テンポ段の始めと終わり・待った回数、§7-20） */
@@ -680,7 +703,12 @@ function noteOutcomes(r: Run): NoteOutcome[] {
   const byIndex = resultsByIndex(r.judge)
   return r.notes.map((n) => {
     const res = byIndex.get(n.index)
-    return { tick: n.group, grade: res?.grade ?? null, skipped: res?.skipped ?? false }
+    return {
+      tick: n.group,
+      grade: res?.grade ?? null,
+      skipped: res?.skipped ?? false,
+      code: n.code,
+    }
   })
 }
 
@@ -715,6 +743,8 @@ export function runOutcome(r: Run): PlayResult {
       keyset === 'all' && mode === 'fixed' && rate === 1 && (practice?.loops ?? 0) === 0,
     weak: weakBars(r.song.chart.pulse, notes),
     chords: chordRate(notes),
+    shapes: chordShapes(notes),
+    aborted: p === null && r.judge.score.failed,
   }
 }
 
@@ -748,6 +778,7 @@ export function finishedPlay(
       syncUsed: { kind: 'audio' },
       offsetUsed: o.offsetUsed,
       ...((o.practice?.loops ?? 0) > 0 ? { looped: true } : {}),
+      ...(o.aborted ? { aborted: true } : {}),
     },
     o.judge,
   )

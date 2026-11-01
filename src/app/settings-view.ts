@@ -5,9 +5,13 @@
 // 色は 標準／グレースケール確認 の 2 値、演出の予算 標準／控えめ／なし、低負荷 自動／ON（段 3）／OFF（段 0）、仮）。
 // 選ぶ項目を表で持ち、選んだ値 → 新しい設定の純関数（DOM は screens/settings.ts）。持ち込み曲の削除と版の作り直しは
 // M2 の手順 4 で screens/settings.ts のデータの群に足した（選ぶ項目ではないのでこの表には入れない。文言は library-view.ts）。
+// M2 の手順 9（M2-05）: 群「プロファイル」（切替は applyProfileDefaults で既定値を一括、m6 renderS6 L916）を先頭に、
+// 「着地と判定」にハイスピード（m2-kickoff §7-15・§7-16）。判定窓・離し窓は出さない（定数、#38 (b)・#73 (b)）。
 
+import { HISPEEDS } from '../render/hex/sizing.ts'
 import { STAGGER_PRESETS, type Stagger } from '../layout/stagger.ts'
 import type { Settings } from '../storage/local.ts'
+import { PROFILE_NAMES, applyProfileDefaults, hispeedLabel } from './profile.ts'
 
 export interface Choice {
   readonly value: string
@@ -54,6 +58,22 @@ export const ACCOMP_STEPS: readonly number[] = [0, 0.25, 0.5, 0.75, 1]
 
 /** 選べる項目（m6 renderS6 の群の順。M1 で出さない物は入れない、§7-11） */
 export const SETTING_GROUPS: readonly Group[] = [
+  {
+    title: 'プロファイル',
+    controls: [
+      {
+        id: 'profile',
+        label: 'プロファイル',
+        choices: [
+          { value: 'beginner', label: PROFILE_NAMES.beginner },
+          { value: 'gamer', label: PROFILE_NAMES.gamer },
+        ],
+        get: (s) => s.profile,
+        set: (s, v) => applyProfileDefaults(s, v === 'gamer' ? 'gamer' : 'beginner'),
+        note: '切替でラベルと辺ヒントを既定値に入れ替えます（着地・音・ハイスピードは保ちます）。記録はプロファイルごとに別に持ち、混ざりません。',
+      },
+    ],
+  },
   {
     title: '配列',
     controls: [
@@ -131,6 +151,17 @@ export const SETTING_GROUPS: readonly Group[] = [
         ],
         get: (s) => onOffOf(s.hints),
         set: (s, v) => ({ ...s, hints: bool(v) }),
+      },
+      {
+        id: 'hispeed',
+        label: 'ハイスピード',
+        choices: HISPEEDS.map((x) => ({ value: String(x), label: hispeedLabel(x) })),
+        get: (s) => (HISPEEDS.includes(s.hispeed) ? String(s.hispeed) : null),
+        set: (s, v) => {
+          const x = Number(v)
+          return HISPEEDS.includes(x) ? { ...s, hispeed: x } : s
+        },
+        note: '落ちる速さに掛けます（流れる時間 ＝ 入門者 1.5 s・音ゲー向け 1.0 s ÷ 倍率。セルの大きさは変えません）。HUD に出すのは音ゲー向けだけ。',
       },
     ],
   },

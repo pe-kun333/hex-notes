@@ -227,6 +227,11 @@ export interface ResultRecord {
    * 折り返さなかった回は書かない（無ければ偽）
    */
   looped?: boolean
+  /**
+   * 途中終了（音ゲー向けのゲージ 0。完走・自己ベスト・初クリアの対象外、ストリークの対象プレイには入る。M2-05、
+   * m2-kickoff §7-14）。途中終了しなかった回は書かない（無ければ偽）
+   */
+  aborted?: boolean
 }
 
 // ---------- 端末・設定の保存（§4.3 localStorage） ----------
@@ -290,6 +295,8 @@ export interface PlayTelemetry extends TelemetryBase {
   keyset?: string
   /** 練習の要約（ループの回数・テンポ段の始めと終わり・待った回数。練習の回だけ） */
   practice?: { loops: number; tempoFrom: number; tempoTo: number; waits: number }
+  /** 途中終了（音ゲー向けのゲージ 0。M2-05 で足した。無ければ偽、§7-20） */
+  aborted?: boolean
 }
 
 /** 校正の行（段 1 ＝ tap、段 2 ＝ propose。decisions #40・#54） */

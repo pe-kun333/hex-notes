@@ -3,11 +3,13 @@
 // （2 枚のカード: 精度・ランク・曲の行・内訳の表／自力率・和音・ずれとオフセット・苦手区間）・提案帯 L381–384（適用／
 // 今回は見送る）、decisions #55 (a)（calib 行は段 2 も書く）・#62。文言は result-view.ts。記録の保存は S2 の終わり
 // （screens/play.ts）。称号・ストリークは手順 11、「練習室で弾く」は M2-03。
+// M2 の手順 9（M2-05）: 音ゲー向けの FULL COMBO（m6 S3 L366）と節（塊／殻／段またぎ・FAST／SLOW・早遅ヒストグラム、
+// m6 S3 L375–379）、途中終了の称号の文。
 
 import { proposalFor, proposalText, signedMs } from '../calibration.ts'
 import { DEFAULT_PRACTICE, type PlayResult } from '../play-runner.ts'
 import { practiceEntryText, weakRange } from '../practice-view.ts'
-import { resultView, rewardView } from '../result-view.ts'
+import { HIST_BAR_MS, HIST_BARS, resultView, rewardView } from '../result-view.ts'
 import { awardsFor, localDay } from '../../results/awards.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { calibRow } from '../../telemetry/rows.ts'
@@ -78,6 +80,7 @@ export function resultScreen(ctx: ScreenContext): ScreenView {
         { className: 'btnrow' },
         h(doc, 'div', {}, h(doc, 'div', { className: 'note', text: '精度' }), h(doc, 'div', { className: 'big', text: v.accuracy })),
         h(doc, 'div', {}, h(doc, 'div', { className: 'note', text: 'ランク' }), h(doc, 'div', { className: 'rank', text: v.rank })),
+        ...(v.fullCombo ? [h(doc, 'div', { className: 'fc' }, h(doc, 'div', { className: 'note', text: 'コンボ' }), h(doc, 'div', { className: 'rank', text: 'FULL COMBO' }))] : []),
       ),
       h(doc, 'p', { className: 'note', text: v.song }),
       table,
@@ -96,6 +99,26 @@ export function resultScreen(ctx: ScreenContext): ScreenView {
       side.append(stack, legend)
     }
     if (v.chord !== null) side.append(h(doc, 'h3', { text: '和音' }), h(doc, 'p', { text: v.chord }))
+    // 音ゲー向けの節（m6 S3 L375–379。ヒストグラムの本の高さは最も多い本に対する比、数は aria-label と title に）
+    if (v.gamer !== null) {
+      const max = Math.max(1, ...v.gamer.hist)
+      const half = (HIST_BARS * HIST_BAR_MS) / 2
+      const hist = h(doc, 'div', { className: 'hist' }, ...v.gamer.hist.map((n, i) => {
+        const bar = h(doc, 'i', { className: i === (HIST_BARS - 1) / 2 ? 'zero' : i > (HIST_BARS - 1) / 2 ? 'late' : '' })
+        bar.style.height = `${Math.round((n / max) * 100)}%`
+        bar.title = `${-half + i * HIST_BAR_MS}〜${-half + (i + 1) * HIST_BAR_MS} ms: ${n}`
+        return bar
+      }))
+      hist.setAttribute('role', 'img')
+      hist.setAttribute('aria-label', `早遅ヒストグラム（早い側から）: ${v.gamer.hist.join('・')}`)
+      side.append(
+        h(doc, 'dl', { className: 'kv' },
+          h(doc, 'dt', { text: '塊／殻／段またぎ' }), h(doc, 'dd', { text: v.gamer.shapes }),
+          h(doc, 'dt', { text: 'FAST／SLOW' }), h(doc, 'dd', { text: v.gamer.fastSlow })),
+        h(doc, 'h4', { text: `早遅ヒストグラム（−${half} … +${half} ms、${HIST_BAR_MS} ms 幅）` }),
+        hist,
+      )
+    }
     const offset = h(doc, 'div', { className: 'card' }, h(doc, 'h3', { text: 'ずれとオフセット' }))
     offset.append(h(doc, 'p', { text: v.lean ?? '正しいキーで当てた音がありません。' }))
     const p = proposalBand(ctx, last)
@@ -108,7 +131,7 @@ export function resultScreen(ctx: ScreenContext): ScreenView {
     void (async () => {
       const [records, bundledIds] = await Promise.all([booted.db.listResults().catch(() => []), ctx.bundledIds()])
       if (!alive) return
-      const rv = rewardView(awardsFor(records, last.record, { today: localDay(new Date().toISOString()), bundledIds }))
+      const rv = rewardView(awardsFor(records, last.record, { today: localDay(new Date().toISOString()), bundledIds }), last.record.aborted === true)
       const pills = h(doc, 'div', { className: 'btnrow' }, ...rv.pills.map((t) => h(doc, 'span', { className: 'pill good', text: t })))
       reward.replaceChildren(h(doc, 'h3', { text: '称号・ストリーク' }), ...(rv.pills.length > 0 ? [pills] : []), ...rv.lines.map((t, i) => h(doc, 'p', { className: i === 0 ? '' : 'note', text: t })))
     })()

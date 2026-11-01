@@ -12,6 +12,7 @@ import { initialFade, type FadeState, type LabelSides } from '../judge/self-rate
 import { DEFAULT_GEOMETRY, parseGeometry, type GeometryMode } from '../layout/fallback.ts'
 import type { LegendKind } from '../layout/legend.ts'
 import { DEFAULT_LANDING, LANDING_MODES, type LandingMode } from '../render/hex/landing.ts'
+import { DEFAULT_HISPEED, HISPEEDS } from '../render/hex/sizing.ts'
 import { DEFAULT_STAGGER, parseStagger, type Stagger } from '../layout/stagger.ts'
 import {
   CHORD_LIMITS,
@@ -120,6 +121,11 @@ export interface Settings {
   readonly imeStop: boolean
   /** 色の確認（§1.3 S6「グレースケール確認」。S2 の落下域と鍵盤図を灰色で描き、色に頼らず読めるかを見る。既定 OFF） */
   readonly grayscale: boolean
+  /**
+   * ハイスピード（§1.3 S6・§2.5「v に掛ける」。1.0／1.25／1.5／2.0、既定 1.0。M2-05 で足した。無ければ既定値なので版は
+   * 上げない。両プロファイルで効き、HUD に出すのは音ゲー向けだけ。m2-kickoff §7-15、仮）
+   */
+  readonly hispeed: number
 }
 
 /**
@@ -144,6 +150,7 @@ export function defaultSettings(): Settings {
     fx: { budget: 'standard', lowload: 'auto' },
     imeStop: false,
     grayscale: false,
+    hispeed: DEFAULT_HISPEED,
   }
 }
 
@@ -176,6 +183,11 @@ const parseBool = (x: unknown, base: boolean): boolean => (typeof x === 'boolean
 /** 0..1 の有限の数。外は既定値 */
 const parseUnit = (x: unknown, base: number): number =>
   typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 1 ? x : base
+
+/** ハイスピードの段（HISPEEDS のどれか）。外は既定値 */
+export function parseHispeed(x: unknown, base: number): number {
+  return typeof x === 'number' && HISPEEDS.includes(x) ? x : base
+}
 
 export function parseAudio(x: unknown, base: AudioSettings): AudioSettings {
   if (!isRec(x)) return base
@@ -215,6 +227,7 @@ export function parseSettings(raw: unknown): Settings {
     fx: parseFx(raw['fx'], d.fx),
     imeStop: parseBool(raw['imeStop'], d.imeStop),
     grayscale: parseBool(raw['grayscale'], d.grayscale),
+    hispeed: parseHispeed(raw['hispeed'], d.hispeed),
   }
 }
 
