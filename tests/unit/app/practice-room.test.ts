@@ -36,7 +36,7 @@ import {
   tempoText,
   weakRange,
 } from '../../../src/app/practice-view.ts'
-import { conditionText, resultView } from '../../../src/app/result-view.ts'
+import { WAIT_ONLY_LEAN, conditionText, resultView } from '../../../src/app/result-view.ts'
 import { canGo, navigate } from '../../../src/app/router.ts'
 import { neighborOf, resultsByIndex, rulesOf } from '../../../src/judge/judge.ts'
 import { PROFILES } from '../../../src/judge/windows.ts'
@@ -140,6 +140,7 @@ describe('S4 の回（期待値: 記録・条件・設定の途中の変更）',
     const d = drive(started(room(song, { ...DEFAULT_PRACTICE, mode: 'fixed', autoTempo: false })), (r) => runPhase(r) === 'ended')
     const f = finishedPlay(d.run, { id: 'x', at: '2026-11-01T00:00:00.000Z', profile: 'beginner' })
     expect([f.record.mode, f.record.rate, isFinished(f.record), f.calibEligible, resultView(f).title]).toEqual(['fixed', 1, true, true, '結果'])
+    expect(resultView(f).lean).toMatch(/^平均 /)
   }) // prettier-ignore
 
   it('音待ちで 1 回 → mode note、S3 は「練習の結果」、条件「音待ち・1.0 倍・全鍵」', () => {
@@ -147,6 +148,8 @@ describe('S4 の回（期待値: 記録・条件・設定の途中の変更）',
     const f = finishedPlay(d.run, { id: 'x', at: '2026-11-01T00:00:00.000Z', profile: 'beginner' })
     const v = resultView(f)
     expect([f.record.mode, v.title, conditionText(f.record)]).toEqual(['note', '練習の結果', '音待ち・1.0 倍・全鍵'])
+    // 待ちで当てた音は dt を持たないので、全部当てても「当てた音がありません」でなく待ちの文（M2 の手順 10、F1）
+    expect([f.record.counts.perfect, f.record.counts.miss, v.lean]).toEqual([42, 0, WAIT_ONLY_LEAN])
   }) // prettier-ignore
 
   it('待ち中に固定テンポへ替える → 待っていた着地 − 300 ms から止まらずに続く', () => {

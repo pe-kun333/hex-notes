@@ -211,6 +211,9 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   }
   const status = h(doc, 'p', { className: 'status', text: '読み込み中…' })
   const home = button(doc, 'ホームへ', () => goHome(), 'small')
+  // S4 は「ホームへ」をパネルに持つので行ごと隠す（空の行も gap を取り、音ゲー向けの 1093×514 で左列が 5 px 溢れた。M2 の手順 10、F2）
+  const homeRow = h(doc, 'div', { className: 'btnrow' }, home)
+  homeRow.hidden = room
   // S0d のチュートリアル曲（手順 9）: 段階の並びと吹き出し 3 つを左列に出す
   const stages = h(doc, 'ol', { className: 'steps tutorial' })
   const tips = h(
@@ -240,7 +243,7 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     status,
     practiceLine,
     tutorialBox,
-    h(doc, 'div', { className: 'btnrow' }, home),
+    homeRow,
     bandSlot,
   )
 
