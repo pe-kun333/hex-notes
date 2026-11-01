@@ -35,6 +35,9 @@ const SELF_ORDER_GAMER: readonly (keyof SelfRate)[] = ['solo', 'hinted', 'miss']
 const GAMER_WORDS = { hits: 'PERFECT／GREAT／GOOD', miss: 'MISS' } as const
 
 /** S3 の早遅ヒストグラム: 30 ms 幅 × 11 本（−165 … ＋165 ms。m2-kickoff 手順 9・§7-19 の自作値、仮） */
+/** 当てた音が全部待ちの解除だった回の「ずれとオフセット」（M2 の手順 10、F1） */
+export const WAIT_ONLY_LEAN =
+  '待ちで当てた音はずれに数えません（時刻どおりに当てた音がありません）。'
 export const HIST_BAR_MS = 30
 export const HIST_BARS = 11
 
@@ -196,9 +199,12 @@ export function resultView(p: FinishedPlay): ResultView {
       ch.total === 0
         ? null
         : `同時押しが合った割合 ${Math.round((ch.hit / ch.total) * 100)}%（${ch.hit} ／ ${ch.total} 拍）`,
+    // 待ちで当てた音は dt を持たない（ずれの標本に入らない）。音待ちで全部当てた回に「当てた音がありません」と出さない（M2 の手順 10、F1）
     lean:
       j.meanMs === null
-        ? null
+        ? r.mode !== 'fixed' && c.perfect + c.great + c.good > 0
+          ? WAIT_ONLY_LEAN
+          : null
         : `平均 ${signedMs(j.meanMs)}（${leanWord(j.meanMs)}）、ばらつき ${j.sdMs === null ? '—' : `${Math.round(j.sdMs)} ms`}、ヒット ${p.samples.length}。`,
     weak:
       p.weak === null
