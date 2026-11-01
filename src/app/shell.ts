@@ -8,6 +8,7 @@ import type { KeysetId } from '../chart/keyset.ts'
 import { validateChart } from '../chart/validate.ts'
 import type { VariantSpec } from '../chart/variants.ts'
 import type { InputEvent } from '../input/keyboard.ts'
+import type { FadeState } from '../judge/self-rate.ts'
 import type { DeviceInfo, SyncKind } from '../shared/types.ts'
 import type { OnboardState, TutorialRun } from './onboard-flow.ts'
 import { BOOTED_KEY, isFirstRun } from '../storage/session.ts'
@@ -16,6 +17,7 @@ import {
   loadCalibration,
   saveCalibration,
   saveDevice,
+  saveFade,
   saveSettings,
   type CalibEntry,
   type Calibration,
@@ -50,6 +52,10 @@ export interface ScreenContext {
   settings(): Settings
   /** 設定を保存する（hexnote.settings。S0a の刻印と配列、S6 は手順 10） */
   saveSettings(s: Settings): void
+  /** 足場外しの α（起動で読んだ値に、回の終わりと S4・控えの取り込みの保存を重ねた物。M2-04） */
+  fade(): FadeState
+  /** 足場外しを保存する（hexnote.fade。回の終わり・S4 の手動／成績連動・リセット・控えの取り込み） */
+  saveFade(f: FadeState): void
   /** 端末プロファイル（同時押しテストの結果。無ければ null ＝ 未診断） */
   device(): DeviceInfo | null
   /** 端末プロファイルを保存する（S0b の終わり。device 行は呼ぶ側、decisions #55 (b)） */
@@ -187,6 +193,7 @@ export function startShell(opts: ShellOptions): Shell {
   let route = booted.route
   let bands: BandsState = initialBands()
   let settings = booted.settings
+  let fade = booted.fade
   let device = booted.device
   let tutorial: TutorialRun | null = null
   let onboard: OnboardState | null = null
@@ -236,6 +243,11 @@ export function startShell(opts: ShellOptions): Shell {
     saveSettings: (s) => {
       saveSettings(booted.local, s)
       settings = s
+    },
+    fade: () => fade,
+    saveFade: (f) => {
+      saveFade(booted.local, f)
+      fade = f
     },
     device: () => device,
     saveDevice: (d) => {

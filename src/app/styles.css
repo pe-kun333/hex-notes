@@ -854,3 +854,55 @@ table.tracks th {
   font-weight: 600;
   font-size: 14px;
 }
+
+/* S4 の足場外し（M2-04。折り畳みの中: 9 マス・手動／成績連動・音高ごとの棒） */
+.practice-panel .fadebox summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.practice-panel .nine {
+  display: grid;
+  grid-template-columns: auto repeat(4, 1fr);
+  gap: 2px 4px;
+  align-items: center;
+  margin: 4px 0;
+  font-size: 12px;
+}
+
+.practice-panel .nine .h {
+  color: var(--muted);
+}
+
+.practice-panel .nine button.cell {
+  min-height: 22px;
+}
+
+.practice-panel .fadebars {
+  display: grid;
+  gap: 1px;
+  margin: 4px 0;
+  font-size: 12px;
+}
+
+.practice-panel .fadebar {
+  display: grid;
+  grid-template-columns: 3.2em 1fr 3em;
+  gap: 6px;
+  align-items: center;
+}
+
+.practice-panel .fadebar .bar {
+  height: 6px;
+  background: var(--line);
+}
+
+.practice-panel .fadebar .bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.practice-panel .fadebar.off span:first-child {
+  color: var(--muted);
+}

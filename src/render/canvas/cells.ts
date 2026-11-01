@@ -32,6 +32,16 @@ export type LabelMode = 'key' | 'note' | 'both' | 'none'
 /** 鍵盤図（kb）と落ちるセル（note）のラベル（hexnote.settings.labels と同じ形。decisions #60） */
 export type FrameLabels = { readonly kb: LabelMode; readonly note: LabelMode }
 
+/**
+ * 足場外しのラベルの透明度（音高 → α。M2-04、design §2.7「足場外し」・m2-kickoff §7-13）。無ければ全て 1。α ＝ 1 は文字に
+ * alpha を付けない（描画コマンドが M1 と同じ）、0.2 未満はキー文字・音名を描かない（鍵盤側も。#30 (d) の足場外しの例外）。
+ * 黒鍵の ♯ と空のキーの文字は対象外
+ */
+export type LabelFade = (midi: number) => number
+
+/** ラベルを消す線（judge/self-rate.ts の FADE_HIDE_BELOW と同じ値。描画層は判定層を引かない） */
+export const LABEL_HIDE_BELOW = 0.2
+
 /** 鍵の刻印（QWERTY。m1' KEYS の label）。表は src/layout/legend.ts（手順 9）。セルの文字は GridCell.label を使う */
 export function keyLabel(code: KeyCode): string {
   return qwertyLabel(code)
@@ -101,16 +111,22 @@ export function labelCommands(
   midi: number | null,
   mode: LabelMode,
   gridR: number,
+  fade?: LabelFade,
 ): TextCmd[] {
   const out: TextCmd[] = []
   const k = label
-  if (mode === 'key' || (mode !== 'none' && midi === null)) {
-    out.push(text(base, 'label', x, y + 0.04 * r, k, 0.95 * r, 700))
+  // 足場外し（音のあるキーだけ）。α ＝ 1 は alpha の欄を付けない、0.2 未満はキー文字・音名を描かない
+  const a = fade === undefined || midi === null ? 1 : fade(midi)
+  const lb: TextBase = a >= 1 ? base : { ...base, alpha: a }
+  if (a < LABEL_HIDE_BELOW) {
+    // 描かない（♯ は下で描く）
+  } else if (mode === 'key' || (mode !== 'none' && midi === null)) {
+    out.push(text(lb, 'label', x, y + 0.04 * r, k, 0.95 * r, 700))
   } else if (mode === 'note' && midi !== null) {
-    out.push(text(base, 'noteName', x, y + 0.04 * r, noteName(midi), 0.62 * r, 700))
+    out.push(text(lb, 'noteName', x, y + 0.04 * r, noteName(midi), 0.62 * r, 700))
   } else if (mode === 'both' && midi !== null) {
-    out.push(text(base, 'label', x, y - 0.24 * r, k, 0.95 * r, 700))
-    out.push(text(base, 'noteName', x, y + 0.52 * r, noteName(midi), 0.62 * r, 500))
+    out.push(text(lb, 'label', x, y - 0.24 * r, k, 0.95 * r, 700))
+    out.push(text(lb, 'noteName', x, y + 0.52 * r, noteName(midi), 0.62 * r, 500))
   }
   if (midi !== null && isBlackKey(midi) && gridR >= CORNER_AID_MIN_R)
     out.push(text(base, 'sharp', x + 0.55 * r, y - 0.5 * r, '♯', 0.4 * r, 700))
@@ -156,6 +172,8 @@ export type KeyboardOptions = {
   readonly glow: ReadonlyMap<KeyCode, number>
   readonly labels: LabelMode
   readonly depth: boolean
+  /** 足場外し（無ければ全て 1） */
+  readonly fade?: LabelFade
 }
 
 /**
@@ -217,6 +235,7 @@ export function keyboardCommands(
         c.midi,
         mode,
         grid.R,
+        o.fade,
       ),
     )
   }
@@ -350,6 +369,7 @@ export function noteLabelCommands(
   mode: LabelMode,
   gridR: number,
   fallTop: number,
+  fade?: LabelFade,
 ): TextCmd[] {
   if (mode === 'none') return []
   const base = {
@@ -357,7 +377,7 @@ export function noteLabelCommands(
     region: 'stage',
     paint: inkOn(shadeOf(p.cell.row, p.note.midi)),
   } as const
-  return labelCommands(base, p.x, p.y, p.r, p.cell.label, p.note.midi, mode, gridR).filter(
+  return labelCommands(base, p.x, p.y, p.r, p.cell.label, p.note.midi, mode, gridR, fade).filter(
     (t) => bboxOf(t).y0 >= fallTop,
   )
 }

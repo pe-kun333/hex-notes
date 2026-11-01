@@ -23,6 +23,7 @@ import { bridgeOf } from '../../clock/audio-bridge.ts'
 import { perfNow } from '../../clock/clock-source.ts'
 import type { InputEvent } from '../../input/keyboard.ts'
 import { neighborOf, rulesOf, summarizeJudge } from '../../judge/judge.ts'
+import { fadeOf, type FadeState } from '../../judge/self-rate.ts'
 import { defaultLegendKind, legendOf, type Legend } from '../../layout/legend.ts'
 import { labelsFor } from '../../layout/fallback.ts'
 import { LAYOUTS } from '../../layout/presets.ts'
@@ -102,10 +103,13 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   const keyset = room && !keysetShown(settings.profile) ? 'all' : ctx.keyset()
   // 幾何（S6、decisions #45）: 物理せん断は段ずれの物理座標で鍵盤図の x をずらす。退避はキー文字を必ず出す
   const rowOff = settings.geometry === 'physical' ? physOffFor(settings.stagger) : ROW_OFF
-  const shownLabels = {
+  // S4 の 9 マスで替えられる（待機中だけ、M2-04）
+  let shownLabels = {
     kb: labelsFor(settings.geometry, settings.labels.kb),
     note: labelsFor(settings.geometry, settings.labels.note),
   }
+  // 退避の間は足場外しを止める（キー文字を常に出し、hinted に数え、α を動かさない。m2-kickoff §7-13）
+  const fadeFrozen = settings.geometry === 'fallback'
   // 鍵盤図の配列は演奏する譜面版の配列（読むまでは設定の配列。チュートリアル曲は Ableton 型だけ、songs.ts の variantFor）
   let layoutId: LayoutId = settings.layout
 
@@ -156,6 +160,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     panel = practicePanel(doc, {
       change: (patch) => changePractice(patch),
       keyset: (k) => changeKeyset(k),
+      labels: (l) => changeLabels(l),
+      fade: (patch) => changeFade(patch),
       fullPlay: () => {
         // 通しで弾く ＝ 同じ曲・同じ譜面版の通常プレイ（固定テンポ・1.0・全鍵、§1.2）
         ctx.setPractice(null)
@@ -299,7 +305,7 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       loopNote.replaceChildren(...(b === null ? [] : [h(doc, 'b', { text: b.title }), h(doc, 'span', { text: b.detail })]))
       loopNote.hidden = b === null
     }
-    panel.update({ opts: { ...p.opts, mode: p.mode }, rate: p.pendingRate ?? p.rate, range, laps: p.loop.laps, bars: runBars(r), nowBar: runBar(r), self: r.judge.selfRate, keyset: r.opts.keyset ?? 'all', keysetShown: keysetShown(settings.profile), layout: r.song.variant.layout, idle: runPhase(r) === 'idle' })
+    panel.update({ opts: { ...p.opts, mode: p.mode }, rate: p.pendingRate ?? p.rate, range, laps: p.loop.laps, bars: runBars(r), nowBar: runBar(r), self: r.judge.selfRate, keyset: r.opts.keyset ?? 'all', keysetShown: keysetShown(settings.profile), layout: r.song.variant.layout, idle: runPhase(r) === 'idle', labels: ctx.settings().labels, fade: r.judge.fade, pitches: r.notes.map((n) => n.midi), fadeFrozen })
   } // prettier-ignore
 
   /**
@@ -312,6 +318,30 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     if (e !== null) ctx.pickSong(e, k, ctx.variantSpec() ?? undefined)
     run = newRun(run.song, { ...run.opts, keyset: k })
     showHud(run)
+    show()
+  }
+
+  /** ラベル 9 マス（S4、待機中だけ。設定に書き、自力率の数え方も替えるので回を作り直す。M2-04） */
+  function changeLabels(l: {
+    kb: 'key' | 'note' | 'both' | 'none'
+    note: 'key' | 'note' | 'both' | 'none'
+  }): void {
+    if (!alive || run === null || runPhase(run) !== 'idle') return
+    ctx.saveSettings({ ...ctx.settings(), labels: l })
+    shownLabels = {
+      kb: labelsFor(settings.geometry, l.kb),
+      note: labelsFor(settings.geometry, l.note),
+    }
+    run = newRun(run.song, { ...run.opts, rules: { ...run.opts.rules, labels: shownLabels } })
+    show()
+  }
+
+  /** 透明度（手動／成績連動・手動の値・リセット）。走っている回にもすぐ効かせ、保存する（M2-04） */
+  function changeFade(patch: Partial<FadeState>): void {
+    if (!alive || run === null) return
+    const fade: FadeState = { ...run.judge.fade, ...patch }
+    run = { ...run, judge: { ...run.judge, fade } }
+    ctx.saveFade(fade)
     show()
   }
 
@@ -400,6 +430,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   const finish = (r: Run): void => {
     const at = new Date().toISOString()
     const o = finishedPlay(r, { id: newRecordId(globalThis.crypto, Date.now(), Math.random), at, profile: prof.profile })
+    // 足場外しの α を回の終わりに保存（m4 の判定ごとの保存 → 回の終わり、§7-13）
+    ctx.saveFade(r.judge.fade)
     ctx.setLastPlay(o)
     const row = playRow(
       r.collect,
@@ -419,7 +451,7 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
         ctx.setTutorial(next)
         const entry = ctx.song()
         if (entry !== null) ctx.pickSong(entry, k)
-        run = newRun(r.song, { ...r.opts, keyset: k })
+        run = newRun(r.song, { ...r.opts, keyset: k, fade: r.judge.fade })
         lateShown = false
         ctx.band({ kind: 'audioLate', on: false })
         effects = []
@@ -445,6 +477,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   /** S1 へ（「ホームへ」と Pause の「やめる」。S0d の途中なら離脱として閉じる） */
   function goHome(): void {
     endTutorial(true)
+    // やめた回でも動いた α は残す（回の終わりの保存、M2-04）
+    if (run !== null && runPhase(run) !== 'idle') ctx.saveFade(run.judge.fade)
     ctx.go('S1')
   }
 
@@ -460,6 +494,9 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       pressed,
       effects,
       labels: shownLabels,
+      ...(fadeFrozen
+        ? {}
+        : { fade: (midi: number) => fadeOf(run?.judge.fade ?? ctx.fade(), midi) }),
       hints: settings.hints,
       level: low.level,
     })
@@ -535,8 +572,9 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
         offsetMs: offsetFor(ctx.calibration(), 'audio'),
         // 自力率は見えているラベルで数える（退避はキー文字を必ず出す）
         labels: shownLabels,
+        fadeFrozen,
       }),
-      fade: ctx.booted.fade,
+      fade: ctx.fade(),
       sound: { melody: settings.audio.guide, accomp: true, click: settings.audio.metronome },
       keyclick: settings.audio.keyclick,
       keyset,
