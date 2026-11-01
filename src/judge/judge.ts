@@ -588,6 +588,21 @@ export function timingSamples(s: JudgeState): number[] {
   return out
 }
 
+/**
+ * FAST／SLOW（S2 の HUD・S3 の音ゲー向けの節）: 正しい鍵の当たりのうち perfect 以外（great・good）を dt の符号で数える
+ * （dt < 0 が FAST、dt > 0 が SLOW。perfect と dt 0 は数えない。m2-kickoff 手順 9・§7-19、仮）
+ */
+export function fastSlowOf(s: Pick<JudgeState, 'results'>): { fast: number; slow: number } {
+  let fast = 0
+  let slow = 0
+  for (const r of s.results) {
+    if (r.dtMs === null || (r.grade !== 'great' && r.grade !== 'good')) continue
+    if (r.dtMs < 0) fast++
+    else if (r.dtMs > 0) slow++
+  }
+  return { fast, slow }
+}
+
 export interface JudgeSummary {
   /** 精度 0–1（判定した音が無ければ 1） */
   readonly acc: number
@@ -605,6 +620,8 @@ export interface JudgeSummary {
   readonly nearRate: number
   readonly holds: { readonly ok: number; readonly early: number; readonly forced: number }
   readonly maxCombo: number
+  /** FAST／SLOW（fastSlowOf） */
+  readonly fastSlow: { readonly fast: number; readonly slow: number }
   /** 音ゲー向けだけ（入門者は null） */
   readonly gamer: {
     readonly points: number
@@ -635,6 +652,7 @@ export function summarizeJudge(s: JudgeState): JudgeSummary {
     nearRate: judged > 0 ? sc.counts.near / judged : 0,
     holds,
     maxCombo: sc.maxCombo,
+    fastSlow: fastSlowOf(s),
     gamer: s.rules.gauge
       ? {
           points: sc.points,

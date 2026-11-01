@@ -155,6 +155,8 @@ function play(over: Partial<FinishedPlay> = {}, judgeOver = {}): FinishedPlay {
     calibEligible: true,
     weak: { from: 17, to: 18, misses: 5 },
     chords: { hit: 14, total: 18 },
+    shapes: { total: 18, cluster: 11, shell: 7, cross: 2 },
+    aborted: false,
     record: resultRecord(META, judge),
     ...over,
   }

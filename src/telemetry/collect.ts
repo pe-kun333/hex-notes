@@ -152,6 +152,8 @@ export interface PlayMeta {
   readonly rate?: number
   readonly keyset?: string
   readonly practice?: PlayTelemetry['practice']
+  /** 途中終了（M2-05。無ければ行に書かない） */
+  readonly aborted?: boolean
 }
 
 /**
@@ -189,5 +191,6 @@ export function playRow(
     ...(meta.rate === undefined ? {} : { rate: meta.rate }),
     ...(meta.keyset === undefined ? {} : { keyset: meta.keyset }),
     ...(meta.practice === undefined ? {} : { practice: meta.practice }),
+    ...(meta.aborted === undefined ? {} : { aborted: meta.aborted }),
   }
 }

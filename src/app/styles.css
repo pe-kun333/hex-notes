@@ -906,3 +906,60 @@ table.tracks th {
 .practice-panel .fadebar.off span:first-child {
   color: var(--muted);
 }
+
+/* 音ゲー向け（M2-05）: S2 の HUD のゲージ（クリアの線 70 以上は緑、m6 renderS2 L825）・S3 の FULL COMBO と早遅ヒストグラム（m6 S3 L366・L377） */
+.play .hud .bar i.clear {
+  background: #62d4a0;
+}
+
+.fc .rank {
+  color: #62d4a0;
+}
+
+.hist {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 64px;
+  margin: 4px 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.hist i {
+  flex: 1;
+  min-height: 1px;
+  background: #6aa9ff;
+}
+
+.hist i.zero {
+  background: #62d4a0;
+}
+
+.hist i.late {
+  background: #e0a458;
+}
+
+.card h4 {
+  margin: 6px 0 2px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.play .hud dd.big small {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.play .hud dd.big small b {
+  color: var(--fg);
+}
+
+/* 左列の空の行を詰める（練習の注記が空のとき・「ホームへ」を隠した行の余白。音ゲー向けの HUD が 1093×514 に入るように、M2-05） */
+.play .left > p.note:empty {
+  display: none;
+}
+
+.play .left > .btnrow {
+  margin: 0;
+}

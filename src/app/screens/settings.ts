@@ -18,6 +18,7 @@ import {
   type Backup,
 } from '../../storage/file.ts'
 import { defaultSettings, offsetFor } from '../../storage/local.ts'
+import { PROFILE_NAMES, applyProfileDefaults } from '../profile.ts'
 import { calibrationPanel } from '../calibration-panel.ts'
 import { chordTestPanel, saveDeviceLimit, type ChordTestPanel } from '../chord-test-panel.ts'
 import { downloadText } from '../file-io.ts'
@@ -112,10 +113,12 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
     doc,
     'div',
     { className: 'btnrow' },
+    // 今のプロファイルの既定へ（プロファイルは保つ。M2-05、m2-kickoff §7-16）
     confirmButton(doc, '既定へ戻す', '本当に既定へ戻す', () => {
-      ctx.saveSettings(defaultSettings())
+      const profile = ctx.settings().profile
+      ctx.saveSettings(applyProfileDefaults(defaultSettings(), profile))
       showGroups()
-      resetMsg.textContent = '既定値に戻しました（入門者の既定）。'
+      resetMsg.textContent = `既定値に戻しました（${PROFILE_NAMES[profile]}の既定）。`
     }),
     resetMsg,
   )

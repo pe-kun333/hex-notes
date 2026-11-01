@@ -5,6 +5,8 @@
 // 待ち（S4、M2-03）と終了（最終ノート＋1.2 秒、判定層の後）は型と遷移だけを置く。
 // M2 の手順 5（M2-03 前半）: 練習層から時計へ届ける seek・setRate と、待ちの解除 waitHit の t（待った音の着地 − 猶予·rate へ
 // 戻して再開）を足し、待ちから入った一時停止の再開は時計を止めたまま待ちに戻す（pausedFrom。decisions #80、m2-kickoff §7-3）。
+// M2 の手順 9（M2-05）: 音ゲー向けのゲージ 0 の途中終了 abort（再生・同期中・待ち → 終了。時計は chartEnd と同じく
+// 止めない ＝ 終了の後は回を捨てる）。
 
 import type { PauseReason } from '../input/focus.ts'
 import type { ClockCommand, ClockEvent, ClockMode, VideoRequest } from '../clock/types.ts'
@@ -39,6 +41,8 @@ export type PlayEvent =
   | { kind: 'return' }
   /** 判定層: 最終ノート＋1.2 秒（§4.2。手順 8 の後） */
   | { kind: 'chartEnd' }
+  /** 判定層: 音ゲー向けのゲージ 0（§1.3 S2「途中終了」、M2-05） */
+  | { kind: 'abort' }
   /** 練習層: 待ちで止める／正解で進める（S4、M2-03）。waitHit の t は再開する曲 ms（無ければ止めた t から） */
   | { kind: 'waitStop' }
   | { kind: 'waitHit'; t?: number }
@@ -141,6 +145,7 @@ export function playStep(s: PlayState, ev: PlayEvent): PlayStep {
       if (s.phase === 'waiting') return stay(s)
       return onClock(s, ev.event)
     case 'chartEnd':
+    case 'abort':
       return stay({ ...s, phase: 'ended' })
     case 'return':
       return s.phase === 'playing' && s.source === 'novideo'

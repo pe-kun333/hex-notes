@@ -5,6 +5,8 @@
 // M2 の手順 2: 「＋ 曲を持ち込む」（初回でないとき）と、一覧に持ち込み曲（同梱曲の後）。版は曲の fold で選ぶ（foldOf）。
 // M2 の手順 4: 絞り込み（すべて／同梱／持ち込み。初回は同梱だけで出さない）と、持ち込み曲の「この配列／上限の版を作る」
 // （library-view.ts）。
+// M2 の手順 9（M2-05）: 上帯にプロファイルと「切替」（m6 S1 L302。applyProfileDefaults で既定値を一括。曲カードの
+// 自己ベスト・完走印をそのプロファイルで引き直す）。
 
 import { validateChart } from '../../chart/validate.ts'
 import { LAYOUTS } from '../../layout/presets.ts'
@@ -43,6 +45,7 @@ import {
   type SongFilter,
 } from '../library-view.ts'
 import { DEFAULT_PRACTICE } from '../play-runner.ts'
+import { PROFILE_NAMES, applyProfileDefaults, otherProfile } from '../profile.ts'
 import { TUTORIAL_SONG_ID, localSong, type SongEntry } from '../songs.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { button, frame, h } from './frame.ts'
@@ -68,14 +71,24 @@ type Failed = { readonly entry: SongEntry; readonly why: string }
 export function homeScreen(ctx: ScreenContext): ScreenView {
   const { doc, booted } = ctx
   const f = frame(ctx, 'ホーム', { gear: true })
-  const settings = ctx.settings()
+  let settings = ctx.settings()
   const deviceLimit = ctx.device()?.limit ?? null
   const calibration = ctx.calibration()
   const audio = calibration.audio
+  // プロファイルの切替: 既定値を一括で入れ替え、記録の引き直しのためにカードを作り直す（記録はプロファイルごと）
+  const profName = h(doc, 'b', { text: PROFILE_NAMES[settings.profile] })
+  const swap = button(doc, '切替', () => {
+    settings = applyProfileDefaults(ctx.settings(), otherProfile(settings.profile))
+    ctx.saveSettings(settings)
+    profName.textContent = PROFILE_NAMES[settings.profile]
+    loaded = loaded.map((l) => ({ ...l, card: cardOf(l.entry, l.chart) }))
+    showList()
+  }, 'small swap-profile')
   const top = h(
     doc,
     'div',
     { className: 'topband' },
+    h(doc, 'span', {}, 'プロファイル ', profName, ' ', swap),
     h(doc, 'span', {}, '端末の上限 ', h(doc, 'b', { text: limitText(ctx.device()) })),
     h(doc, 'span', {}, h(doc, 'b', { text: calibText(audio === undefined ? null : offsetFor(calibration, 'audio')) })),
   )

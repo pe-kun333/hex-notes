@@ -35,6 +35,17 @@ export const V_MIN = 0.2
 export const T0_MS = 1500
 /** 流れる時間 ms（§2.2: 入門者 1.5 s、音ゲー向け 1.0 s） */
 export const TRAVEL_MS: Readonly<Record<Profile, number>> = { beginner: 1500, gamer: 1000 }
+/**
+ * ハイスピードの段（§2.5「v に掛ける」、m2-kickoff §7-15。1.0／1.25／1.5／2.0 は自作値、仮）。流れる時間を倍率で割る
+ * （v ＝ D/T に掛けるのと同じ）。R は T0_MS で決めるので変わらない（decisions #24 (c)）
+ */
+export const HISPEEDS: readonly number[] = [1, 1.25, 1.5, 2]
+export const DEFAULT_HISPEED = 1
+
+/** ハイスピードを掛けた流れる時間 ms（倍率が段に無ければ 1 として扱う） */
+export function travelWithHispeed(travelMs: number, hispeed: number): number {
+  return travelMs / (HISPEEDS.includes(hispeed) ? hispeed : DEFAULT_HISPEED)
+}
 
 export type Size = { readonly w: number; readonly h: number }
 /** プレイヤー矩形（§1.3 S2: 480×270、下限 356×200） */

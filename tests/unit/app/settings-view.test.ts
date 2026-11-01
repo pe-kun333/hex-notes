@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { versionChoice } from '../../../src/app/home-view.ts'
 import { creditOf } from '../../../src/app/screens/settings.ts'
+import { applyProfileDefaults } from '../../../src/app/profile.ts'
 import { ACCOMP_STEPS, SETTING_GROUPS, controlById } from '../../../src/app/settings-view.ts'
 import { physOffFor } from '../../../src/layout/stagger.ts'
 import { buildKeyboardGrid } from '../../../src/render/hex/grid.ts'
@@ -42,13 +43,17 @@ describe('S6 の項目（m6 renderS6、§7-11）', () => {
         const s = c.set(base, ch.value)
         expect(c.get(s), `${c.id}=${ch.value}`).toBe(ch.value)
         expect(parseSettings(JSON.parse(JSON.stringify(s)))).toEqual(s)
-        for (const other of CONTROLS) if (other.id !== c.id && !(c.id === 'geometry' && other.id === 'stagger')) expect(other.get(s), `${c.id} → ${other.id}`).toBe(other.get(base))
+        // 例外: 幾何 → 段ずれ、プロファイル → ラベル・辺ヒント（既定値を一括、M2-05）
+        const tied = (other: (typeof CONTROLS)[number]): boolean => (c.id === 'geometry' && other.id === 'stagger') || (c.id === 'profile' && ['labels.kb', 'labels.note', 'hints'].includes(other.id))
+        for (const other of CONTROLS) if (other.id !== c.id && !tied(other)) expect(other.get(s), `${c.id} → ${other.id}`).toBe(other.get(base))
       }
   }) // prettier-ignore
 
-  it('M1 で出さない物（プロファイル切替・判定窓・対照 W–H）は無い。群の順は m6 のまま', () => {
-    expect(SETTING_GROUPS.map((g) => g.title)).toEqual(['配列', '幾何', '着地と判定', 'ラベル（9 マス）', '色と演出', '音', '入力'])
-    expect(controlById('profile')).toBeUndefined()
+  it('群の順は m6 のまま（M2-05 でプロファイルを先頭に）。判定窓・対照 W–H は無い', () => {
+    expect(SETTING_GROUPS.map((g) => g.title)).toEqual(['プロファイル', '配列', '幾何', '着地と判定', 'ラベル（9 マス）', '色と演出', '音', '入力'])
+    expect(controlById('profile')?.choices.map((c) => [c.value, c.label])).toEqual([['beginner', '入門者'], ['gamer', '音ゲー向け']])
+    expect(controlById('hispeed')?.choices.map((c) => [c.value, c.label])).toEqual([['1', '×1.0'], ['1.25', '×1.25'], ['1.5', '×1.5'], ['2', '×2.0']])
+    expect(controlById('windows')).toBeUndefined()
     expect(controlById('layout')?.choices.map((c) => c.value)).toEqual(['ableton', 'vmpk'])
     expect(controlById('nope')).toBeUndefined()
   }) // prettier-ignore
@@ -69,14 +74,29 @@ describe('S6 の項目（m6 renderS6、§7-11）', () => {
     expect(ACCOMP_STEPS).toEqual([0, 0.25, 0.5, 0.75, 1])
   })
 
-  it('既定へ戻す ＝ defaultSettings（入門者の既定）', () => {
+  it('既定へ戻す ＝ 今のプロファイルの既定（applyProfileDefaults(defaultSettings(), profile)。M2-05）', () => {
     const changed = CONTROLS.reduce(
       (s, c) => c.set(s, c.choices.at(-1)?.value ?? ''),
       defaultSettings(),
     )
     expect(changed).not.toEqual(defaultSettings())
+    expect(changed.profile).toBe('gamer')
+    const reset = applyProfileDefaults(defaultSettings(), changed.profile)
+    expect(reset).toEqual({
+      ...defaultSettings(),
+      profile: 'gamer',
+      labels: { kb: 'key', note: 'key' },
+      hints: false,
+    })
     expect(parseSettings(defaultSettings())).toEqual(defaultSettings())
   })
+
+  it('プロファイルの切替（S6・S1 の上帯）: profile・labels・hints だけを入れ替え、ハイスピード・着地・音は保つ', () => {
+    const s = { ...defaultSettings(), hispeed: 2, landing: 'line' as const, audio: { ...defaultSettings().audio, guide: false } }
+    const g = controlById('profile')?.set(s, 'gamer')
+    expect(g).toEqual({ ...s, profile: 'gamer', labels: { kb: 'key', note: 'key' }, hints: false })
+    expect(controlById('profile')?.set(g ?? s, 'beginner')).toEqual(s)
+  }) // prettier-ignore
 })
 
 describe('設定を変えても記録が混ざらない（完了条件）', () => {
@@ -84,11 +104,15 @@ describe('設定を変えても記録が混ざらない（完了条件）', () =
     const base = defaultSettings()
     const k0 = bestKey(base, 2)
     for (const c of CONTROLS) {
-      if (c.id === 'layout') continue
+      if (c.id === 'layout' || c.id === 'profile') continue
       for (const ch of c.choices)
         expect(bestKey(c.set(base, ch.value), 2), `${c.id}=${ch.value}`).toBe(k0)
     }
     expect(bestKey(controlById('layout')?.set(base, 'vmpk') ?? base, 2)).not.toBe(k0)
+    // プロファイルを替えると自己ベストの鍵が別（入門者と記録が混ざらない、§5.3 M2-05）。戻すと同じ鍵
+    const gamer = controlById('profile')?.set(base, 'gamer') ?? base
+    expect(bestKey(gamer, 2)).toBe(k0.replace('|beginner|', '|gamer|'))
+    expect(bestKey(controlById('profile')?.set(gamer, 'beginner') ?? base, 2)).toBe(k0)
     // 端末の上限を上げても自動で選ぶのは上限 2（同じ鍵）。上限 3 の版を選べば別の鍵
     expect(bestKey(base, 3)).toBe(k0)
     expect(versionChoice(TWINKLE, 'ableton', 3).limits.find((l) => l.limit === 3)?.allowed).toBe(
