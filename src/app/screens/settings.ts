@@ -17,7 +17,7 @@ import {
   makeBackup,
   type Backup,
 } from '../../storage/file.ts'
-import { defaultSettings, offsetFor, saveFade } from '../../storage/local.ts'
+import { defaultSettings, offsetFor } from '../../storage/local.ts'
 import { calibrationPanel } from '../calibration-panel.ts'
 import { chordTestPanel, saveDeviceLimit, type ChordTestPanel } from '../chord-test-panel.ts'
 import { downloadText } from '../file-io.ts'
@@ -195,7 +195,7 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
   const exportBackup = async (): Promise<void> => {
     const at = new Date().toISOString()
     const [charts, results] = await Promise.all([booted.db.listCharts(), booted.db.listResults()])
-    const b = makeBackup({ settings: ctx.settings(), fade: booted.fade, charts, results }, at)
+    const b = makeBackup({ settings: ctx.settings(), fade: ctx.fade(), charts, results }, at)
     say(downloadText(doc, backupFileName(at), backupFileText(b)) ? `控えを書き出しました（記録 ${results.length} 件）。` : '書き出せませんでした。')
   } // prettier-ignore
   // ---------- 持ち込み曲（M2-06） ----------
@@ -252,7 +252,7 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
     for (const r of b.results) await booted.db.putResult(r).catch(() => {})
     if (withSettings) {
       ctx.saveSettings(b.settings)
-      saveFade(booted.local, b.fade)
+      ctx.saveFade(b.fade)
       showGroups()
     }
     pending.replaceChildren()

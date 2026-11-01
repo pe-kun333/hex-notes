@@ -777,7 +777,8 @@ export function runControl(
   if (a === null) return { step: null, go: null, fresh: false }
   if (a.kind === 'quit') return { step: null, go: 'S1', fresh: false }
   if (a.kind === 'restart') {
-    const s = runInput(newRun(r.song, r.opts), now, { kind: 'start' })
+    // 足場外しの α はこの回で動いた所から続ける（M2-04）
+    const s = runInput(newRun(r.song, { ...r.opts, fade: r.judge.fade }), now, { kind: 'start' })
     return {
       step: { run: s.run, effects: [{ kind: 'cancelSounds' }, ...s.effects] },
       go: null,

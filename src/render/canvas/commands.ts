@@ -13,7 +13,7 @@ import type { HexPos, Pt } from '../hex/hex.ts'
 import type { LandingMode } from '../hex/landing.ts'
 import { lineY } from '../hex/landing.ts'
 import type { Sizing } from '../hex/sizing.ts'
-import type { FrameLabels, FrameNote, NotePlace } from './cells.ts'
+import type { FrameLabels, FrameNote, LabelFade, NotePlace } from './cells.ts'
 import {
   HOLD_MIN_MS,
   approachGlow,
@@ -80,6 +80,8 @@ export type FrameInput = {
   readonly effects: readonly FxIntent[]
   /** 鍵盤図は kb、落ちるセルは note（decisions #60） */
   readonly labels: FrameLabels
+  /** 足場外しのラベルの透明度（音高 → α。無ければ全て 1 ＝ M1 と同じコマンド。M2-04） */
+  readonly fade?: LabelFade
   /** 辺ヒント（入門者だけ） */
   readonly hints: boolean
   readonly level: LowLoadLevel
@@ -179,6 +181,7 @@ export function buildFrame(input: FrameInput): DrawCommand[] {
     pressed: input.pressed,
     glow: approachGlow(input.notes, t.song),
     labels: input.labels.kb,
+    ...(input.fade === undefined ? {} : { fade: input.fade }),
     depth: fx.depth,
   })
 
@@ -196,7 +199,9 @@ export function buildFrame(input: FrameInput): DrawCommand[] {
   const chords = chordShapes(places, codeAt(grid), fallTop, fx.shells)
   const tails = places.flatMap((p) => tailCommand(p, grid, s.v, t.song, fallTop) ?? [])
   const cells = places.flatMap((p) => noteCommand(p, fallTop, chords.edges.get(p.note.index)) ?? [])
-  const texts = places.flatMap((p) => noteLabelCommands(p, input.labels.note, grid.R, fallTop))
+  const texts = places.flatMap((p) =>
+    noteLabelCommands(p, input.labels.note, grid.R, fallTop, input.fade),
+  )
 
   const effects = feedbackCommands(input.effects, {
     grid,

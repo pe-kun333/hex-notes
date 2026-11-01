@@ -7,7 +7,8 @@
 // 純関数（DOM は practice-panel.ts）。
 
 import { KEYSET_NAMES, type KeysetId } from '../chart/keyset.ts'
-import { selfRatio } from '../judge/self-rate.ts'
+import { FADE_HIDE_BELOW, fadeOf, selfRatio, type FadeState } from '../judge/self-rate.ts'
+import { noteName } from '../render/canvas/cells.ts'
 import type { LoopRange } from '../practice/loop.ts'
 import { TEMPO_NOVIDEO } from '../practice/tempo.ts'
 import type { WaitMode } from '../practice/wait.ts'
@@ -167,4 +168,53 @@ export function practiceEntryText(weak: LoopRange | null): string {
   return weak === null
     ? '練習室で弾く'
     : `練習室で弾く（${weak.startBar}〜${weak.endBar} 小節をループ）`
+}
+
+// ---------- 足場外し（M2-04、M2 の手順 8） ----------
+
+/**
+ * ラベルのマスの 1 側の値（m6 renderS4 L885–887・m4 L158–173 は キー文字・音名・なし の 3×3 ＝ 9 マス。入門者の既定の
+ * ノート側「両方」と S6 の 4 値を表せるよう「両方」を足して 4×4 にした、decisions #90）
+ */
+export const LABEL_SIDE_CHOICES: readonly { readonly value: 'key' | 'note' | 'both' | 'none'; readonly label: string }[] = [
+  { value: 'key', label: 'キー文字' },
+  { value: 'note', label: '音名' },
+  { value: 'both', label: '両方' },
+  { value: 'none', label: 'なし' },
+] // prettier-ignore
+
+export const FADE_NOTE =
+  '当てた −0.12、外した ＋0.30、NEAR は不変。0.2 未満でラベル無し（鍵盤側も）。'
+
+/** 手動の透明度の段（0〜100% を 5% 刻み、§7-13） */
+export const MANUAL_STEP = 0.05
+
+/** 手動の値を 5% 刻みに丸める（0..1） */
+export function manualValue(pct: number): number {
+  const x = Math.round(Math.min(100, Math.max(0, pct)) / 5) * 5
+  return x / 100
+}
+
+export interface FadeBar {
+  readonly midi: number
+  readonly name: string
+  /** α の百分率（四捨五入） */
+  readonly pct: number
+  /** 0.2 未満（ラベル無し。m4 renderFade の緑） */
+  readonly hidden: boolean
+}
+
+/** 音高ごとの透明度の棒（その曲の音高の昇順。m4 renderFade L593–597） */
+export function fadeBars(fade: FadeState, pitches: readonly number[]): FadeBar[] {
+  return [...new Set(pitches)]
+    .sort((a, b) => a - b)
+    .map((midi) => {
+      const a = fadeOf(fade, midi)
+      return { midi, name: noteName(midi), pct: Math.round(a * 100), hidden: a < FADE_HIDE_BELOW }
+    })
+}
+
+/** 自力率の 4 区分の 1 行（m4 L174–184 の区分） */
+export function selfPartsText(s: SelfRate): string {
+  return `ラベル無しで当てた ${s.solo}・ヒント付き ${s.hinted}・NEAR ${s.near}・外した ${s.miss}`
 }

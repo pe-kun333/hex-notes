@@ -81,6 +81,11 @@ export interface JudgeRules extends ProfileRules {
   readonly neighbor: (a: KeyCode, b: KeyCode) => boolean
   /** ラベルの出し方（自力率の hinted／solo） */
   readonly labels: LabelSides
+  /**
+   * 足場外しを止める（退避 geometry fallback の間。キー文字は常に見えるので hinted に数え、α も動かさない。#45 (c)・#73 (c)、
+   * m2-kickoff §7-13）。無ければ偽
+   */
+  readonly fadeFrozen?: boolean
 }
 
 export type JudgeRulesInput = Partial<Omit<JudgeRules, keyof ProfileRules>> &
@@ -284,7 +289,11 @@ function settle(
   if (n === undefined) return
   const r = s.rules
   const hit = grade === 'miss' ? 'miss' : grade === 'near' ? 'near' : 'hit'
-  const cat = classify(hit, labelVisible(s.fade, n.midi, r.labels), tainted)
+  const cat = classify(
+    hit,
+    r.fadeFrozen === true || labelVisible(s.fade, n.midi, r.labels),
+    tainted,
+  )
   const holding = n.hold && hit !== 'miss' && code !== null
   const results = resultsOf(w)
   results[i] = {
@@ -308,7 +317,7 @@ function settle(
   w.s = {
     ...w.s,
     score,
-    fade: fadeAfter(s.fade, n.midi, cat),
+    fade: r.fadeFrozen === true ? s.fade : fadeAfter(s.fade, n.midi, cat),
     selfRate: { ...s.selfRate, [cat]: s.selfRate[cat] + 1 },
   }
   if (hit === 'miss') w.out.push({ kind: 'miss', index: n.index, noteCode: n.code })
