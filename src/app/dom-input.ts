@@ -50,6 +50,10 @@ export interface AttachOptions extends KeyboardOptions {
    * 戻してもスクロールしない（preventScroll）。
    */
   focusTarget: HTMLElement
+  /**
+   * keydown・keyup の timeStamp を毎回渡す（欄の中・repeat も。刻みの推定の標本、M3 の手順 11、m3-kickoff §7-38。仮）
+   */
+  onStamp?: (timeStamp: number) => void
 }
 
 export interface KeyboardHandle {
@@ -75,6 +79,7 @@ export function attachKeyboard(
   const reclaim = (): void => opts.focusTarget.focus({ preventScroll: true })
 
   const onKey = (e: KeyboardEvent): void => {
+    opts.onStamp?.(e.timeStamp)
     // 文字の欄では keydown だけ素通し。keyup は押下集合にある code を外すだけなので欄の中でも通す（押しっぱなしを防ぐ）
     if (e.type === 'keydown' && isEditableTarget(e.target)) return
     const now = performance.now()

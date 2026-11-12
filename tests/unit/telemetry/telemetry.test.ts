@@ -304,6 +304,19 @@ describe('押下 collectPress・play 行 playRow', () => {
     ).toBe(null)
   })
 
+  // M3 の手順 11（m3-kickoff 手順 11 の期待値 (4)、§7-38）: p95 は lags の最近接順位 ⌈0.95·n⌉ 番目。標本が無ければ欄を書かない
+  it('入力遅延の p95: [3, null, 8, 1, null, 20] → 20、1〜20 → 19（中央値 10.5）、lag 4 の 1 打 → 4、標本なし → 欄なし、64 打の境 30／2', () => {
+    const of = (lags: readonly (number | null)[]): ReturnType<typeof playRow> => playRow(lags.reduce((c, l) => collectPress(c, l), initialCollect()), META, SUMMARY, null, AT)
+    expect([of([3, null, 8, 1, null, 20]).inputLatencyMedian, of([3, null, 8, 1, null, 20]).inputLatencyP95]).toEqual([5.5, 20])
+    const n20 = of(Array.from({ length: 20 }, (_, i) => i + 1))
+    expect([n20.inputLatencyMedian, n20.inputLatencyP95]).toEqual([10.5, 19])
+    expect(of([4]).inputLatencyP95).toBe(4)
+    const none = of([null, null])
+    expect([none.inputLatencyMedian, 'inputLatencyP95' in none]).toEqual([null, false])
+    expect(of([...Array<number>(60).fill(2), ...Array<number>(4).fill(30)]).inputLatencyP95).toBe(30)
+    expect(of([...Array<number>(61).fill(2), ...Array<number>(3).fill(30)]).inputLatencyP95).toBe(2)
+  }) // prettier-ignore
+
   it('§4.6 の項目が揃い、動画 ID は入らない（動画ありの回でも）', () => {
     let c = initialCollect()
     c = collectClock(c, out([resync('jump'), { kind: 'novideo', t: 100 }]))
@@ -320,6 +333,7 @@ describe('押下 collectPress・play 行 playRow', () => {
       resyncCount: 1,
       fallback: true,
       inputLatencyMedian: 4,
+      inputLatencyP95: 4,
       pressCount: 1,
       pressNoLag: 0,
       frameIntervalSd: null,

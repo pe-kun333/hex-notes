@@ -72,7 +72,7 @@ export function rowBrief(r: TelemetryRow): string {
       return (
         `${r.chartId.replace(/^sha256:/, '').slice(0, 8)}… ${r.variantId} ${r.profile} ${r.clock} ${r.mode}・` +
         `精度 ${fix(r.acc * 100)}%・UR ${fix(r.ur)}・NEAR ${fix(r.nearRate * 100)}%・再同期 ${r.resyncCount}・` +
-        `切替 ${r.fallback ? 'あり' : 'なし'}・入力遅延 ${fix(r.inputLatencyMedian, 2)} ms（押下 ${r.pressCount}、` +
+        `切替 ${r.fallback ? 'あり' : 'なし'}・入力遅延 ${fix(r.inputLatencyMedian, 2)} ms（${r.inputLatencyP95 === undefined ? '' : `p95 ${fix(r.inputLatencyP95, 2)}、`}押下 ${r.pressCount}、` +
         `標本なし ${r.pressNoLag}）・フレーム SD ${fix(r.frameIntervalSd, 2)} p95 ${fix(r.frameIntervalP95)} ms・` +
         `時計残差 ${fix(r.clockResidualSd, 2)}・予約の遅れ ${fix(r.audioLateMaxMs)}`
       )

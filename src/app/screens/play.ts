@@ -60,6 +60,8 @@ import type { KeyCode, LayoutId } from '../../shared/types.ts'
 import { calibKindOf, calibOffset } from '../calibration.ts'
 import { offsetFor } from '../../storage/local.ts'
 import { playRow } from '../../telemetry/collect.ts'
+import { deviceAfterPlay } from '../../input/resolution.ts'
+import { saveDeviceTsResolution } from '../chord-test-panel.ts'
 import { gamerHudOf, hudOf } from '../hud.ts'
 import type { ControlInput } from '../play-control.ts'
 import {
@@ -782,6 +784,9 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     )
     void ctx.booted.db.putResult(o.record).catch(() => {})
     void ctx.booted.db.appendTelemetry(row).catch(() => {})
+    // 刻みが決まった・変わった回だけ端末プロファイルと device 行（M3 の手順 11、§7-38）
+    const dev = deviceAfterPlay(ctx.device(), ctx.stamps())
+    if (dev !== null) saveDeviceTsResolution(ctx, dev)
     // S0d: 段階 1・2 の曲末は次の段階をこの画面のまま待機に（Space で開始）。最後の段階の後に導線を終えて S3 へ
     const t = ctx.tutorial()
     if (t !== null) {
