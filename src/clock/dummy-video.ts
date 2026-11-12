@@ -5,7 +5,7 @@
 // 状態は閉包に持つ（グローバルに置かない）。時刻は全て呼ぶ側が渡す now（ms）。
 
 import { gauss, mulberry32, type Rng } from '../shared/random.ts'
-import type { VideoSample, VideoState } from './types.ts'
+import type { VideoPort, VideoRequest, VideoSample, VideoState } from './types.ts'
 
 export interface DummyVideoOptions {
   /** 読みの刻み ms（既定 15。0 は連続） */
@@ -185,5 +185,45 @@ export function createDummyVideo(opts: DummyVideoOptions = {}): DummyVideo {
       if (s === 'paused') lastRaw = q(anchorT)
       st = s
     },
+  }
+}
+
+export interface DummyPortOptions {
+  /** 要求を呼べたか（既定 真。偽 ＝ 呼べなかった〔例外・プレイヤーが無い〕。pauseVideo なら次の標本に pauseFailed） */
+  callable?: (now: number, q: VideoRequest) => boolean
+  /** 呼べた要求が効くか（既定 真。偽 ＝ 呼べたが効かない〔広告の模擬、clock-dev〕） */
+  pass?: (now: number, q: VideoRequest) => boolean
+  /** 受けた要求の記録（callable・pass の前に呼ぶ） */
+  onRequest?: (now: number, q: VideoRequest) => void
+}
+
+/**
+ * ダミー動画の口（M3 の手順 1、仮。m3-kickoff §7-9）。実物の口（src/youtube/port.ts）と同じ VideoPort を返す。callable・
+ * pass が偽の要求はダミーへ渡さない。pauseFailed は、呼べなかった pauseVideo の後の最初の標本に 1 回だけ付ける。
+ * pause の効く遅れはダミー動画の pauseLatencyMs（既定 0 ms）。
+ */
+export function dummyPort(d: DummyVideo, opts: DummyPortOptions = {}): VideoPort {
+  let pauseFailed = false
+  return {
+    sample(now) {
+      const s = d.sample(now)
+      if (!pauseFailed) return s
+      pauseFailed = false
+      return { ...s, pauseFailed: true }
+    },
+    apply(now, requests) {
+      for (const q of requests) {
+        opts.onRequest?.(now, q)
+        if (!(opts.callable?.(now, q) ?? true)) {
+          if (q.kind === 'pauseVideo') pauseFailed = true
+          continue
+        }
+        if (!(opts.pass?.(now, q) ?? true)) continue
+        if (q.kind === 'pauseVideo') d.pauseVideo(now)
+        else if (q.kind === 'playVideo') d.play(now)
+        else d.seek(q.t, now)
+      }
+    },
+    dispose() {},
   }
 }
