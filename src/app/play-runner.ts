@@ -16,6 +16,11 @@
 // 始めの源・sync の offset と rate・切替の fallbackAt。動画が先に終わった回は aborted（§7-16）、動画の回は校正 段 2 の外。
 // M3 の手順 6（M3-04）: 同期中の訳 Run.syncCause（src/play/sync-cause.ts。歩ごとに時計の事象と動画への要求から）と、口の事象
 // （自動再生ブロック・プレイヤーが隠れている）を回へ渡す runPortEvent。案内の行と帯は画面（sync-notice.ts）。
+// M3 の手順 7（M3-05 後半、m3-kickoff §7-4 の案 A ＝ #96・§7-17・§7-31）: 動画なしへの切替（novideo の事象ごと、2 回目も）で発音の
+// 列を切替の後の列 fallbackItems（旋律は設定によらず鳴らす・伴奏は常に・クリックは設定）に差し替え、切替の t から予約する。
+// resync(return) で空の列に戻し、戻りを待つ歩（源 novideo の held(playing)）に入るときも先の予約を止める。予約には門（context が
+// running かつ 時計の最後の標本が PLAYING でない）を掛け、閉じていた後に開いた回は今の譜面 ms へ数え直す。戻りの後の次の
+// 未判定の音の着地 returnLandMs（案内の行の「あと n 秒」）。
 
 import { keyclickFor, type KeyclickPlan } from '../audio/keyclick.ts'
 import {
@@ -31,7 +36,7 @@ import {
 import { filterKeyset, type KeysetId } from '../chart/keyset.ts'
 import { buildMsTable, type MsTable } from '../chart/mstable.ts'
 import type { AudioBridge } from '../clock/audio-bridge.ts'
-import { IDENTITY_AXIS, axisOf, perfAt, toChartMs, type SyncAxis } from '../clock/map.ts'
+import { IDENTITY_AXIS, axisOf, perfAt, songAt, toChartMs, type SyncAxis } from '../clock/map.ts'
 import type { ClockMap, VideoRequest, VideoSample } from '../clock/types.ts'
 import type { ClockKind, KeyCode, PlayMode, SyncUsed } from '../shared/types.ts'
 import { phraseOfBar } from '../practice/bars.ts'
@@ -151,6 +156,11 @@ export interface RunOptions {
    * の回、decisions #94）
    */
   readonly video?: { readonly videoId: string }
+  /**
+   * 動画の回が動画なしへ切り替えた後に鳴らす部（無ければ 旋律 真・伴奏 真・クリックは sound のまま。旋律は設定のガイド音に
+   * よらず鳴らす。M3 の手順 7、§7-31）
+   */
+  readonly fallbackSound?: SoundOptions
 }
 
 /** 練習の設定（殻が持ち、保存しない。m2-kickoff §7-7） */
@@ -232,8 +242,15 @@ export interface Run {
   /** 終了の曲 ms（最終ノートの終わり＋1.2 秒、§4.2） */
   readonly endMs: number
   readonly collect: PlayCollect
+  /** 今の発音の列（動画の回は空、切替の後は fallbackItems、戻ると空。M3 の手順 7） */
   readonly items: readonly SoundItem[]
+  /** 動画の回が動画なしへ切り替えた後の列（動画なしの回は空） */
+  readonly fallbackItems: readonly SoundItem[]
   readonly sched: SchedulerState
+  /** 予約の門が閉じていた（開いた回に今の譜面 ms へ数え直す） */
+  readonly pumpGated: boolean
+  /** resync(return) の時点で次に来る未判定の音の着地（譜面 ms。案内の行の「あと n 秒」。切替で null） */
+  readonly returnLandMs: number | null
   /** 練習（RunOptions.practice。通常プレイは null） */
   readonly practice: PracticeRun | null
 }
@@ -312,7 +329,13 @@ export function newRun(song: RunSong, opts: RunOptions): Run {
     collect: initialCollect(),
     // 動画の回は旋律・伴奏・クリックを鳴らさない（誤打の打鍵音だけ。design L150、m3-kickoff §7-14）
     items: video === null ? soundItems(song.chart, song.variant, o.sound) : [],
+    fallbackItems:
+      video === null
+        ? []
+        : soundItems(song.chart, song.variant, o.fallbackSound ?? { ...o.sound, melody: true, accomp: true }),
     sched: initialScheduler(),
+    pumpGated: false,
+    returnLandMs: null,
     practice,
   }
 } // prettier-ignore
@@ -350,14 +373,31 @@ function judgeEffects(r: Run, out: readonly JudgeOutcome[], realNow: number): Ru
  */
 function applyStep(r: Run, step: SessionStep, realNow: number, effects: RunEffect[]): Run {
   const before = runPhase(r)
+  let items = r.items
   let sched = r.sched
   let cancel = false
-  for (const ev of step.out.events)
-    if (ev.kind === 'resync') {
-      // 予約の列は譜面の ms（動画なしは時計の軸 ＝ 譜面の軸）
-      sched = seekSchedule(sched, r.items, toChartMs(ev.t, r.axis))
+  let returned = false
+  let returnLandMs = r.returnLandMs
+  for (const ev of step.out.events) {
+    if (ev.kind === 'novideo' && r.video !== null) {
+      // S7c: 切替の後の列に差し替え、切替の t から予約する（2 回目の切替も。M3 の手順 7）
+      items = r.fallbackItems
+      sched = seekSchedule(sched, items, toChartMs(ev.t, r.axis))
+      returnLandMs = null
       cancel = true
-    }
+    } else if (ev.kind === 'resync') {
+      // 動画へ戻したら列を空に（動画の音だけ）
+      if (ev.reason === 'return') {
+        items = []
+        returned = true
+      }
+      // 予約の列は譜面の ms（動画なしは時計の軸 ＝ 譜面の軸）
+      sched = seekSchedule(sched, items, toChartMs(ev.t, r.axis))
+      cancel = true
+    } else if (ev.kind === 'held' && ev.state === 'playing' && r.session.play.source === 'novideo')
+      // 戻りを待つ歩に入る（動画は PLAYING）: ピアノの先の予約を止める
+      cancel = true
+  }
   const phase = step.session.play.phase
   // 一時停止・待ちに入ったら先の予約を止める（待ちの解除は着地から数え直す）
   if ((phase === 'paused' || phase === 'waiting') && before !== phase) cancel = true
@@ -386,10 +426,37 @@ function applyStep(r: Run, step: SessionStep, realNow: number, effects: RunEffec
     }),
     collect: collectClock(r.collect, step.out),
     judge: j.state,
+    items,
     sched,
+    returnLandMs: returned ? nextLandOf(r.notes, j.state) : returnLandMs,
   }
   effects.push(...judgeEffects(next, j.out, realNow))
   return next
+}
+
+/** 未判定の音で最も早い着地（譜面 ms）。無ければ null */
+function nextLandOf(notes: readonly FrameNote[], judge: JudgeState): number | null {
+  const byIndex = resultsByIndex(judge)
+  let best: number | null = null
+  for (const n of notes)
+    if (
+      (byIndex.get(n.index)?.state ?? 'pending') === 'pending' &&
+      (best === null || n.tLandMs < best)
+    )
+      best = n.tLandMs
+  return best
+}
+
+/** 次の未判定の音の着地（譜面 ms。M3 の手順 7） */
+export const nextLandMs = (r: Run): number | null => nextLandOf(r.notes, r.judge)
+
+/**
+ * 戻りの後、次の未判定の音の着地までの実時間 ms（案内の行の「あと n 秒」。戻っていない・過ぎた・源 novideo なら null）
+ */
+export function untilNextMs(r: Run): number | null {
+  if (r.returnLandMs === null || r.session.play.source !== 'video') return null
+  const ms = (r.returnLandMs - r.t) / (r.axis.rate * r.session.clock.rate)
+  return ms > 0 ? ms : null
 }
 
 /**
@@ -399,6 +466,25 @@ function applyStep(r: Run, step: SessionStep, realNow: number, effects: RunEffec
 export function runPortEvent(r: Run, kind: ResumeBlock): Run {
   const c = syncCauseBlock(r.syncCause, kind)
   return c === r.syncCause ? r : { ...r, syncCause: c }
+}
+
+/**
+ * 動画が失われた（切替の後に口が失敗を知らせ、以後は標本を渡さない。M3 の手順 7、§7-32）。最後の標本が PLAYING のままだと、
+ * 戻りを待つ同期中から抜けられず、予約の門も閉じたままになるので、PLAYING でない標本を 1 つ渡して止めた t から動画なしで続け
+ * （resync(resume)）、門を開く。源 video の回・最後の標本が PLAYING でない回は変えない
+ */
+export function runVideoGone(r: Run, now: number): RunStep {
+  const c = r.session.clock
+  const effects: RunEffect[] = []
+  if (r.video === null || c.mode !== 'novideo' || c.lastState !== 'playing')
+    return { run: r, effects }
+  const sample: VideoSample = {
+    state: 'paused',
+    timeMs: c.lastRead ?? 0,
+    rate: c.rate,
+    visible: true,
+  }
+  return { run: applyStep(r, sessionTick(r.session, now, sample), now, effects), effects }
 }
 
 /** 状態機械への事象（start・pause・resume・chartEnd） */
@@ -708,14 +794,27 @@ function abortsOn(r: Run): boolean {
   )
 }
 
-/** 発音の予約 1 回（PUMP_MS ごと。bridge は同じタスクで読んだ AudioContext の対応点） */
+/**
+ * 発音の予約 1 回（PUMP_MS ごと。bridge は同じタスクで読んだ AudioContext の対応点）。running は AudioContext が running か
+ * （省けば真）。門 ＝ running かつ 時計の最後の標本が PLAYING でない（動画が鳴っている間はピアノを重ねない、§6.1 L320）。
+ * 閉じている間は予約せず、開いた回に今の譜面 ms へ数え直す（溜まった音をまとめて鳴らさない。M3 の手順 7、§7-31）
+ */
 export function runPump(
   r: Run,
   now: number,
   bridge: AudioBridge,
+  running = true,
 ): { run: Run; play: ScheduledSound[] } {
-  const p = pumpSchedule(r.sched, r.items, { map: r.map, now, axis: r.axis }, bridge)
-  return { run: p.state === r.sched ? r : { ...r, sched: p.state }, play: p.play }
+  if (!running || r.session.clock.lastState === 'playing')
+    return { run: r.pumpGated ? r : { ...r, pumpGated: true }, play: [] }
+  const sched0 = r.pumpGated
+    ? seekSchedule(r.sched, r.items, toChartMs(songAt(r.map, now), r.axis))
+    : r.sched
+  const p = pumpSchedule(sched0, r.items, { map: r.map, now, axis: r.axis }, bridge)
+  return {
+    run: p.state === r.sched && !r.pumpGated ? r : { ...r, sched: p.state, pumpGated: false },
+    play: p.play,
+  }
 }
 
 /** 描画層のノート（判定の状態を写す。変わらない音は同じ物） */
@@ -827,7 +926,8 @@ export function runOutcome(r: Run): PlayResult {
     variantId: r.song.variant.id,
     name: r.song.name,
     judge: summarizeJudge(r.judge),
-    audioLateMaxMs: r.items.length === 0 ? null : r.sched.lateMaxMs,
+    // 切替の後に予約した回は、戻って列が空になっても数値（M3 の手順 7、§7-38）
+    audioLateMaxMs: r.items.length === 0 && r.collect.fallbackT === null ? null : r.sched.lateMaxMs,
     samples: timingSamples(r.judge),
     offsetUsed: r.opts.rules.offsetMs,
     keyset,

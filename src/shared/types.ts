@@ -293,7 +293,8 @@ export interface PlayTelemetry extends TelemetryBase {
   clockResidualSd: number | null
   /**
    * 発音の予約の遅れの最大 ms（音の実時刻を過ぎてから予約した分。src/audio/scheduler.ts の lateMaxMs。主スレッドの停止で
-   * 音が遅れた・抜けたのを見つける）。音を予約しない回（動画の音だけ）は null（decisions #47）
+   * 音が遅れた・抜けたのを見つける）。音を予約しない回（動画の音だけ）は null（decisions #47）。動画なしへ切り替えた後に
+   * 予約した回は、戻って列が空になっても数値（decisions #107）
    */
   audioLateMaxMs: number | null
   /** テンポ段（M2-03 で足した。無ければ 1。書き出しは hexnote-telemetry/1 のまま、m2-kickoff §7-20） */

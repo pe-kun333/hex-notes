@@ -235,6 +235,7 @@ M2 の終わりの状態（主担当が 2026-11-11 に実行）: M2 の手順書
     - 「pause 無効」で S7c の帯が出ない。
     - 3 視口 × 2 プロファイルで帯が左列に入り dev の assert の console.error 0（実測の表を取り直す）。
   - (b) 実 IFrame: `freezeReads` で（実物の凍結は起こせない）、pane で押せた分（手順 1 の線引き。固定から 2.0〜2.5 秒で帯、iframe の ▶ で戻る〔採らない・未採否の形は ▶ → 一時停止 → Space → 釦〕、PAUSED の遅れの記録）＋利用者の手元の表（ピアノ音までの遅れ、▶ の後に鳴り始めるピアノが 1 音まで〔上限は期待値 (3)〕、押下が親に届く、Firefox、広告の出る動画で切り替わらない〔U-06 を手順 6 の前（17 日目まで）に測るのは提案（§7-7）。無ければ模擬で閉じ「広告 未」〕）。
+- 実際に取った手順（2026-11-12、手順 7、ブランチ `claude/m3-step7-s7c`）: §7-4 は #96 の案 A なので〔採る〕の側を作った（時計の `fellBack` と動画なしの間の PLAYING の待ち・戻り、状態機械の `returning` と源 novideo の pause(iframe) の無視、`RunOptions.fallbackSound`・`Run.fallbackItems`・列の差し替え・予約の門と数え直し・`returnLandMs`・`untilNextMs`、`sync-cause` の `returnWait`、`sync-notice` の `fallbackBand`・`S7C_TEXT`、S2 の帯・案内の行・釦「戻す」〔▶ の案内〕・打鍵音の門、DEV の ▶（ダミー）と 2 行と `freezeReads`）。裁定は decisions #107。手順書から変えた・足したのは 3 つ: PLAYING の最初の tick で読みがもう動いていれば待たずに戻す（0.25 ms の掃きの値に合わせた読み）、戻りを待つ間の失敗の道 `runVideoGone`（見直しで見つけた）、押下の中の wake は切替の後の回だけ。作らなかった物: `stateAtMs`（手順 1 の実測が未）、案 B の return 入力。期待値 (5) は記録として残す。手順 6 の `pressPlanner` の窓の下端を丸め分だけ緩めた（128 音の譜面でフレームの境に乗った 12 音を押さなかった。m3-04.json は変わらない）。期待値 (1)〜(4)・(6)〜(12) は原型の値のまま全部通った（試験 32 件 ＝ fallback-video 31 件と clock-source の 1 件、もう 1 件は書き直し）。DEV の道と 3 視口 × 2 プロファイルは pane で見た（m3-verification §9）。実 IFrame（freezeReads）は pane が隠れていて「未」。初回読込 261,307 → 265,419 バイト。試験 1,315 → 1,347 件。
 
 ### 手順 8: 報酬の切り分け（M3-06、S）
 

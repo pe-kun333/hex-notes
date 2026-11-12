@@ -62,6 +62,8 @@ pane が表に出ている時に、開発ページ `/src/app/dev/youtube.html` �
 | 153（Referer を送らない設定）・拡張機能のブロック・オフラインで S2 の S7a の見出しと本文 | 5 | 手順 5 の PR の後（まとめて 30 日目でも可） | 未 |
 | Firefox で一時停止 → Space の再開が止められたときの自動再生ブロックの帯（1 秒後、▶ で下りる）。Space の後の状態の列（BUFFERING・CUED が先に来るか）と、onAutoplayBlocked が来るか・いつかも記録する（§8 の開いた点） | 6 | 手順 6 の PR の後（まとめて 30 日目でも可） | 未 |
 | 再生中にプレイヤーのシークバーを触る（iframe への blur で一時停止、再開は resync(resume)。コードの読みだけ） | 6 | 同上 | 未 |
+| 実 IFrame の S7c: 見本の動画で `__hexnoteDev.freeze(10000)` → 2.0〜2.5 秒で帯、iframe の ▶ で戻る。▶ の後の状態の列（BUFFERING を挟むか）とピアノが鳴り直すか、pauseVideo → PAUSED の遅れを記録する | 7 | pane を表に出せる時（主担当）か手順 7 の PR の後 | 未 |
+| 切替からピアノ音までの遅れ・▶ の後に鳴り始めるピアノが 1 音まで（耳で）・切替の後の押下が親に届く・Firefox | 7 | 手順 7 の PR の後（まとめて 30 日目でも可） | 未 |
 
 ## 4. 手順 2（時計の接続と S2 の動画の回）
 
@@ -205,3 +207,27 @@ pane の後片付け: dev（ポート 5173）の鍵 `hexnote.noembed` は消し�
 開いた点: 実 IFrame の再開は PLAYING の前に BUFFERING を返した（Chromium）。訳は BUFFERING で resumeWait を離れるので、止められた再開でも BUFFERING・CUED・UNSTARTED が先に来ると 1,000 ms を数えず、遅れて来た autoplayBlocked も捨て、▶ の帯でなく待ちの帯 sync（2,000 ms 後）になる。Firefox の手元の確かめで Space の後の状態の列と onAutoplayBlocked が来るか・いつかを見て、当たれば訳の決まりを直す（今は手順書のまま）（decisions #106 (g)）。
 
 pane の後片付け: プロファイルは入門者（S6 の切替で、ラベルと辺ヒントは入門者の既定に入れ替わった）、低負荷は自動（確かめの間だけ OFF にした）、視口は既定に戻した。試験の記録は dev の置き場に残っている。
+
+## 9. 手順 7（S7c と「戻す」）
+
+ブランチ `claude/m3-step7-s7c`。裁定は decisions #107（§7-4 は #96 の案 A）。
+
+| 確かめ | 段 | 結果 |
+|---|---|---|
+| 期待値 (1)〜(4)・(6)〜(12)（`tests/unit/app/fallback-video.test.ts` 31 件、回し方は `fallback-drive.ts`）と clock-source.test.ts の 2 件 | (a) | 通った。値は手順書の原型の値と全部同じ（(1) novideo @12,000・fallbackAt 9,001、(2) 48 音・最初は 12,598.94、(3) held @15,000・return @15,016.67 t 12,007.39・ピアノ 5 音・あと 3,592.61 ms・2,719 フレーム、(4) 7 つの形、(6) ピアノ 0 音・帯 0 回、(7) fallbackAt 9,484・14,615.56、(8) 13,198.94、(10) 25・21・20・0、(12) 128 音・シーク 2 つ） |
+| ▶ の時刻の掃き（14,400〜15,000） | (a) | 試験は 2.5 ms 刻みで ▶ から同期中まで 1 フレーム以内・戻りまで 17.5 ms・▶ の後のピアノは 1 音まで 13.94 ms。0.25 ms 刻み（手元で 20 秒）は 16.58・18.25 ms・1 音・15.44 ms で手順書と同じ |
+| 戻りを待つ間の失敗（手順書に無い道） | (a) | ▶ が play だけで待つ間の 15,500 に失敗 → 止めた t から resync(resume)、ピアノは計 48 音、曲末で終わる（`runVideoGone`。無いと同期中のまま、予約の門も閉じたまま） |
+| `npm run check`（試験 1,347 件、回帰ハーネスの 3 表）・build・size・pwa:check | (a) | 通った。m3-04.json は変わらない（押下の予定の窓の下端を丸め分だけ緩めた後も）。初回読込 261,307 → 265,419 バイト |
+| 凍結（`hexDmyFreez`）・入門者・1366×668: 戻す → ▶ | (a) | 12.05 秒に源 novideo・案内の行「ピアノ音で続けています」・帯「動画が止まったので、ピアノ音で続けます」（戻す 有効）、14.03 秒に「戻す」で帯が「プレイヤーの ▶ を押してください」（無効）、15.06 秒に ▶（ダミー）で戻り（読みがもう動いていて待たない）・帯が下りる・「あと 4 秒」→ 18.6 秒に「再生中」。S3 の記録に fallbackAt 9,039 |
+| 戻さず曲末 | (a) | 源 novideo のまま S3、帯 0 本、fallbackAt 9,043 |
+| pause 無効（`hexDmyAdPau`） | (a) | 帯 sync（12.54〜16.01 秒）だけ、S7c の帯は出ない |
+| 広告中から切替（`hexDmyAdFal`） | (a) | 12.56 秒に帯 sync、14.59 秒に源 novideo で帯 sync が下り videoFallback（戻す 有効）が点く |
+| 凍結の後に onError 150（`hexDmyFrE15`） | (a) | 14.04 秒に帯が「動画に戻せません。ピアノ音で続けます」（無効）、embedError 行 +1（150）、鍵に `hexDmyFrE15`、dispose 0 回、その後の ▶（ダミー）で戻らない |
+| 切替の後の Pause | (a) | 一時停止の間は帯が残り、「最初から」で待機（帯なし）、「やめる」で S1（帯なし） |
+| 3 視口 × 2 プロファイルの帯 videoFallback | (a) | 帯は 1 本、高さ 42.4 px、下端は入門者 453.2・音ゲー向け 498.8（1093×514 の音ゲー向けも左列の下端 502 の内）、scrollHeight ＝ clientHeight、dev の assert のエラー 0 |
+| build（門が偽） | (a) | dist に `dummy`・`hexDmy`・`__hexnoteDev`・`elementsFromPoint`・「ダミー動画で試す」・`tests/fixtures`・`M7lc1UVf`・`autoplay-video`・`freezeReads` は 0 件 |
+| 実 IFrame（見本の動画で `__hexnoteDev.freeze`、iframe の ▶ で戻る、PAUSED の遅れ） | (b) | 未（pane が隠れていて iframe の ▶ の座標の click が届かなかった。§3 の手元の表へ） |
+
+開いた点: 実物の ▶ の後の状態の列（手順 6 では再開で PLAYING の前に BUFFERING）。PLAYING → BUFFERING → PLAYING の順なら、待つ歩から一度 resync(resume) でピアノが鳴り直してから戻る。§3 の行で ▶ の後の状態の列とピアノが鳴り直すかを記録する。
+
+pane の後片付け: 鍵 `hexnote.noembed` は消し、プロファイルは入門者（S6 の切替でラベルと辺ヒントは入門者の既定に入れ替わった）、低負荷は自動（確かめの間だけ OFF にした）、視口は既定に戻した。試験の記録と embedError 行は dev の置き場に残っている。

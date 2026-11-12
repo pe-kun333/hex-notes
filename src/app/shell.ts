@@ -209,6 +209,8 @@ export interface ShellOptions {
   readonly updates?: { state(): UpdateState; apply(): void }
   /** 動画の口の差し口（DEV のダミーの口。null を返せば実物の口。src/app/dev/dummy-port.ts） */
   readonly videoPort?: (o: MountOptions) => VideoPort | null
+  /** 実物の口を包む差し口（DEV の読みを固める口。M3 の手順 7） */
+  readonly wrapVideoPort?: (p: VideoPort) => VideoPort
   /** 開発時の観測口（src/app/dev/dummy-port.ts） */
   readonly devProbe?: DevProbe
 }
@@ -443,7 +445,12 @@ export function startShell(opts: ShellOptions): Shell {
     setUseVideo: (v) => {
       useVideo = v
     },
-    videoPort: (o) => opts.videoPort?.(o) ?? createYoutubePlayer(o),
+    videoPort: (o) => {
+      const dev = opts.videoPort?.(o) ?? null
+      if (dev !== null) return dev
+      const real = createYoutubePlayer(o)
+      return opts.wrapVideoPort?.(real) ?? real
+    },
     devProbe: opts.devProbe ?? null,
   }
 

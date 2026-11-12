@@ -6,6 +6,8 @@
 // window.__hexnoteDev（DEV だけ）: ダミーが受けた要求と事象（状態の変化）の列・AudioContext の state・回の相と源・最後の記録。
 // 手順 5 で失敗の筋書き 4 行（onError 150 の ▶ の前・再生中 5 秒、読込の失敗、応答なし。事象は実物と同じく口の作り手の onEvent が
 // 運ぶ。VideoPort の型と dummyPort は変えない）と、口の dispose の回数・失敗の事象の列を足した。
+// 手順 7 で「▶（ダミー）」を stuck(0) → play に（凍結を解く利用者の ▶）、筋書き「広告中から切替」1 行（1 回目の pauseVideo だけ
+// 効かない）、実物の口の読みを固める freezeReads（window.__hexnoteDev.freeze(forMs)。殻の wrapVideoPort が実物の口を包む）を足した。
 // 手順 6 で筋書き「playVideo 無効」1 行（手順 1 の dummyPort の pass が playVideo だけ偽 ＝ 呼べたが効かない。再開の Space の後に
 // 自動再生ブロックの帯。利用者の ▶（ダミー）は口を通らないので効く）を足した。
 // 手順 3 で band（帯を点ける。殻の band へ）と actions（帯の釦の押下の記録）を足した。performance.now の直呼びは src/app/ だけ
@@ -47,6 +49,8 @@ export interface DummyScenario {
   }
   /** 口の playVideo を呼べたが効かない（自動再生ブロックの模擬。M3 の手順 6） */
   readonly blockPlay?: true
+  /** 1 回目の pauseVideo だけ効かない（広告中から切替の模擬。M3 の手順 7） */
+  readonly dropFirstPause?: true
 }
 
 /** DEV の表（S1 の「試験: クリック 100 BPM」の 5 行と、手順 4 の段 4） */
@@ -113,6 +117,22 @@ export const DUMMY_VIDEOS: readonly DummyScenario[] = [
     script: [],
     blockPlay: true,
   },
+  // 広告中から切替（M3 の手順 7）: 10 秒から凍結、1 回目の pauseVideo が効かず広告中とみなし、2.5 秒後の 2 回目が効いて S7c
+  {
+    id: 'hexDmyAdFal',
+    label: '広告中から切替（10 秒、1 回目の pause が効かない）',
+    options: {},
+    script: [{ at: 10_000, run: (d, now) => d.stuck(60_000, now) }],
+    dropFirstPause: true,
+  },
+  // 切替の後の失敗（M3 の手順 7、§7-32）: 10 秒から凍結 → 12 秒に S7c → 14 秒に onError 150。回は続き、帯は「戻せない」
+  {
+    id: 'hexDmyFrE15',
+    label: '凍結の後に onError 150（14 秒）',
+    options: {},
+    script: [{ at: 10_000, run: (d, now) => d.stuck(60_000, now) }],
+    fail: { at: 14_000, kind: 'error', code: 150 },
+  },
 ]
 
 /** 筋書きの失敗を口の事象の形に（error は手順 1 の errorGroupOf で組を付ける） */
@@ -143,11 +163,15 @@ export interface ScenarioPort {
 
 export function scenarioPort(sc: DummyScenario, hooks: ScenarioHooks = {}): ScenarioPort {
   const d = createDummyVideo({ stepMs: 15, seed: 7, ...sc.options })
+  let pauses = 0
+  const pass = (_now: number, q: VideoRequest): boolean => {
+    if (sc.blockPlay === true && q.kind === 'playVideo') return false
+    if (sc.dropFirstPause === true && q.kind === 'pauseVideo' && pauses++ === 0) return false
+    return true
+  }
   const base = dummyPort(d, {
     ...(hooks.onRequest === undefined ? {} : { onRequest: hooks.onRequest }),
-    ...(sc.blockPlay === true
-      ? { pass: (_now: number, q: VideoRequest) => q.kind !== 'playVideo' }
-      : {}),
+    ...(sc.blockPlay === true || sc.dropFirstPause === true ? { pass } : {}),
   })
   let start: number | null = null
   const done = new Set<number>()
@@ -156,6 +180,8 @@ export function scenarioPort(sc: DummyScenario, hooks: ScenarioHooks = {}): Scen
     video: d,
     play(now) {
       start ??= now
+      // 利用者の ▶ は凍った読みも動かす（M3 の手順 7。凍ったままの PLAYING は vitest だけ）
+      d.stuck(0, now)
       d.play(now)
     },
     startedAt: () => start,
@@ -212,6 +238,49 @@ const state: DevState = {
 
 let shell: Shell | null = null
 
+/** 読みを固める口（M3 の手順 7。§7-11） */
+export interface FrozenPort {
+  readonly port: VideoPort
+  /** now から forMs の間、標本の timeMs を最初の読みに固める（state・apply・事象は実物のまま） */
+  freeze(forMs: number, now: number): void
+}
+
+/**
+ * 実物の口を包み、点けた時から sample の timeMs だけを固定する（pauseVideo が効けば PAUSED で切り替わる）。解くのは実物が
+ * PLAYING でなくなった tick か forMs の後
+ */
+export function freezeReads(base: VideoPort): FrozenPort {
+  let frozen: { until: number; timeMs: number | null } | null = null
+  return {
+    freeze(forMs, now) {
+      frozen = { until: now + forMs, timeMs: null }
+    },
+    port: {
+      sample(now) {
+        const s = base.sample(now)
+        if (frozen === null || s === null) return s
+        if (s.state !== 'playing' || now >= frozen.until) {
+          frozen = null
+          return s
+        }
+        frozen.timeMs ??= s.timeMs
+        return { ...s, timeMs: frozen.timeMs }
+      },
+      apply: (now, reqs) => base.apply(now, reqs),
+      dispose: () => base.dispose(),
+    },
+  }
+}
+
+/** 今の実物の口（freeze の的） */
+let realFreeze: FrozenPort | null = null
+
+/** 殻の wrapVideoPort（実物の口を作るたびに包む。DEV だけ） */
+export function wrapRealPort(p: VideoPort): VideoPort {
+  realFreeze = freezeReads(p)
+  return realFreeze.port
+}
+
 const r1 = (x: number): number => Math.round(x * 10) / 10
 const since = (now: number): number => r1(now - (state.startAt ?? now))
 
@@ -228,6 +297,12 @@ export function installDevProbe(): DevProbe {
     /** 釦の押下の記録を空にする */
     clearActions(): void {
       state.actions = []
+    },
+    /** 実物の口の読み（timeMs）を forMs の間固める（凍結の模擬。PLAYING でなくなれば解ける。M3 の手順 7） */
+    freeze(forMs: number): boolean {
+      if (realFreeze === null) return false
+      realFreeze.freeze(forMs, performance.now())
+      return true
     },
   }
   return {

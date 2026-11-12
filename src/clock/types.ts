@@ -27,7 +27,7 @@ export type ClockMode = 'video' | 'novideo'
  * 時計の相（decisions #33）。stopped ＝ 利用者の一時停止・開始前（t は止まる）、held ＝ 動画が PLAYING でない
  * （止まる。PLAYING で再アンカー）、grace ＝ 再アンカーから 300 ms（判定を保留）、locked ＝ 通常、pauseReq ＝ 停止検知で
  * pauseVideo を要求して結果を待つ 500 ms、ad ＝ 要求が効かず広告中とみなす（t は止まる）。novideo の時計は
- * stopped・grace・locked だけを通る。
+ * stopped・grace・locked と、動画なしへ切り替えた後に PLAYING を見て戻りを待つ held（t は止まる。M3 の手順 7）を通る。
  */
 export type ClockPhase = 'stopped' | 'held' | 'grace' | 'locked' | 'pauseReq' | 'ad'
 
