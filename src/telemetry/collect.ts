@@ -137,6 +137,19 @@ export function collectPress(c: PlayCollect, lag: number | null): PlayCollect {
   }
 }
 
+/** 最近接順位の分位（⌈p·n⌉ 番目。空なら null。play 行の inputLatencyP95、M3 の手順 11） */
+export function nearestRank(xs: readonly number[], p: number): number | null {
+  if (xs.length === 0) return null
+  const s = [...xs].sort((a, b) => a - b)
+  return s[Math.max(0, Math.ceil(p * s.length) - 1)] ?? null
+}
+
+/** play 行の inputLatencyP95（標本が無ければ欄を書かない） */
+function latencyP95(lags: readonly number[]): { inputLatencyP95?: number } {
+  const p = nearestRank(lags, 0.95)
+  return p === null ? {} : { inputLatencyP95: p }
+}
+
 /** SyncUsed.fallbackAt（動画なしへ切り替えた曲の ms）。切り替えていなければ undefined */
 export function fallbackAtMs(c: PlayCollect, axis: SyncAxis): number | undefined {
   return c.fallbackT === null ? undefined : toChartMs(c.fallbackT, axis)
@@ -182,6 +195,7 @@ export function playRow(
     resyncCount: c.resyncCount,
     fallback: c.fallbackT !== null,
     inputLatencyMedian: median(c.lags),
+    ...latencyP95(c.lags),
     pressCount: c.pressCount,
     pressNoLag: c.pressCount - c.lags.length,
     frameIntervalSd: welfordSd(c.frames),

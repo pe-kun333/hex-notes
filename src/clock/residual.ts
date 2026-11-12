@@ -8,7 +8,7 @@
 
 import { BETA_DEFAULT } from './clock-source.ts'
 import { lsq, spanOf, type FitPoint } from './fit.ts'
-import type { ClockPhase, ResyncReason } from './types.ts'
+import type { ClockPhase, ResyncReason, VideoState } from './types.ts'
 
 /** 基準の窓（ms。読みが変わった tick の now がこれより古い物を落とす。2 点は残す） */
 export const REF_WINDOW_MS = 10_000
@@ -28,6 +28,8 @@ export interface ResidualFrame {
   readonly resync: ResyncReason | null
   /** 時計の q̂（ClockOutput.qHat） */
   readonly qHat: number
+  /** 標本の状態（走の要約が ENDED を見る。M3 の手順 11） */
+  readonly state?: VideoState
 }
 
 export interface ResidualSummary {
@@ -106,3 +108,64 @@ export function residualOf(frames: readonly ResidualFrame[], beta = BETA_DEFAULT
     ctlSd: sd(ctls),
   }
 } // prettier-ignore
+
+// ---------- 走の要約（M3 の手順 11、仮。m3-kickoff 手順 11「作る」・§7-18） ----------
+// 開発ページ youtube-dev の 1 走（ページの読込から ENDED まで）を残差の表の 1 行にする。数える走 ＝ 文書が隠れていない・
+// rAF 50 回／秒以上・再アンカー 0・40 秒以上（手順 2 の線）。秒数と rAF は再生の始まり（最初の再アンカー start）から、
+// 最初の ENDED の読みまで（無ければ最後のフレームまで）で数える（読込から ▶ までの待ちを入れない）。ENDED まで回したかは
+// 印だけで、数える条件に入れない（見本の動画は ENDED まで回さない）。時計残差（play 行の clockResidualSd）は製品と同じ
+// collectClock の値を呼ぶ側が渡す。
+
+/** 数える走の rAF の下限（回／秒） */
+export const RUN_MIN_RAF = 50
+/** 数える走の長さの下限（秒） */
+export const RUN_MIN_SECONDS = 40
+
+export interface RunSummary extends ResidualSummary {
+  /** 時計残差（locked の tick の dev の SD。play 行の clockResidualSd と同じ量。無ければ null） */
+  readonly clockResidualSd: number | null
+  /** 負の増分（読みが前のフレームより小さい回） */
+  readonly negatives: number
+  /** 再生の始まりから終わりまでのフレーム */
+  readonly frames: number
+  /** 再生の始まりから終わりまでの秒 */
+  readonly seconds: number
+  /** フレーム ÷ 秒 */
+  readonly rafPerSec: number
+  /** 始まりから終わりの間に文書が隠れたか */
+  readonly hiddenSeen: boolean
+  /** ENDED の読みまで回したか */
+  readonly ended: boolean
+}
+
+/** 1 走の要約（再生が始まっていない・数えたフレームが 2 未満なら null） */
+export function runSummary(frames: readonly ResidualFrame[], clockResidualSd: number | null, beta = BETA_DEFAULT): RunSummary | null {
+  const start = frames.findIndex((f) => f.resync === 'start')
+  if (start < 0) return null
+  const endAt = frames.findIndex((f, i) => i >= start && f.state === 'ended')
+  const run = frames.slice(start, endAt < 0 ? frames.length : endAt + 1)
+  const r = residualOf(run, beta)
+  const first = run[0]
+  const last = run[run.length - 1]
+  if (r === null || first === undefined || last === undefined) return null
+  let negatives = 0
+  for (let i = 1; i < run.length; i++) if ((run[i] as ResidualFrame).raw < (run[i - 1] as ResidualFrame).raw) negatives++
+  const seconds = (last.now - first.now) / 1000
+  return {
+    ...r,
+    clockResidualSd,
+    negatives,
+    frames: run.length,
+    seconds,
+    rafPerSec: seconds > 0 ? run.length / seconds : 0,
+    hiddenSeen: run.some((f) => !f.visible),
+    ended: endAt >= 0,
+  }
+} // prettier-ignore
+
+/** 数える走か（隠れていない・rAF 50 回／秒以上・再アンカー 0・40 秒以上） */
+export function runCountable(s: RunSummary): boolean {
+  return (
+    !s.hiddenSeen && s.rafPerSec >= RUN_MIN_RAF && s.resyncs === 0 && s.seconds >= RUN_MIN_SECONDS
+  )
+}

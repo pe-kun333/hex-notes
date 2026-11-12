@@ -7,6 +7,9 @@
 // 製品画面ではない（導線は開発時だけ、src/main.ts）。performance.now の直呼びは src/app/ だけ（src/README.md）。
 // M3 の手順 2: 残差の道具（src/clock/residual.ts）の値を読み出しと JSON の residual に出す（m3-kickoff §7-18。完了条件 (b)
 // ＝ 見本の動画を 40 秒以上・可視・rAF 50 回/秒以上で回し、補間後 SD ＜ 直読み SD を数値で残す）。
+// M3 の手順 11（M3-07）: 走の要約 runSummary（秒・rAF・負の増分・時計残差・数えるか）を読み出しと JSON の run・runs に出す。
+// 時計残差は製品の play 行と同じ collectClock の値。走ごとにページを読み直す（m3-kickoff §7-18）。ENDED に着いた走は、
+// 下の欄に要約の JSON を出す（書き出しの釦を押さなくても読める）。動画 ID は JSON に書かない（decisions #99。U-02 は限定公開）。
 
 import '../styles.css'
 import type {
@@ -17,7 +20,14 @@ import type {
   VideoSample,
   VideoState,
 } from '../../clock/types.ts'
-import { residualOf, type ResidualFrame, type ResidualSummary } from '../../clock/residual.ts'
+import {
+  residualOf,
+  runCountable,
+  runSummary,
+  type ResidualFrame,
+  type ResidualSummary,
+  type RunSummary,
+} from '../../clock/residual.ts'
 import type { InputEvent } from '../../input/keyboard.ts'
 import {
   initialSession,
@@ -27,6 +37,12 @@ import {
   type SessionStep,
 } from '../../play/session.ts'
 import type { PlayEvent } from '../../play/state.ts'
+import {
+  collectClock,
+  initialCollect,
+  welfordSd,
+  type PlayCollect,
+} from '../../telemetry/collect.ts'
 import { playerPort, type PortEvent } from '../../youtube/port.ts'
 import { videoIdOf } from '../../youtube/video-id.ts'
 import { moreThanHalfVisible } from '../../youtube/visible.ts'
@@ -50,6 +66,13 @@ function residualText(r: ResidualSummary | null, wallMs: number | null): string 
   const long = wallMs !== null && wallMs >= 40_000
   return `残差 n ${r.n}  直読み SD ${f(r.rawSd)}  補間後 SD ${f(r.outSd)}${r.outSd < r.rawSd ? '（＜ 直読み）' : '（≥ 直読み）'}  平均 ${f(r.outMean)}  q̂ ${f(r.qHat)}  偏り ${f(r.bias)}  傾き ${f(r.slope, 5)}  再アンカー ${r.resyncs}  対照 ${f(r.ctlSd)}  ${long ? '40 秒以上' : `${Math.round((wallMs ?? 0) / 1000)} 秒（40 秒に満たない）`}`
 }
+
+/** 走の要約の 1 行（秒・rAF・負の増分・時計残差・数えるか。M3 の手順 11） */
+function runText(s: RunSummary | null): string {
+  if (s === null) return '走 —（再生が始まるのを待つ）'
+  const why = [s.hiddenSeen ? '隠れた' : '', s.rafPerSec < 50 ? 'rAF 50 未満' : '', s.resyncs > 0 ? '再アンカーあり' : '', s.seconds < 40 ? '40 秒未満' : ''].filter((x) => x !== '')
+  return `走 ${s.seconds.toFixed(1)} 秒  フレーム ${s.frames}  rAF ${s.rafPerSec.toFixed(1)} 回／秒  負の増分 ${s.negatives}  時計残差 ${s.clockResidualSd === null ? '—' : s.clockResidualSd.toFixed(2)}  ${s.ended ? 'ENDED まで' : '途中'}  ${runCountable(s) ? '数える' : `数えない（${why.join('・')}）`}`
+} // prettier-ignore
 
 /** 開発ページだけが呼ぶ口（計測用。製品の型には書かない） */
 interface DevPlayer extends YtPlayer {
@@ -110,6 +133,8 @@ interface DevRecord {
   residual: ResidualSummary | null
   /** 残差に渡したフレームの長さ（ms。最初と最後の now の差） */
   residualWallMs: number | null
+  /** 走の要約（再生の始まりから最初の ENDED まで。M3 の手順 11） */
+  run: RunSummary | null
   events: Array<{ at: number; text: string }>
   requests: Array<{ at: number; kind: string; why?: string }>
   frames: Array<[number, number | null, VideoState | null, number | null, number, string, string]>
@@ -129,6 +154,7 @@ const fresh = (videoId: string): DevRecord => ({
   slope: null,
   residual: null,
   residualWallMs: null,
+  run: null,
   events: [],
   requests: [],
   frames: [],
@@ -172,8 +198,14 @@ function main(): void {
   let slopePts: Array<[number, number]> = []
   // 残差の道具に渡すフレーム（読込から。1 秒ごとと JSON の書き出しで数え直す）
   let resFrames: ResidualFrame[] = []
+  // 時計残差（製品の play 行と同じ collectClock。時計の出力ごと）
+  let clk: PlayCollect = initialCollect()
+  // ENDED に着いた走（このページの間。読み直すと空）
+  const runs: RunSummary[] = []
+  let runDone = false
   const updateResidual = (): void => {
     rec.residual = residualOf(resFrames)
+    rec.run = runSummary(resFrames, welfordSd(clk.clockDev))
     const a = resFrames[0]
     const b = resFrames[resFrames.length - 1]
     rec.residualWallMs = a === undefined || b === undefined ? null : r1(b.now - a.now)
@@ -237,6 +269,7 @@ function main(): void {
     const before = session.play
     session = step.session
     last = step.out
+    clk = collectClock(clk, step.out)
     for (const ev of step.out.events) log(now, `時計: ${describe(ev)}`)
     applyReqs(now, step.video)
     const p = session.play
@@ -261,6 +294,8 @@ function main(): void {
     slopePts = []
     slopeDone = false
     resFrames = []
+    clk = initialCollect()
+    runDone = false
     $('log').replaceChildren()
     const now = performance.now()
     rec.mountAt = r1(now)
@@ -284,13 +319,19 @@ function main(): void {
 
   const devPlayer = (): DevPlayer | null => (mounted?.player() as DevPlayer | null) ?? null
 
-  const exportJson = (): void => {
-    updateResidual()
-    const text = JSON.stringify(
-      { page: 'youtube-dev', at: new Date().toISOString(), ...rec },
+  // 動画 ID は書かない（decisions #99）
+  const recordJson = (): string => {
+    const { videoId: _id, ...rest } = rec
+    return JSON.stringify(
+      { page: 'youtube-dev', at: new Date().toISOString(), ...rest, runs },
       null,
       1,
     )
+  }
+
+  const exportJson = (): void => {
+    updateResidual()
+    const text = recordJson()
     const box = $('json') as HTMLTextAreaElement
     box.value = text
     const a = document.createElement('a')
@@ -379,8 +420,21 @@ function main(): void {
         visible: sample.visible,
         resync: rs?.kind === 'resync' ? rs.reason : null,
         qHat: o.qHat,
+        state: sample.state,
       })
       if (resFrames.length % 60 === 0) updateResidual()
+      // 最初の ENDED で走を閉じ、要約を欄に出す（書き出しの釦を押さなくても読める）
+      if (!runDone && sample.state === 'ended') {
+        updateResidual()
+        runDone = true
+        if (rec.run !== null) runs.push(rec.run)
+        ;($('json') as HTMLTextAreaElement).value = JSON.stringify(
+          { run: rec.run, countable: rec.run === null ? false : runCountable(rec.run) },
+          null,
+          1,
+        )
+        log(now, `走を閉じた: ${runText(rec.run)}`)
+      }
     }
     const raf = frameTimes.length
     if (mounted !== null && rec.readyMs !== null) rec.rafMin = Math.min(rec.rafMin ?? raf, raf)
@@ -390,6 +444,7 @@ function main(): void {
       `標本 ${sample === null ? 'null' : `${sample.state} ${sample.timeMs.toFixed(1)} ms ×${sample.rate}`}`,
       `傾き ${rec.slope === null ? `取得中 ${slopePts.length} 点` : `${rec.slope.slope.toFixed(4)}（${rec.slope.ok === null ? '数えない' : rec.slope.ok ? '0.9〜1.1 の中' : '外'}）`}`,
       residualText(rec.residual, rec.residualWallMs),
+      runText(rec.run),
     ].join('\n')
     requestAnimationFrame(frame)
   }

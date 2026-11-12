@@ -277,6 +277,8 @@ export interface PlayTelemetry extends TelemetryBase {
   fallback: boolean
   /** 押下の now − timeStamp の中央値（ms）。標本が無ければ null（decisions #25） */
   inputLatencyMedian: number | null
+  /** 押下の now − timeStamp の 95 パーセンタイル（最近接順位。標本が無ければ書かない。M3 の手順 11、m3-kickoff §7-38、仮） */
+  inputLatencyP95?: number
   /** 演奏の押下の数と、そのうち入力遅延の標本にならなかった（timeStamp が使えない・古い）数（decisions #54） */
   pressCount: number
   pressNoLag: number

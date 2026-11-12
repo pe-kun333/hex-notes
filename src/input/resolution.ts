@@ -75,6 +75,24 @@ export function estimateTsResolution(samples: readonly number[]): TsResolution {
   return { q: 0, fit: 0, n }
 }
 
+// ---------- 回の終わりの刻みの更新（M3 の手順 11、m3-kickoff §7-38、仮） ----------
+// 開発ページ input の他に、製品のプレイの回の終わりにも推定して hexnote.device の tsResolution を更新する（device 行は呼ぶ側）。
+// 未診断（device が無い・同時押しテストを飛ばした diagnosed 偽）には書かない（S6 で同時押しテストを通した後から。仮）。
+
+/** 推定に使う直近の timeStamp の数（開発ページ input と同じ） */
+export const STAMP_RING = 200
+
+/**
+ * 回の終わりの端末プロファイル。stamps は keydown・keyup の timeStamp。未診断・推定できない（q が null か 0）・保存の値と
+ * 同じなら null（書かない）。替えるのは tsResolution だけで、at（診断の時刻）は変えない
+ */
+export function deviceAfterPlay<D extends { readonly diagnosed?: boolean; readonly tsResolution?: number }>(device: D | null, stamps: readonly number[]): D | null {
+  if (device === null || device.diagnosed === false) return null
+  const { q } = estimateTsResolution(stamps)
+  if (q === null || q === 0 || q === device.tsResolution) return null
+  return { ...device, tsResolution: q }
+} // prettier-ignore
+
 /** 判定が粗い環境か（注記を出すか）。q が null・0 は「分からない」で false */
 export function isCoarse(q: number | null): boolean {
   return q !== null && q >= TS_COARSE_MS

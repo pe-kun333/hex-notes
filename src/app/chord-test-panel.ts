@@ -16,7 +16,7 @@ import {
 } from '../input/chord-test.ts'
 import type { InputEvent } from '../input/keyboard.ts'
 import type { Legend } from '../layout/legend.ts'
-import type { ChordLimit, KeyCode } from '../shared/types.ts'
+import type { ChordLimit, DeviceInfo, KeyCode } from '../shared/types.ts'
 import { deviceRow } from '../telemetry/rows.ts'
 import { button, h } from './screens/frame.ts'
 import type { ScreenContext } from './shell.ts'
@@ -46,6 +46,18 @@ export function saveDeviceLimit(ctx: ScreenContext, limit: ChordLimit, diagnosed
   const kbApi = (navigator as Navigator & { keyboard?: { getLayoutMap?: unknown } }).keyboard
   const at = new Date().toISOString()
   const device = { ...(ctx.device() ?? {}), limit, at, layoutMapOk: typeof kbApi?.getLayoutMap === 'function', diagnosed }
+  ctx.saveDevice(device)
+  void ctx.booted.db
+    .appendTelemetry(deviceRow({ ua: navigator.userAgent, screenPx: [screen.width, screen.height], dpr: window.devicePixelRatio || 1, device }, at))
+    .catch(() => {})
+} // prettier-ignore
+
+/**
+ * 回の終わりに刻みが決まった・変わった端末プロファイルを保存して device 行を足す（M3 の手順 11、m3-kickoff §7-38。device は
+ * resolution.ts の deviceAfterPlay が返した物。at は診断の時刻のまま、行の at は今の時刻）
+ */
+export function saveDeviceTsResolution(ctx: ScreenContext, device: DeviceInfo): void {
+  const at = new Date().toISOString()
   ctx.saveDevice(device)
   void ctx.booted.db
     .appendTelemetry(deviceRow({ ua: navigator.userAgent, screenPx: [screen.width, screen.height], dpr: window.devicePixelRatio || 1, device }, at))

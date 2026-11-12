@@ -46,6 +46,7 @@ import {
 import { playerPoints, type Placement } from './placement.ts'
 import type { Booted } from './boot.ts'
 import { attachKeyboard } from './dom-input.ts'
+import { STAMP_RING } from '../input/resolution.ts'
 import type { FinishedPlay, PracticeOptions } from './play-runner.ts'
 import { navigate, type Route, type ScreenId } from './router.ts'
 import { songList, type SongEntry } from './songs.ts'
@@ -104,6 +105,8 @@ export interface ScreenContext {
   device(): DeviceInfo | null
   /** 端末プロファイルを保存する（S0b の終わり。device 行は呼ぶ側、decisions #55 (b)） */
   saveDevice(d: DeviceInfo): void
+  /** 直近の keydown・keyup の timeStamp（最大 STAMP_RING 件、古い順。回の終わりの刻みの推定、M3 の手順 11） */
+  stamps(): readonly number[]
   /** 端末プロファイルの初期化（S6 → S0。hexnote.device と hexnote.booted を消し、次は初回の導線、§1.3 S6） */
   resetDevice(): void
   /**
@@ -293,6 +296,8 @@ export function startShell(opts: ShellOptions): Shell {
   let settings = booted.settings
   let fade = booted.fade
   let device = booted.device
+  // keydown・keyup の timeStamp の輪（直近 STAMP_RING 件。resolution.ts の推定と同じ数）
+  const stamps: number[] = []
   let tutorial: TutorialRun | null = null
   let onboard: OnboardState | null = null
   let bundled: Promise<readonly string[]> | null = null
@@ -368,6 +373,7 @@ export function startShell(opts: ShellOptions): Shell {
       saveDevice(booted.local, d)
       device = d
     },
+    stamps: () => stamps,
     resetDevice: () => {
       booted.local.remove(LOCAL_KEYS.device)
       // 埋め込み不可の一覧も消す（M3 の手順 5、m3-kickoff §7-27）
@@ -482,7 +488,13 @@ export function startShell(opts: ShellOptions): Shell {
       }
       view?.onInput?.(events)
     },
-    { focusTarget: host },
+    {
+      focusTarget: host,
+      onStamp: (ts) => {
+        stamps.push(ts)
+        if (stamps.length > STAMP_RING) stamps.splice(0, stamps.length - STAMP_RING)
+      },
+    },
   )
   window.addEventListener('resize', () => {
     view?.onResize?.()

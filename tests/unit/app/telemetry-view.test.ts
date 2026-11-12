@@ -47,6 +47,8 @@ describe('行の要約 rowBrief', () => {
       '8ee244ea… ableton/2/octave beginner novideo fixed・精度 94.2%・UR 123.4・NEAR 5.0%・再同期 0・切替 なし・' +
         '入力遅延 1.90 ms（押下 120、標本なし 2）・フレーム SD 1.30 p95 17.0 ms・時計残差 —・予約の遅れ 0.0',
     )
+    // p95 のある行（M3 の手順 11、期待値 (4)。文は仮）
+    expect(rowBrief({ ...PLAY, inputLatencyP95: 4.2 })).toContain('・切替 なし・入力遅延 1.90 ms（p95 4.20、押下 120、標本なし 2）・フレーム SD 1.30 p95 17.0 ms・')
     expect(rowBrief({ kind: 'calib', at: AT, stage: 'tap', n: 24, sd: 12.34, applied: true, proposed: -18 })).toBe(
       '段 1（タップ）・標本 24・SD 12.3 ms・−18 ms・適用',
     )
