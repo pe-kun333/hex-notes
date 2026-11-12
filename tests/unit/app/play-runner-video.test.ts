@@ -284,13 +284,14 @@ describe('通し（期待値 (3)）', () => {
     expect(o.aborted).toBe(false)
   })
 
-  it('記録: clock video・syncUsed youtube（offset 3・rate 1）・offsetUsed 0（校正が {audio −19} でも）・calibEligible 偽、称号の対象外・完走', () => {
+  it('記録: clock video・syncUsed youtube（offset 3・rate 1）・offsetUsed 0（校正が {audio −19} でも）・calibEligible 真（手順 9 で式の sync の動画の回を母集団に入れた）、称号の対象外・完走', () => {
     const cal = { v: 1 as const, audio: { offsetMs: -19, at: '2026-11-01T00:00:00.000Z', via: 'tap' as const } }
     const offsetMs = offsetFor(cal, 'youtube')
     expect(offsetMs).toBe(0)
     const d = drive()
     const f = finishedPlay(d.run, META)
-    expect(f.calibEligible).toBe(false)
+    // 手順 2 の安全弁「動画の回は偽」は手順 9 で外した（measured の無い式の sync・切り替わっていない回は youtube の母集団）
+    expect(f.calibEligible).toBe(true)
     expect(f.clock).toBe('video')
     expect(f.record.clock).toBe('video')
     expect(f.record.syncUsed).toEqual({ kind: 'youtube', videoId: 'hexDmyPlain', offset: 3, rate: 1 })

@@ -78,7 +78,7 @@ export function rowBrief(r: TelemetryRow): string {
       )
     case 'calib':
       return (
-        `段 ${r.stage === 'tap' ? '1（タップ）' : '2（提案）'}・標本 ${r.n}・SD ${r.sd === null ? '—' : `${fix(r.sd)} ms`}・` +
+        `段 ${r.stage === 'tap' ? '1（タップ）' : '2（提案）'}${r.source === 'youtube' ? '・YouTube' : ''}・標本 ${r.n}・SD ${r.sd === null ? '—' : `${fix(r.sd)} ms`}・` +
         (r.proposed === null
           ? `満たさず（${r.reason ?? '—'}）`
           : `${signedMs(r.proposed)}・${r.applied ? '適用' : '見送り'}`)

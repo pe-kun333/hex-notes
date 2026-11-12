@@ -57,6 +57,7 @@ import { regionsOf } from '../../render/canvas/primitives.ts'
 import { buildKeyboardGrid, type KeyboardGrid } from '../../render/hex/grid.ts'
 import type { Sizing } from '../../render/hex/sizing.ts'
 import type { KeyCode, LayoutId } from '../../shared/types.ts'
+import { calibKindOf, calibOffset } from '../calibration.ts'
 import { offsetFor } from '../../storage/local.ts'
 import { playRow } from '../../telemetry/collect.ts'
 import { gamerHudOf, hudOf } from '../hud.ts'
@@ -912,8 +913,11 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     return {
       rules: rulesOf(prof.rules, {
         neighbor: neighborOf(byCode),
-        // 動画の回は youtube の校正（未校正 0。measured の分けと段 2 の提案は手順 9）
-        offsetMs: offsetFor(ctx.calibration(), videoId === null ? 'audio' : 'youtube'),
+        // 校正の種別は回から（動画の回は youtube、段 4 のタップで合わせた sync〔measured 真〕は 0。M3 の手順 9、§7-34）
+        offsetMs: calibOffset(
+          ctx.calibration(),
+          calibKindOf({ video: videoId !== null, measured: song.sync?.sources[0]?.measured }),
+        ),
         // 自力率は見えているラベルで数える（退避はキー文字を必ず出す）
         labels: shownLabels,
         fadeFrozen,
