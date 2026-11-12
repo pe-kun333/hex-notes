@@ -6,10 +6,11 @@
 
 import {
   createDummyVideo,
+  dummyPort,
   type DummyVideo,
   type DummyVideoOptions,
 } from '../../clock/dummy-video.ts'
-import type { ClockEvent, ClockOutput, VideoRequest } from '../../clock/types.ts'
+import type { ClockEvent, ClockOutput, VideoPort, VideoRequest } from '../../clock/types.ts'
 import type { InputEvent } from '../../input/keyboard.ts'
 import {
   initialSession,
@@ -134,31 +135,28 @@ function main(): void {
     while (log.childElementCount > 40) log.lastElementChild?.remove()
   }
 
-  const applyVideo = (now: number, reqs: VideoRequest[]): void => {
-    for (const q of reqs) {
-      if (q.kind === 'pauseVideo') {
-        const why = q.why === 'stall' ? '停止検知' : '一時停止'
-        if (now < adUntil) addLog(now, `pauseVideo（${why}。広告の模擬中なので効かない）`)
-        else {
-          addLog(now, `pauseVideo（${why}）`)
-          dummy.pauseVideo(now)
-        }
-      } else if (q.kind === 'playVideo') {
-        addLog(now, 'playVideo（再開）')
-        dummy.play(now)
-      } else {
-        addLog(now, `seekTo ${q.t.toFixed(0)}`)
-        dummy.seek(q.t, now)
-      }
-    }
+  /** 要求の記録（広告の模擬の間の pauseVideo は口が落とす） */
+  const logRequest = (now: number, q: VideoRequest): void => {
+    if (q.kind === 'pauseVideo') {
+      const why = q.why === 'stall' ? '停止検知' : '一時停止'
+      addLog(now, `pauseVideo（${why}${now < adUntil ? '。広告の模擬中なので効かない' : ''}）`)
+    } else if (q.kind === 'playVideo') addLog(now, 'playVideo（再開）')
+    else addLog(now, `seekTo ${q.t.toFixed(0)}`)
   }
+  /** ダミー動画の口（M3 の手順 1。実物の口と同じ VideoPort） */
+  const makePort = (): VideoPort =>
+    dummyPort(dummy, {
+      onRequest: logRequest,
+      pass: (now, q) => !(q.kind === 'pauseVideo' && now < adUntil),
+    })
+  let port: VideoPort = makePort()
 
   const apply = (now: number, step: SessionStep): void => {
     const before = session.play
     session = step.session
     last = step.out
     for (const ev of step.out.events) addLog(now, describeEvent(ev))
-    applyVideo(now, step.video)
+    port.apply(now, step.video)
     const p = session.play
     if (p.phase !== before.phase || p.source !== before.source)
       addLog(now, `プレイの相: ${before.phase}/${before.source} → ${p.phase}/${p.source}`)
@@ -178,6 +176,7 @@ function main(): void {
       freezeHold: holdBox.checked,
     }
     dummy = createDummyVideo(opts)
+    port = makePort()
     session = initialSession({ mode: 'video', t0: 0, beta: Number(betaSel.value) })
     rateSel.value = '1'
     trace = []
@@ -370,11 +369,11 @@ function main(): void {
 
   const frame = (): void => {
     const now = performance.now()
-    const sample = dummy.sample(now)
+    const sample = port.sample(now)
     apply(now, sessionTick(session, now, sample))
     const tt = dummy.trueTime(now)
     const o = last
-    if (o !== null) {
+    if (o !== null && sample !== null) {
       trace.push({
         now,
         raw: sample.timeMs - tt,

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>YouTube の実プレイヤー（開発）</title>
+  </head>
+  <body>
+    <main id="app" tabindex="-1" class="screen" style="max-width: 980px; padding: 16px">
+      <h1>YouTube の実プレイヤー（M3 の手順 1）</h1>
+      <p class="note">
+        実物の口（src/youtube/ と app/youtube-player.ts）で IFrame
+        を読み、毎フレームの読みを時計と状態機械（play/session）に当てます。Esc
+        で一時停止（pauseVideo）、Space
+        で再開（playVideo）。「再生（ミュート）」と「seekTo」はこのページだけの計測用です（製品は利用者の
+        ▶ だけ、decisions #95）。測る間は Claude の窓を前に出しておいてください（非表示では rAF
+        が止まり、YouTube も止まります）。
+      </p>
+      <div id="controls"></div>
+      <div id="host" style="width: 480px; height: 270px; background: #000; margin: 12px 0"></div>
+      <pre id="readout" class="note"></pre>
+      <h2>記録（新しい順）</h2>
+      <ol id="log" reversed></ol>
+      <h2>JSON</h2>
+      <textarea id="json" rows="8" style="width: 100%" readonly></textarea>
+    </main>
+    <script type="module" src="./youtube-dev.ts"></script>
+  </body>
+</html>

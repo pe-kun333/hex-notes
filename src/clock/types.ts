@@ -78,6 +78,18 @@ export type VideoRequest =
   | { kind: 'playVideo' }
   | { kind: 'seekTo'; t: number }
 
+/**
+ * 動画の口（M3 の手順 1、仮。m3-kickoff §0・§7-9）。実物の口（src/youtube/port.ts の playerPort、app/youtube-player.ts の
+ * createYoutubePlayer）と、ダミー動画の口（dummy-video.ts の dummyPort）が同じ形を返す。sample は毎フレーム 1 回
+ * （読めない・準備前は null）、apply は時計と状態機械が出した要求の列を渡す（呼べない要求は捨てる）、dispose は作り直しと
+ * 画面を離れる時。
+ */
+export interface VideoPort {
+  sample(now: number): VideoSample | null
+  apply(now: number, requests: readonly VideoRequest[]): void
+  dispose(): void
+}
+
 /** 時計への命令（decisions #32 (b)。tick とは別の関数で、入力のハンドラの now で効かせる） */
 export type ClockCommand =
   | { kind: 'start' }
