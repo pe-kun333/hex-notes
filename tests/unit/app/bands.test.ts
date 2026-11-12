@@ -9,6 +9,7 @@ import {
   type BandEvent,
   type BandKind,
   type BandsState,
+  VIDEO_FALLBACK_TITLE,
 } from '../../../src/app/bands.ts'
 import { LATE_BAND_MS } from '../../../src/audio/scheduler.ts'
 import { emptyInputState, handleKey, type KeyEventRecord } from '../../../src/input/keyboard.ts'
@@ -196,8 +197,8 @@ describe('予約の遅れ（#47 (c)）と自動再生ブロック', () => {
     })
   })
 
-  it('IME 以外の 4 種は「閉じる」を出し、閉じると消える', () => {
-    const shown: Record<Exclude<BandKind, 'ime'>, BandEvent> = {
+  it('IME と S7c 以外の 4 種は「閉じる」を出し、閉じると消える', () => {
+    const shown: Record<Exclude<BandKind, 'ime' | 'videoFallback'>, BandEvent> = {
       autoplayBlocked: { kind: 'autoplayBlocked', on: true },
       audioLate: { kind: 'audioLate', on: true },
       lowLoad: { kind: 'lowLoad', level: 1 },
@@ -210,17 +211,71 @@ describe('予約の遅れ（#47 (c)）と自動再生ブロック', () => {
     }
   })
 
-  it('全部出ていれば BAND_ORDER の順（ime → 自動再生 → 予約の遅れ → 低負荷 → 保存できません）', () => {
+  it('全部出ていれば BAND_ORDER の順（ime → S7c → 自動再生 → 予約の遅れ → 低負荷 → 保存できません）', () => {
     const s = run([
+      { kind: 'videoFallback', on: true, enabled: true },
       { kind: 'storageFail', area: 'idb' },
       { kind: 'lowLoad', level: 3 },
       { kind: 'audioLate', on: true },
       { kind: 'autoplayBlocked', on: true },
       { kind: 'ime', on: true },
     ])
-    // m6 L790–803 の ime → 自動再生 → 保存できません の間に、予約の遅れと低負荷（BAND_ORDER 自身と比べない）
-    expect(kinds(s)).toEqual(['ime', 'autoplayBlocked', 'audioLate', 'lowLoad', 'storageFail'])
+    // m6 L790–803 の ime → 自動再生 → 保存できません の間に、予約の遅れと低負荷、ime の次に S7c（M3 の手順 3。手順 6 で sync が
+    // ime の次に入る）。BAND_ORDER 自身と比べない
+    expect(kinds(s)).toEqual([
+      'ime',
+      'videoFallback',
+      'autoplayBlocked',
+      'audioLate',
+      'lowLoad',
+      'storageFail',
+    ])
     expect(BAND_ORDER).toEqual(kinds(s))
+  })
+})
+
+describe('帯の釦と S7c の仮の帯（M3 の手順 3、期待値 (8)、m3-kickoff §7-22）', () => {
+  it('videoFallback を on・enabled 真 → 題は既定（m6 L797 の 19 字）・閉じるなし・釦 {return, 戻す, 真}', () => {
+    const s = run([{ kind: 'videoFallback', on: true, enabled: true }])
+    expect(bandsOf(s, OFF)).toEqual([
+      {
+        kind: 'videoFallback',
+        title: VIDEO_FALLBACK_TITLE,
+        detail: '',
+        dismissible: false,
+        action: { id: 'return', label: '戻す', enabled: true },
+      },
+    ])
+    expect(VIDEO_FALLBACK_TITLE).toBe('動画が止まったので、ピアノ音で続けます')
+    expect([...VIDEO_FALLBACK_TITLE]).toHaveLength(19)
+  })
+
+  it('題と活性は画面が渡す（題「プレイヤーの ▶ を押してください」・enabled 偽 → その題と偽）', () => {
+    const s = run([{ kind: 'videoFallback', on: true, title: 'プレイヤーの ▶ を押してください', enabled: false }])
+    expect(bandsOf(s, OFF)[0]).toMatchObject({
+      title: 'プレイヤーの ▶ を押してください',
+      action: { id: 'return', label: '戻す', enabled: false },
+    })
+    // 題を省けば既定に戻る
+    expect(bandsOf(bandStep(s, { kind: 'videoFallback', on: true, enabled: false }), OFF)[0]?.title).toBe(VIDEO_FALLBACK_TITLE)
+  }) // prettier-ignore
+
+  it('同じ値の知らせと dismiss は同じ state（===）、off で消える。今の 5 種は釦なし', () => {
+    const s = run([{ kind: 'videoFallback', on: true, enabled: true }])
+    expect(bandStep(s, { kind: 'videoFallback', on: true, enabled: true })).toBe(s)
+    expect(bandStep(s, { kind: 'dismiss', band: 'videoFallback' })).toBe(s)
+    expect(bandStep(s, { kind: 'videoFallback', on: true, enabled: false })).not.toBe(s)
+    expect(kinds(bandStep(s, { kind: 'videoFallback', on: false }))).toEqual([])
+    const off = initialBands()
+    expect(bandStep(off, { kind: 'videoFallback', on: false })).toBe(off)
+    const all = run([
+      { kind: 'ime', on: true },
+      { kind: 'autoplayBlocked', on: true },
+      { kind: 'audioLate', on: true },
+      { kind: 'lowLoad', level: 1 },
+      { kind: 'storageFail', area: 'local' },
+    ])
+    expect(bandsOf(all, OFF).every((b) => b.action === undefined)).toBe(true)
   })
 })
 

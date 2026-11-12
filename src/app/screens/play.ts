@@ -13,6 +13,9 @@
 // M3 の手順 2（M3-03 前半）: 動画の回（video-run.ts の videoRunOf。門 VIDEO_FEATURE は開発時だけ真）はプレイヤー矩形に
 // ctx.videoPort の口（前に何も置かない。同意の門は mountPlayer）、毎フレームの標本を runFrame へ、要求の効果を口の apply へ。
 // 開始は利用者の ▶ だけ（decisions #95）。音を出す準備は S2 を作る時（S1 の釦の click の中）にも呼ぶ（m3-kickoff §7-14）。
+// M3 の手順 3（M3-01 後半＋M3-02）: 左列を 480×270 のまま詰めた（HUD 13 px・「ホームへ」を案内の行へ・曲名 1 行。動画なしの
+// S2 も同じ形、m3-kickoff §7-21）。動画ありの矩形は class `video`（縁・背景なし）。寸法の注記と入らない窓の文は折り返してよい
+// 別の行。dev の assert に配置モデル（placement.ts）と、矩形と交差してはならない物を渡す（layoutProbe、§7-20）。
 
 import {
   PART_GAINS,
@@ -84,6 +87,7 @@ import { onboardRow } from '../../telemetry/rows.ts'
 import { newRecordId } from '../../results/record.ts'
 import type { PortEvent } from '../../youtube/port.ts'
 import { videoRunOf } from '../video-run.ts'
+import { placementOf, sizeNote, type Placement } from '../placement.ts'
 import { button, h } from './frame.ts'
 import { pauseOverlay } from './pause.ts'
 
@@ -218,12 +222,16 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     return v
   }
   const title = hudRow('曲名')
+  // 曲名は 1 行で省略（全文は title。左列の予算、§7-21）
+  title.className = 'songname'
   const bar = h(doc, 'i')
   const barText = h(doc, 'span', { text: '0%' })
   hudRow('進行', h(doc, 'span', { className: 'bar' }, bar), barText)
   // 音ゲー向け（prof.hud にランク以下の項目があるときだけ）: 精度の行の後ろに「ランク S ・ コンボ 48」（m6 L824 の横並び。
   // 1093×514 の左列に入るよう行を足さない）、ゲージの棒と数、「×1.0（1.0 s） ・ FAST 37 ／ SLOW 22」
-  const gamerHud = prof.hud.includes('rank')
+  // S0d（チュートリアル曲）は design L75 の「S2 の入門者形態」で、音ゲー向けでも入門者の HUD（左列の予算、m3-kickoff §7-21 の
+  // 案 A。判定・流れる時間はプロファイルのまま）
+  const gamerHud = prof.hud.includes('rank') && ctx.tutorial() === null
   const accuracy = h(doc, 'span')
   const rank = h(doc, 'b')
   const combo = h(doc, 'b')
@@ -239,11 +247,18 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     hudRow('ゲージ', h(doc, 'span', { className: 'bar' }, gaugeBar), gaugeText)
     hudRow('ハイスピード', hispeed, t(' ・ FAST '), fast, t(' ／ SLOW '), slow)
   }
-  const status = h(doc, 'p', { className: 'status', text: '読み込み中…' })
+  const status = h(doc, 'p', { className: 'status' })
+  /** 案内の行の文（1 行で省略するので全文は title にも） */
+  const setStatus = (text: string): void => {
+    if (status.textContent !== text) status.textContent = text
+    if (status.title !== text) status.title = text
+  }
+  setStatus('読み込み中…')
+  // 「ホームへ」は案内の行の右（待機中だけ。行の高さは釦の 28.4 px のまま。S4 はパネルに持つので出さない。M3 の手順 3、§7-21）
   const home = button(doc, 'ホームへ', () => goHome(), 'small')
-  // S4 は「ホームへ」をパネルに持つので行ごと隠す（空の行も gap を取り、音ゲー向けの 1093×514 で左列が 5 px 溢れた。M2 の手順 10、F2）
-  const homeRow = h(doc, 'div', { className: 'btnrow' }, home)
-  homeRow.hidden = room
+  const statusRow = h(doc, 'div', { className: 'statusrow' }, status, home)
+  // 寸法の注記・入らない窓の文（折り返してよい別の行。空なら消える）
+  const sizeLine = h(doc, 'p', { className: 'note sizenote' })
   // S0d のチュートリアル曲（手順 9）: 段階の並びと吹き出し 3 つを左列に出す
   const stages = h(doc, 'ol', { className: 'steps tutorial' })
   const tips = h(
@@ -270,10 +285,10 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     { className: 'left' },
     player,
     hud,
-    status,
+    statusRow,
+    sizeLine,
     practiceLine,
     tutorialBox,
-    homeRow,
     bandSlot,
   )
 
@@ -287,6 +302,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   const stage = h(doc, 'div', { className: 'stage' }, canvas, pause.el)
   const root = h(doc, 'section', { className: 'screen play' }, left, stage)
   root.tabIndex = -1
+  // 配置モデル（鍵盤図が入らない窓は null）。dev の assert が実 DOM と突き合わせる
+  let placement: Placement | null = null
 
   const layout = (): void => {
     const vw = window.innerWidth
@@ -298,9 +315,14 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       // 箱が R 24 の鍵盤図より低い（decisions #24 (e)）。描かずに知らせ、resize で組み直す
       sizing = null
       grid = null
-      status.textContent = `窓 ${vw}×${vh} では鍵盤図が入りません。窓を広げてください（${e instanceof Error ? e.message : String(e)}）`
+      placement = null
+      // 相の文は消す（入らない窓では Space で始めない）。曲を読めなかった文などは回が無いので残す
+      if (run !== null) setStatus('')
+      sizeLine.textContent = `窓 ${vw}×${vh} では鍵盤図が入りません。窓を広げてください（${e instanceof Error ? e.message : String(e)}）`
       return
     }
+    placement = placementOf({ w: vw, h: vh }, st)
+    sizeLine.textContent = sizeNote(st.sizing, travelMs) ?? ''
     const { box, player: p } = st
     left.style.width = `${p.w}px`
     // S4 はパネルがプレイヤー矩形の場所を使う（高さはパネルの中身、左列の中で縦に流す）
@@ -328,22 +350,27 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     // 鍵盤図が入らない窓の知らせは残す
     const t = ctx.tutorial()
     if (sizing !== null)
-      status.textContent =
+      setStatus(
         t !== null && phase === 'idle'
           ? `段階 ${t.stage + 1}／${TUTORIAL_KEYSETS.length}: ${KEYSET_NAMES[tutorialKeyset(t)]} ― Space で開始`
           : (videoNote ??
-            phaseText({
-              phase,
-              source: run.session.play.source,
-              ready: run.video === null || videoReady,
-            }))
+              phaseText({
+                phase,
+                source: run.session.play.source,
+                ready: run.video === null || videoReady,
+              })),
+      )
     home.hidden = room || phase !== 'idle'
+    // S0d の吹き出しは待機中だけ（演奏中は段階の 1 行だけにして帯の場所を空ける。§7-21 の案 A）
+    tips.hidden = phase !== 'idle'
     showPractice()
     if (phase === 'paused') pause.show()
     else if (!pause.el.hidden) {
       pause.hide()
       root.focus({ preventScroll: true })
     }
+    // 相の変わり目（dev では配置の assert を回す）
+    ctx.layoutChanged()
   }
 
   /** S4 のパネル・ループ中の帯・練習記録の注記を今の回から描く（変わった所だけ。毎フレーム） */
@@ -424,6 +451,7 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     const sum = summarizeJudge(r.judge)
     const v = hudOf(r.song.name, r.t, r.lastEndMs, sum)
     put(title, v.title)
+    if (title.title !== v.title) title.title = v.title
     const w = `${(v.progress * 100).toFixed(1)}%`
     if (bar.style.width !== w) bar.style.width = w
     put(barText, v.progressText)
@@ -457,7 +485,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   const onVideoEvent = (e: PortEvent): void => {
     if (!alive) return
     if (e.kind === 'loadFail' || e.kind === 'noResponse' || e.kind === 'error') {
-      videoNote = `動画を再生できません（コード ${e.code}）。「ホームへ」で戻れます。`
+      // 案内の行（全角 24 字の幅、§7-21）に収める。「ホームへ」は待機中なら同じ行の右
+      videoNote = `動画を再生できません（コード ${e.code}）`
       show()
     }
   }
@@ -468,6 +497,7 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     videoReady = false
     videoNote = null
     port = ctx.videoPort({ host: videoHost, videoId: run.video.videoId, onEvent: onVideoEvent })
+    ctx.layoutChanged()
   }
 
   const effect = (e: RunEffect): void => {
@@ -666,22 +696,23 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
 
   const load = async (): Promise<void> => {
     if (entry === null) {
-      status.textContent = '曲が選ばれていません。ホームで選んでください。'
+      setStatus('曲が選ばれていません。ホームで選んでください。')
       return
     }
     title.textContent = entry.name
+    title.title = entry.name
     let json: unknown
     try {
       json = await entry.load()
     } catch (e) {
-      if (alive) status.textContent = `曲が読めません（${e instanceof Error ? e.message : String(e)}）`
+      if (alive) setStatus(`曲が読めません（${e instanceof Error ? e.message : String(e)}）`)
       return
     }
     if (!alive) return
     // S1 で選んだ版、無ければ設定の配列・プロファイルの上限（手順 8）
     const song = songOf(json, ctx.variantSpec() ?? { layout: settings.layout, limit: prof.limit, fold: settings.fold })
     if (typeof song === 'string') {
-      status.textContent = song
+      setStatus(song)
       return
     }
     // 動画の回か（sources[0] が youtube・「動画を使う」・練習室でない・門が真。練習〔S0d の段階も〕とは併せない、#94）
@@ -707,7 +738,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     }
     run = newRun(song, opts)
     if (run.video !== null) {
-      // 動画の回: 矩形は口だけ（前に何も置かない、design §2.9）
+      // 動画の回: 矩形は口だけ（前に何も置かない、design §2.9。縁・背景なしで iframe は矩形ちょうど、§7-21）
+      player.className = 'player video'
       player.replaceChildren(videoHost)
       mountVideo()
     }
@@ -751,6 +783,13 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     player,
     onInput: onEvents,
     onResize: layout,
+    // 矩形と交差してはならない物（帯は殻が足す）。左列の予算は S2 の通常の回だけ見る（S4・S0d は外す、§7-21）
+    layoutProbe: () => ({
+      outside: [hud, statusRow, sizeLine, practiceLine, tutorialBox, stage, pause.el],
+      column: room || ctx.tutorial() !== null ? null : left,
+      placement: room ? null : placement,
+      canvas: stage,
+    }),
     unmount: () => {
       alive = false
       if (raf !== null) cancelAnimationFrame(raf)

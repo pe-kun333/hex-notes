@@ -4,6 +4,9 @@
 // （状態 → 描く）。状態は startShell の閉包に持つ（グローバルに置かない）。試験の外（DOM）なので手で確かめる（M1 の手順 14）。
 // M3 の手順 2: 「動画を使う」（useVideo。保存しない・既定 真、切替は手順 4）と動画の口（videoPort。DEV の差し口が返せば
 // それ、無ければ実物の口 createYoutubePlayer）と DEV の観測口（devProbe）を画面へ渡す（m3-kickoff §7-13）。
+// M3 の手順 3: 帯の釦（押下を画面の onBandAction へ返し、焦点を host に戻す。同じ種類の帯の要素は使い回して、押す途中の
+// click を落とさない）と、dev の assert checkLayout（帯と矩形の重なりに、左列の他の子・.stage・.pause、矩形の 5 点の先頭、
+// 左列の溢れ、配置モデルと実 DOM の差を足した。build では空の関数。m3-kickoff §7-20・§7-22）。
 
 import { createAudioOut, type AudioOut } from '../audio/context.ts'
 import type { KeysetId } from '../chart/keyset.ts'
@@ -34,8 +37,11 @@ import {
   initialBands,
   type Band,
   type BandEvent,
+  type BandKind,
   type BandsState,
+  type Box,
 } from './bands.ts'
+import { playerPoints, type Placement } from './placement.ts'
 import type { Booted } from './boot.ts'
 import { attachKeyboard } from './dom-input.ts'
 import type { FinishedPlay, PracticeOptions } from './play-runner.ts'
@@ -63,6 +69,20 @@ export interface DevPlayState {
 export interface DevProbe {
   play(s: DevPlayState): void
   finished(r: FinishedPlay): void
+  /** 帯の釦が押された（M3 の手順 3） */
+  bandAction(id: string): void
+}
+
+/** dev の assert に画面が渡す物（S2・S4。M3 の手順 3、仮） */
+export interface LayoutProbe {
+  /** 矩形と交差してはならない物（左列の他の子・`.stage`・`.pause`。帯は殻が足す） */
+  readonly outside: readonly HTMLElement[]
+  /** 予算を見る左列（S2 の待機・演奏中。S4 と S0d は null ＝ 見ない） */
+  readonly column: HTMLElement | null
+  /** 配置モデル（鍵盤図が入らない窓は null） */
+  readonly placement: Placement | null
+  /** 右列の箱の要素（placement.canvas と突き合わせる） */
+  readonly canvas: HTMLElement | null
 }
 
 /** 画面が殻から受け取る物 */
@@ -141,6 +161,8 @@ export interface ScreenContext {
   videoPort(o: MountOptions): VideoPort
   /** 開発時の観測口（build では null） */
   readonly devProbe: DevProbe | null
+  /** 配置が変わった（相の変わり目・口の作り直し）。dev では assert を回す（build では何もしない） */
+  layoutChanged(): void
 }
 
 /** 画面の DOM と受け口 */
@@ -156,6 +178,10 @@ export interface ScreenView {
   onResize?(): void
   /** アプリの更新とオフラインの状態が変わった（ctx.update() を読み直す） */
   onUpdate?(): void
+  /** 帯の釦が押された（id は Band.action.id。M3 の手順 3） */
+  onBandAction?(id: string): void
+  /** dev の assert に渡す物（無ければ帯と矩形の重なりだけ） */
+  layoutProbe?(): LayoutProbe
   unmount(): void
 }
 
@@ -184,26 +210,56 @@ export interface Shell {
   updated(): void
 }
 
-function bandElement(doc: Document, b: Band, onDismiss: () => void): HTMLElement {
+/** 帯の要素の手（同じ種類の帯は要素を使い回し、題・本文・釦の文字と活性だけ書き換える） */
+interface BandHandlers {
+  dismiss(kind: BandKind): void
+  action(id: string): void
+}
+
+function bandElement(doc: Document, b: Band, on: BandHandlers): HTMLElement {
   const el = doc.createElement('div')
   el.className = `band band-${b.kind}`
   el.dataset['band'] = b.kind
-  // S2 は帯を 1 行に詰めて本文を省くので、全文は title でも読めるようにする（#65）
-  el.title = `${b.title}。${b.detail}`
   const title = doc.createElement('b')
-  title.textContent = b.title
   const detail = doc.createElement('span')
-  detail.textContent = b.detail
   el.append(title, detail)
+  if (b.action !== undefined) {
+    const act = doc.createElement('button')
+    act.type = 'button'
+    act.className = 'small'
+    act.dataset['action'] = '1'
+    // 押下の時の id は要素に書いた今の値（題と活性の書き換えで釦を作り直さない）
+    act.addEventListener('click', () => {
+      const id = act.dataset['id']
+      if (id !== undefined && !act.disabled) on.action(id)
+    })
+    el.append(act)
+  }
   if (b.dismissible) {
     const close = doc.createElement('button')
     close.type = 'button'
     close.className = 'small'
     close.textContent = '閉じる'
-    close.addEventListener('click', onDismiss)
+    close.addEventListener('click', () => on.dismiss(b.kind))
     el.append(close)
   }
+  updateBand(el, b)
   return el
+}
+
+/** 帯の要素に今の文言と釦の活性を書く（変わった所だけ） */
+function updateBand(el: HTMLElement, b: Band): void {
+  // S2 は帯を 1 行に詰めて本文を省くので、全文は title でも読めるようにする（#65）
+  const full = b.detail === '' ? b.title : `${b.title}。${b.detail}`
+  if (el.title !== full) el.title = full
+  const [title, detail] = [el.querySelector('b'), el.querySelector('span')]
+  if (title !== null && title.textContent !== b.title) title.textContent = b.title
+  if (detail !== null && detail.textContent !== b.detail) detail.textContent = b.detail
+  const act = el.querySelector<HTMLButtonElement>('button[data-action]')
+  if (act === null || b.action === undefined) return
+  if (act.textContent !== b.action.label) act.textContent = b.action.label
+  act.dataset['id'] = b.action.id
+  if (act.disabled === b.action.enabled) act.disabled = !b.action.enabled
 }
 
 /** 焦点のある押せる物を押す（Enter＝ボタン決定。入力層が Enter を preventDefault するので、ブラウザの既定の押下の代わり） */
@@ -238,26 +294,40 @@ export function startShell(opts: ShellOptions): Shell {
   let audio: AudioOut | null = null
   let calibration = booted.calibration
 
+  const handlers: BandHandlers = {
+    dismiss: (kind) => band({ kind: 'dismiss', band: kind }),
+    action: (id) => {
+      opts.devProbe?.bandAction(id)
+      view?.onBandAction?.(id)
+      // 焦点は host へ（演奏・役割の keydown を画面へ。#26）
+      host.focus({ preventScroll: true })
+    },
+  }
+
   const renderBands = (): void => {
     if (view === null) return
     const slot = view.bandSlot
-    slot.replaceChildren(
-      ...bandsOf(bands, { imeStop: settings.imeStop }).map((b) =>
-        bandElement(doc, b, () => band({ kind: 'dismiss', band: b.kind })),
-      ),
-    )
-    if (import.meta.env.DEV) checkBands()
+    const old = new Map<string, HTMLElement>()
+    for (const el of slot.querySelectorAll<HTMLElement>(':scope > .band'))
+      old.set(el.dataset['band'] ?? '', el)
+    const els = bandsOf(bands, { imeStop: settings.imeStop }).map((b) => {
+      const el = old.get(b.kind)
+      // 釦の有無が変わった帯だけ作り直す（他は使い回し、押す途中の click を落とさない）
+      const same =
+        el !== undefined &&
+        (el.querySelector('button[data-action]') !== null) === (b.action !== undefined)
+      if (!same) return bandElement(doc, b, handlers)
+      updateBand(el, b)
+      return el
+    })
+    // 並びが同じなら付け替えない
+    const cur = [...slot.children]
+    if (cur.length !== els.length || cur.some((c, i) => c !== els[i])) slot.replaceChildren(...els)
+    if (import.meta.env.DEV) checkLayout()
   }
 
-  // dev ビルドの assert（kickoff 手順 2 の期待値、§7-12）: 帯の矩形がプレイヤー矩形と交差しない
-  const checkBands = (): void => {
-    const player = view?.player
-    if (view === null || player === undefined) return
-    const p = player.getBoundingClientRect()
-    for (const el of view.bandSlot.querySelectorAll<HTMLElement>('.band'))
-      if (!bandOutside(el.getBoundingClientRect(), p))
-        console.error(`帯（${el.dataset['band'] ?? '?'}）がプレイヤー矩形に重なった`)
-  }
+  // dev ビルドの assert（M1 の kickoff 手順 2、§7-12 に M3 の手順 3 で足した。m3-kickoff §7-20）: build では空の関数
+  const checkLayout = import.meta.env.DEV ? (): void => devCheckLayout(doc, view) : (): void => {}
 
   const band = (ev: BandEvent): void => {
     const next = bandStep(bands, ev)
@@ -347,6 +417,7 @@ export function startShell(opts: ShellOptions): Shell {
       // プレイ中は入れ替えない（S2 は釦を出さないが、念のため殻でも止める。ADR 0004）
       if (route.screen !== 'S2') opts.updates?.apply()
     },
+    layoutChanged: () => checkLayout(),
     useVideo: () => true,
     videoPort: (o) => opts.videoPort?.(o) ?? createYoutubePlayer(o),
     devProbe: opts.devProbe ?? null,
@@ -384,9 +455,74 @@ export function startShell(opts: ShellOptions): Shell {
   )
   window.addEventListener('resize', () => {
     view?.onResize?.()
-    if (import.meta.env.DEV) checkBands()
+    checkLayout()
   })
 
   mount()
   return { band, route: () => route, updated: () => view?.onUpdate?.() }
 }
+
+/** 矩形と実 DOM の差の許し（px） */
+const LAYOUT_TOL = 0.5
+
+const rectOf = (el: Element): Box => {
+  const r = el.getBoundingClientRect()
+  return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+}
+
+const near = (a: Box, b: Box): boolean =>
+  Math.abs(a.left - b.left) <= LAYOUT_TOL &&
+  Math.abs(a.top - b.top) <= LAYOUT_TOL &&
+  Math.abs(a.right - b.right) <= LAYOUT_TOL &&
+  Math.abs(a.bottom - b.bottom) <= LAYOUT_TOL
+
+const boxText = (b: Box): string =>
+  `{${[b.left, b.top, b.right, b.bottom].map((x) => Math.round(x * 10) / 10).join(', ')}}`
+
+/**
+ * dev の assert（M3 の手順 3、仮。m3-kickoff §7-20）。矩形（view.player）と、帯・左列の他の子・.stage・.pause が交差しない。
+ * (i) 矩形の 5 点のうち視口の中の点で elementsFromPoint の先頭が矩形かその子孫（動画ありで iframe があればその iframe）。
+ * (ii) 予算を見る左列（S2 の待機・演奏中）は溢れず、先頭の帯の下端 ≤ 左列の下端。(iii) 配置モデルと実 DOM の差が 0.5 px
+ * 以内。破れたら console.error（DEV だけ。試験の外なので pane で確かめる）
+ */
+function devCheckLayout(doc: Document, view: ScreenView | null): void {
+  const player = view?.player
+  if (view === null || player === undefined) return
+  const win = doc.defaultView
+  if (win === null) return
+  const p = rectOf(player)
+  const probe = view.layoutProbe?.() ?? null
+  const bands = [...view.bandSlot.querySelectorAll<HTMLElement>('.band')]
+  const named = (el: HTMLElement): string =>
+    el.dataset['band'] !== undefined ? `帯（${el.dataset['band']}）` : `${el.tagName.toLowerCase()}.${el.className || '?'}`
+  for (const el of [...bands, ...(probe?.outside ?? [])])
+    if (!bandOutside(rectOf(el), p)) console.error(`${named(el)}がプレイヤー矩形に重なった`)
+  // (i) 5 点の先頭
+  const iframe = player.classList.contains('video') ? player.querySelector('iframe') : null
+  const radius = parseFloat(win.getComputedStyle(player).borderTopLeftRadius) || 0
+  for (const pt of playerPoints(p, { w: win.innerWidth, h: win.innerHeight }, radius)) {
+    const top = doc.elementsFromPoint(pt.x, pt.y)[0]
+    const ok = top !== undefined && (iframe !== null ? top === iframe : player.contains(top))
+    if (!ok)
+      console.error(`プレイヤー矩形の点 (${pt.x}, ${pt.y}) の先頭が${iframe !== null ? ' iframe' : '矩形の中'}でない（${top === undefined ? '無し' : top.tagName.toLowerCase()}）`)
+  }
+  if (probe === null) return
+  // (ii) 左列の予算
+  const col = probe.column
+  if (col !== null) {
+    if (col.scrollHeight > col.clientHeight)
+      console.error(`左列が溢れた（${col.scrollHeight}／${col.clientHeight}）`)
+    const first = bands[0]
+    if (first !== undefined && first.getBoundingClientRect().bottom > rectOf(col).bottom + LAYOUT_TOL)
+      console.error(`先頭の帯（${first.dataset['band'] ?? '?'}）が左列の下端を越えた`)
+  }
+  // (iii) 配置モデルと実 DOM
+  const pl = probe.placement
+  if (pl === null) return
+  if (!near(p, pl.player))
+    console.error(`プレイヤー矩形 ${boxText(p)} が配置モデル ${boxText(pl.player)} と違う`)
+  if (col !== null && !near(rectOf(col), pl.left))
+    console.error(`左列 ${boxText(rectOf(col))} が配置モデル ${boxText(pl.left)} と違う`)
+  if (probe.canvas !== null && !near(rectOf(probe.canvas), pl.canvas))
+    console.error(`右列の箱 ${boxText(rectOf(probe.canvas))} が配置モデル ${boxText(pl.canvas)} と違う`)
+} // prettier-ignore

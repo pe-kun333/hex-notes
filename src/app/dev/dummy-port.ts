@@ -4,7 +4,8 @@
 // 被せ、プレイヤー矩形の中に釦「▶（ダミー）」を置いた口を返す。外れれば null（殻が実物の口を作る）。筋書きの時刻は ▶ からの
 // ms（tests/unit/app/play-runner-video.test.ts の (9) と同じ作り。手順 4 の段 4 も同じ表を引く）。
 // window.__hexnoteDev（DEV だけ）: ダミーが受けた要求と事象（状態の変化）の列・AudioContext の state・回の相と源・最後の記録。
-// 手順 3 が band・actions を足す。performance.now の直呼びは src/app/ だけ（src/README.md）。
+// 手順 3 で band（帯を点ける。殻の band へ）と actions（帯の釦の押下の記録）を足した。performance.now の直呼びは src/app/ だけ
+// （src/README.md）。
 
 import {
   createDummyVideo,
@@ -14,7 +15,8 @@ import {
 } from '../../clock/dummy-video.ts'
 import type { VideoPort, VideoRequest, VideoState } from '../../clock/types.ts'
 import type { ResultRecord } from '../../shared/types.ts'
-import type { DevProbe, DevPlayState } from '../shell.ts'
+import type { BandEvent } from '../bands.ts'
+import type { DevProbe, DevPlayState, Shell } from '../shell.ts'
 import type { MountOptions } from '../youtube-player.ts'
 
 /** 筋書きの 1 手（▶ から at ms に、ダミーへ） */
@@ -125,6 +127,8 @@ interface DevState {
   events: Array<{ at: number; state: VideoState }>
   play: DevPlayState | null
   lastRecord: ResultRecord | null
+  /** 帯の釦の押下（id と performance.now。M3 の手順 3） */
+  actions: Array<{ at: number; id: string }>
 }
 
 const state: DevState = {
@@ -134,7 +138,10 @@ const state: DevState = {
   events: [],
   play: null,
   lastRecord: null,
+  actions: [],
 }
+
+let shell: Shell | null = null
 
 const r1 = (x: number): number => Math.round(x * 10) / 10
 const since = (now: number): number => r1(now - (state.startAt ?? now))
@@ -145,6 +152,14 @@ export function installDevProbe(): DevProbe {
     get state(): DevState {
       return structuredClone(state)
     },
+    /** 帯を点ける・消す（殻の band。例 {kind: 'videoFallback', on: true, enabled: true}） */
+    band(ev: BandEvent): void {
+      shell?.band(ev)
+    },
+    /** 釦の押下の記録を空にする */
+    clearActions(): void {
+      state.actions = []
+    },
   }
   return {
     play: (s) => {
@@ -153,7 +168,15 @@ export function installDevProbe(): DevProbe {
     finished: (r) => {
       state.lastRecord = r.record
     },
+    bandAction: (id) => {
+      state.actions.push({ at: r1(performance.now()), id })
+    },
   }
+}
+
+/** 殻を渡す（__hexnoteDev.band が殻の band を呼ぶ。main.ts が startShell の後に 1 回） */
+export function attachShell(s: Shell): void {
+  shell = s
 }
 
 /**

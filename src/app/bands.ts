@@ -3,6 +3,9 @@
 // 消える）・#29 (c)（自動では上げない。戻すのは S6）・#47 (c)（予約の遅れが 20 ms を超えたら帯）・#50 (a)(g)（置き場ごとに
 // 1 回、文言）・#65（置き場と閉じ方、仮）、m6 bandsHtml L790–803。
 // 帯の状態 → 帯の列の純関数（DOM は shell.ts）。同期中（S7b）・動画なし（S7a・S7c）・音待ちの帯は M2・M3 で足す。
+// M3 の手順 3（m3-kickoff §7-22、仮）: 帯に釦 `action`（殻が釦を作り、押下を画面の onBandAction へ返す）と、釦の型と口を
+// 通す仮の帯 videoFallback（S7c の帯。名前と題・活性の 3 つの形 ＝ 切替・▶ の案内・戻せない、は手順 7 で決める）。
+// 題と活性は画面が渡し、ここは canReturn を知らない。「閉じる」なし・釦「戻す」（m6 L797 の「閉じる」は外した）。
 
 import { IME_BAND_TEXT } from '../input/ime.ts'
 import { LATE_BAND_MS } from '../audio/scheduler.ts'
@@ -17,11 +20,16 @@ import {
  * 帯の種類。autoplayBlocked は動画あり（M3）まで文言だけ。lowLoad は低負荷の段が自動で上がったとき、audioLate は発音の
  * 予約の遅れ（#47 (c)）
  */
-export type BandKind = 'ime' | 'autoplayBlocked' | 'audioLate' | 'lowLoad' | 'storageFail'
+export type BandKind =
+  'ime' | 'videoFallback' | 'autoplayBlocked' | 'audioLate' | 'lowLoad' | 'storageFail'
 
-/** 並べる順（m6 L790–803 の ime → 自動再生 → 保存できません の間に、低負荷と予約の遅れを入れた） */
+/**
+ * 並べる順（m6 L790–803 の ime → 自動再生 → 保存できません の間に、低負荷と予約の遅れを入れた。M3 の手順 3 で videoFallback を
+ * ime の次に。手順 6 で sync が ime の次に入る、m3-kickoff §7-22）
+ */
 export const BAND_ORDER: readonly BandKind[] = [
   'ime',
+  'videoFallback',
   'autoplayBlocked',
   'audioLate',
   'lowLoad',
@@ -34,7 +42,18 @@ export interface Band {
   readonly detail: string
   /** 「閉じる」を出すか。IME は演奏・役割の keydown で消えるので出さない（#26 (5)） */
   readonly dismissible: boolean
+  /** 帯の釦（殻が釦を作り、押下を画面の onBandAction(id) へ返す。無効は disabled。M3 の手順 3） */
+  readonly action?: BandAction
 }
+
+export interface BandAction {
+  readonly id: string
+  readonly label: string
+  readonly enabled: boolean
+}
+
+/** S7c の帯の題の既定（m6 L797 の 19 字。仮） */
+export const VIDEO_FALLBACK_TITLE = '動画が止まったので、ピアノ音で続けます'
 
 export interface BandsState {
   /** IME の帯（入力層の imeBand をそのまま写す） */
@@ -45,6 +64,8 @@ export interface BandsState {
   readonly lowLoad: LowLoadLevel
   readonly audioLate: boolean
   readonly autoplayBlocked: boolean
+  /** S7c の帯（題は無ければ既定、釦「戻す」の活性。null は出さない。M3 の手順 3、仮） */
+  readonly videoFallback: { readonly title?: string; readonly enabled: boolean } | null
   /** 「閉じる」で閉じた帯（同じ種類の新しい知らせで開き直す） */
   readonly closed: readonly BandKind[]
 }
@@ -57,6 +78,9 @@ export type BandEvent =
   /** 予約の遅れ（on は lateBand が真になった。新しい回の始めに false） */
   | { kind: 'audioLate'; on: boolean }
   | { kind: 'autoplayBlocked'; on: boolean }
+  /** S7c の帯（題と釦の活性は画面が渡す。M3 の手順 3、仮） */
+  | { kind: 'videoFallback'; on: true; title?: string; enabled: boolean }
+  | { kind: 'videoFallback'; on: false }
   | { kind: 'dismiss'; band: BandKind }
 
 export function initialBands(): BandsState {
@@ -66,6 +90,7 @@ export function initialBands(): BandsState {
     lowLoad: 0,
     audioLate: false,
     autoplayBlocked: false,
+    videoFallback: null,
     closed: [],
   }
 }
@@ -99,8 +124,21 @@ export function bandStep(s: BandsState, ev: BandEvent): BandsState {
         ? { ...s, [ev.kind]: true, closed: reopen(s.closed, ev.kind) }
         : { ...s, [ev.kind]: false }
     }
+    case 'videoFallback': {
+      if (!ev.on) return s.videoFallback === null ? s : { ...s, videoFallback: null }
+      const cur = s.videoFallback
+      if (cur !== null && cur.title === ev.title && cur.enabled === ev.enabled) return s
+      return {
+        ...s,
+        videoFallback: {
+          ...(ev.title === undefined ? {} : { title: ev.title }),
+          enabled: ev.enabled,
+        },
+      }
+    }
     case 'dismiss':
-      if (ev.band === 'ime' || s.closed.includes(ev.band)) return s
+      // IME と S7c の帯は「閉じる」を出さない（S7c を閉じると戻す手段が見えない）
+      if (ev.band === 'ime' || ev.band === 'videoFallback' || s.closed.includes(ev.band)) return s
       return { ...s, closed: [...s.closed, ev.band] }
   }
 }
@@ -130,6 +168,18 @@ function bandOf(s: BandsState, kind: BandKind, opts: BandsOptions): Band | null 
       return s.ime
         ? { kind, title: IME_BAND_TEXT, detail: imeDetail(opts.imeStop), dismissible: false }
         : null
+    case 'videoFallback': {
+      const v = s.videoFallback
+      return v === null
+        ? null
+        : {
+            kind,
+            title: v.title ?? VIDEO_FALLBACK_TITLE,
+            detail: '',
+            dismissible: false,
+            action: { id: 'return', label: '戻す', enabled: v.enabled },
+          }
+    }
     case 'autoplayBlocked':
       return s.autoplayBlocked && open
         ? {
