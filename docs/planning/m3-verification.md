@@ -67,6 +67,8 @@ pane が表に出ている時に、開発ページ `/src/app/dev/youtube.html` �
 | 実動画の回の S3 が対象外の文・S1 に完走印なし（耳の 8 拍から S3 までの通しの中で） | 8 → 12 | 手順 12 の通しの時 | 未 |
 | 実 IFrame の動画の回（見本の動画の行。式の sync）で S3 の帯の内訳が「YouTube の…」、「適用」で `hexnote.calibration` の youtube だけ変わる | 9 | pane を表に出せる時（主担当）か手順 11 の U-02 の式の sync の回 | 未 |
 | 段 4 で自分がタップした曲（measured 真）を 1 回弾き、S3 に「適用」の釦が出ない（出たら不具合として書く） | 9 | 手順 9 の PR の後（まとめて 30 日目でも可） | 未 |
+| 実 IFrame の ▶ の後に onError 153 が出ない事と、送られる Referer（DevTools の Network で origin ＋ "/" か） | 10 | pane を表に出せる時（主担当）か手順 11 の頭 | 未 |
+| プレイヤーの全画面の釦（allowfullscreen なしの形）の見え方を実 IFrame で見る（照合の件 (4) は未確認のまま） | 10 | 手順 12 の通しの時 | 未 |
 
 ## 4. 手順 2（時計の接続と S2 の動画の回）
 
@@ -279,3 +281,20 @@ pane の回（DEV、入門者、`ableton/2/octave`。校正は空から audio �
 | ダミーの式の sync の行を押下の間隔 600.6 ms で（校正は空に戻した後。ずれが曲の中で約 38 ms 伸びる） | 無し | youtube | 0 | ＋32（SD 12・ヒット 64） | なし。帯の場所に「ずれが曲の中で約 38 ms 動きました。動画のテンポが譜面と合っていないようです。」の 1 行（釦なし）、calib 行なし | 空のまま |
 
 pane の後片付け: `hexnote.calibration` は消して始めの空に戻し、低負荷は自動（確かめの間だけ OFF）、視口は既定に戻した。段 4 で保存した曲「校正の試し（タップ）」（持ち込み曲）と試験の記録・計測の行は dev の置き場に残っている。
+
+## 12. 手順 10（規約の照合表）
+
+ブランチ `claude/m3-step10-terms`。裁定は decisions #110（照合表は design §6.1、原文の要旨は `docs/planning/m3-compliance.md`。§7-35 と §7-39 の書き分けを採った）。
+
+| 確かめ | 段 | 結果 |
+|---|---|---|
+| 期待値 (1)〜(3)（`tests/unit/play/requests.test.ts` 8 件） | (a) | 通った。(1) 48 状態 × 40 事象の要求は pauseVideo〔user〕80・playVideo 2（seekTo・stall 0）、returning の無い 24 状態は原型の 28・1、14 状態は 14・1、型どおりの 16 状態は 22・1。(2) 命令 474 回で要求 0、相 6 つ全部、tick の要求は pauseVideo〔stall〕だけ。(3) 9 本は原型の値のまま（(ii) 2,983.33 の 1 件、(iii) 5 件、(iv) 3,000・5,500 の 2 件と adEnd 7,016.67、(v) 5・5、(vi) 3,400 の playVideo 1、(ix) 1・1 と held(ended)）。(viii) だけ 5,016.67 ms に戻る（手順 7 の戻り。要求は同じ） |
+| 期待値 (4)〜(7)・(12)（`tests/unit/youtube/compliance.test.ts` 5 件）・(5) の残り（`reward.test.ts`）・(9)（`practice.test.ts` と `ime-focus.test.ts`） | (a) | 通った。連携層が呼ぶプレイヤーの関数は 6 つ（destroy・getCurrentTime・getPlaybackRate・getPlayerState・pauseVideo・playVideo）、seekTo などは文字列も 0 件 |
+| 期待値 (8)・(10)（`tests/unit/tools/precache.test.ts`） | (a) | 通った。NetworkOnly の式は 1 本で vite.config.ts と同じ、https の youtube・nocookie に当たり、他の 5 つには当たらない。YouTube の URL を混ぜた precache は URL ごとに 1 件落ちる。数える関数は 1・1・1 と 0・0・0 |
+| `npm run check`（試験 1,389 件、回帰ハーネスの 3 表）・build・size・pwa:check | (a) | 通った。初回読込 268,157 → 268,160 バイト。pwa:check は precache 11 件（YouTube 系 0 件）・NetworkOnly の規則あり・束 2 個に seekTo・setPlaybackRate・.mute( 0 件（2026-11-12 の build。同じ束の pauseVideo 8・playVideo 7 は固定しない） |
+| 製品の S2 の iframe（DEV、見本の動画の行 `M7lc1UVf-VE`、動画を使う「はい」）を DOM で読む | (b) | src `https://www.youtube.com/embed/M7lc1UVf-VE?enablejsapi=1&playsinline=1&disablekb=1&origin=http%3A%2F%2Flocalhost%3A5173`、allow `autoplay; encrypted-media`、referrerpolicy `strict-origin-when-cross-origin`、allowfullscreen なし。title は読込の後に YouTube の側が動画の題へ書き換えていた（付けた値は「YouTube の動画プレイヤー」）。356×200（pane が狭く R_w ＜ 24）。iframe は 1 つで、ページは最上位（入れ子なし）。▶ 待ちの案内で、S7a のカードも embedError 行も無い（▶ の前の読込まで 153 なし）。コンソールのエラー 0 |
+| 動画なしの回に youtube.com への要求 | (b) | 0 件（同じ行を「いいえ（自前音源）」で Space の開始 → 6 秒。ページの読込の resource 136 件〔上限 250 に届かない〕と、開始の前に buffer を広げて消した後の 23 件〔PerformanceObserver でも同じ〕に youtube.com・ytimg・googlevideo のホスト 0 件、iframe 0、YouTube の script 0、`window.YT` 無し） |
+| ▶ の後の 153 と、送られる Referer の実値 | (b) | 未（pane が隠れていて iframe の ▶ を押せない。Referer はページから読めない。§3） |
+| 「疑う」1 回（主担当が別に起こした読み手。頁の原文の HTML・実装・検査の実在） | (a) | 直し 14 件を全部入れた（条の番号を字に戻す、III.A.2.c を公開前へ、検査の指し先 2 つ、行を 4 つ足す、照合の件 (4) の allow を未確認へ、ほか。decisions #110 (i)）。照合表は 33 行（済 17・運用 5・未確認 8・公開前 3） |
+
+pane の後片付け: 確かめの間に低負荷も校正も触っていない。視口は既定のまま。

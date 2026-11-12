@@ -273,7 +273,7 @@ Canvas 2D・rAF 1 本（PixiJS 8 MIT は 300 セル超で 60 fps を割ったら
 | M3-06 | 報酬の切り分け（syncUsed）←01, M1-11 | S | 動画を使った回から称号集計が呼ばれない |
 | M3-07 | 実動画の同期と計測（Chromium・Firefox）←03, M2-02, U-02 | M | 残差 SD と UR が数値で残る（残差は同じ読みの 10 秒窓の直線を基準にした直読みと補間後。2026-11-12、decisions #97） |
 | M3-08 | 校正 段 2 ←03, M1-05 | S | youtube／audio で別の値 |
-| M3-09 | 規約の照合表（RMF、III.E.1、III.F.3.b／c、III.I、onError コード。状態に「公開前」〔同意の保存・Made for Kids・公開先〕を設ける、2026-11-12、decisions #100）←01〜06 | S | 表が §6.1 に載る（検） |
+| M3-09 | 規約の照合表（RMF、III.E.1、III.F.3.b／c、III.I、onError コード。状態に「公開前」〔同意の保存・Made for Kids・公開先〕を設ける、2026-11-12、decisions #100）←01〜06 | S | 表が §6.1 に載る（検）（2026-11-12: 主担当が照合表を起こし「疑う」1 回で受けた、decisions #110） |
 | M3-10 | 通し検証（Chromium、3 視口。動画ありはダミーの口と実 IFrame 1 本。2026-11-12、decisions #93）←01〜09 | S | エラーなし。持ち込み 1 曲に S5 の段 4 で動画を付け、S1 から動画あり・なしの両方が S3 まで通る。実 IFrame で ▶ から S3 まで 1 回通る（手元でも可） |
 
 注記（2026-11-12、decisions #93〜#100）: 着手手順書は docs/planning/m3-kickoff.md（12 手順・累積 30 日。M3-01・03・05 を前後に割り、通し検証 M3-10 を 1 日足した。着手順は M3-01 前半 → 03 前半 → 01 後半＋02 → 03 後半 → 05 前半 → 04 → 05 後半 → 06 → 08 → 09 → 07 → 10）。M3-03 の 8 日は動画の回の配線・DEV の差し口・残差と U-02 の道具・S5 段 4、M3-05 の 6 日は S7a と S7c の音の道の量による。
@@ -317,11 +317,53 @@ M4 の後: ローカルリプレイ（social-01、L、依存 M0-09・M0-05）、
 | T-3 | 膜式のゴースト | 既定 2。上限 3〜4 の版に「保証なし」印（M-3） |
 | T-4〜8 | 入力遅延の個体差、ジッタ・125% の縦予算、timeStamp の刻み（Firefox の resistFingerprinting で 16.667 ms、以前は 100 ms。Firefox 既定の Windows の入力時刻と不変 TSC の無い CPU の Chromium で約 15.6 ms。2026-10-30 訂正: 「16.7 ms」は Chromium でない）・getLayoutMap 不可、背景タブ、譜面版の組合せ爆発 | 二段校正、§2.5 の式と低負荷（M-7）、刻みを推定し 8 ms 以上は注記（decisions #25）、刻印の選択 UI、非表示中は停止検知しない、版は自動生成 |
 | T-9 | 保存失敗（プライベート、容量、ITP、ブロック） | try/catch、メモリ内続行、sessionStorage、書き出し（M-11） |
-| L-1〜4 | RMF、III.F.3.c 報酬禁止、スコア表示が報酬か（未解決）、III.E.1.a／I.7／I.9 | 帯・演出・HUD を矩形の外（M3-01）、§4.4 のガードを単体テスト（M3-06）、「YouTube にも報酬」フラグを持たない、採譜なし・音を重ねない・矩形は一時停止のまま残す（S7a は iframe を外してカードを置く、decisions #105） |
-| L-5 | III.F.3.b と pause→seek→play の反復、半分超可視の自動再生 | 動画ありで待ちを出さない。再生は click のみ。プログラム操作は 3 用途に限る（M3-09。2026-11-12、decisions #95: 「最初から」と段 4 のやり直しは iframe の作り直し〔可否は M3-09 で照合〕。decisions #94: ループ頭出しは動画ありの練習室とともに M4 の後） |
+| L-1〜4 | RMF、III.F.3.c 報酬禁止、スコア表示が報酬か（未解決）、III.E.1.a／I.7／I.9 | 帯・演出・HUD を矩形の外（M3-01）、§4.4 のガードを単体テスト（M3-06）、「YouTube にも報酬」フラグを持たない、採譜なし・旋律・伴奏を重ねない（誤打の打鍵音は別に鳴らす。L150、#48。2026-11-12、decisions #110）・矩形は一時停止のまま残す（S7c の物。S7a は iframe を外してカードを置く、decisions #105）。条ごとの照合は下の「YouTube 規約の照合表」 |
+| L-5 | III.F.3.b と pause→seek→play の反復、半分超可視の自動再生 | 動画ありで待ちを出さない。開始は click のみ・再開は Space の playVideo（#35 (e)。2026-11-12、decisions #110）。プログラム操作は 3 用途に限る（M3-09。2026-11-12、decisions #95: 「最初から」と段 4 のやり直しは iframe の作り直し〔可否は M3-09 で照合〕。decisions #94: ループ頭出しは動画ありの練習室とともに M4 の後。M3 で出るのは Pause 再開と停止検知の 2 用途。照合は下の照合表〔作り直しは公式に記述なしで未確認〕） |
 | L-6〜10 | 譜面の権利、同梱曲の権利、AGPL 混入、等方性配列の特許、投稿規約 | PD・CC・自作のみ、U-03 の 6 欄、§4.5、W–H は対照のまま、共有は後（M-9、CI） |
 | H-1〜9 | 可読性、段ずれ、段またぎ、黒鍵、色覚・閃光、導線、過依存、足場外しの振動、校正の誤適用 | R 24 下限、退避、継ぎ目、30° 黒鍵、予算、「あとで」、自力率、ヒステリシス、提案ゲート（M-4〜6） |
 | B-1〜6 | 対象層のずれ、曲不足、競合、動画消失、継続の空洞、工数 | プロファイル、10→30 曲、動画なしで全機能、称号は自前音源へ、23 週（2026-11-12 に 25 週、decisions #93） |
+
+#### YouTube 規約の照合表（2026-11-12、M3-09、decisions #110）
+
+公式の文書 8 本を 2026-11-12 に読み直して当てた（URL・読んだ節・条ごとの要旨は `docs/planning/m3-compliance.md`）。状態は 済（実装で満たし、検査の欄の試験か `docs/planning/m3-verification.md` の行で見た）／運用（決めた運用で満たす。解釈は未解決）／未確認（既定は本書の形。手元の表へ）／公開前（公開先を決める時、U-08）。「済」でも製品に出るのは門 `VIDEO_FEATURE` を外す M3 の手順 12 の PR から。条の番号は原文の番号（III の下は A.1・A.2.c のように数字と字。I の下だけ I.1〜I.21。頁の HTML の字の並びと印 `III-E-4-i` などで確かめた）。主担当は条文の解釈を決めない。
+
+| 条項 | 画面 | 振る舞い | 検査 | 状態 |
+|---|---|---|---|---|
+| RMF Embedded YouTube Player size（200×200 以上、16:9 は 480×270 以上を勧める） | S2・段 4 | S2 は 480×270、R_w ＜ 24 のときは左列ごと 356×200（L79・L129）。段 4 は 480×270 固定 | `tests/unit/app/placement.test.ts`（S2 の全視口の掃き）、m3-verification §5（356×200）・§6（段 4 の矩形）・§12（DOM で 356×200） | 済 |
+| RMF Overlays and frames・Mouseovers（前に置かない・隠さない、プレイヤーの上の事象で操作を起こさない） | S2・段 4・S7a | 帯・HUD・演出・Pause の覆いは矩形の外。S7a は iframe を外してからカード（#105）。プレイヤーの上の pointer の事象を使わない | `tests/unit/app/placement.test.ts`、dev の assert `checkLayout`（m3-verification §5・§6） | 済 |
+| III.F.2.a・c（YouTube が出どころと分かる、プレイヤーの中の帰属を隠さない） | S2・段 4 | プレイヤーの題・ロゴはそのまま（前に置かない、上の行）。S3 の曲の行の末に「YouTube」（手順 4・8） | `tests/unit/app/placement.test.ts`、`tests/unit/results/reward.test.ts`（曲の行の末） | 済 |
+| RMF YouTube Player attributes・III.I.4・I.6（文書に無い変更をしない、プレイヤーの部分・機能を塞がない） | S2・段 4 | 引数は enablejsapi・playsinline・disablekb・origin の 4 つ（controls・fs・rel は既定のまま書かない）。角丸なし | `tests/unit/youtube/compliance.test.ts`（src の鍵 4 つ） | 済 |
+| 全画面（文書に記述なし。fs の既定 1 で釦は出る） | S2・段 4 | `allowfullscreen` を付けない（右列が隠れる。否なら付けて fullscreenchange で一時停止、m3-kickoff §7-10） | — | 未確認（照合の件 (4)） |
+| RMF Autoplay and scripted playbacks（半分超が見えるまで始めない、同時の自動再生は 1 つ） | S2 | 開始は利用者の ▶ だけ（autoplay の引数なし）。再開の playVideo は半分超が見えないと呼ばず、終わった動画へは流さない。iframe は 1 画面に 1 つ | `tests/unit/clock/video-port.test.ts`（見えないと playVideo 0 回）・`tests/unit/youtube/youtube.test.ts`（moreThanHalfVisible）、`tests/unit/app/play-runner-video.test.ts` の (13)、m3-verification §12（iframe 1 つ） | 済 |
+| RMF API Client Identity and Credentials（Referer で名乗る、Referrer-Policy で消さない）・onError 153 | S2・段 4 | iframe に referrerpolicy `strict-origin-when-cross-origin`（RMF が勧める値）、src に origin | `tests/unit/youtube/compliance.test.ts`、m3-verification §12（localhost の読込で 153 なし） | 済（公開先は下の公開前の行） |
+| III.A.1 の前半（YouTube 利用規約へのリンク） | 段 4・S6 | リンクの 1 行（URL は条に書かれた物、2026-11-12 に照合。同じ行に Google のプライバシーポリシーへのリンクも置く） | `tests/unit/app/import-sync.test.ts`（URL と文）、m3-verification §6（段 4 と S6 に出る） | 済 |
+| III.A.1 の後半・III.A.2（自分の規約に書く、機能を使う前の同意、自分のプライバシーポリシーとその中の Google のポリシーへのリンク ＝ A.2.c）・API ToS §7 | S1・S5 | 書いていない。iframe_api と iframe の前に門 `embedGate`（今は常に通す、#100） | `tests/unit/youtube/youtube.test.ts`（loadStep の門） | 公開前 |
+| III.C.2（a〜c: YouTube の操作と分かる、自分の機能と分ける、利用者が起こす） | S2 | 開始は iframe の ▶。プログラムの操作は、ゲームの一時停止・再開（Esc・Space・blur・iframe・非表示・IME）に連れた pauseVideo〔user〕・playVideo と、停止検知の pauseVideo〔stall〕だけ | `tests/unit/play/requests.test.ts` | 運用（#11・#35 による運用。解釈は決めない） |
+| プレイの間に利用者がプレイヤーを操作する（音量・字幕・設定・リンクの click が iframe への blur になる）（RMF Mouseovers・III.I.6・III.C.2 に触れうる） | S2 | ゲームを一時停止して pauseVideo〔user〕を出し、焦点をページへ戻す（#35） | `tests/unit/input/ime-focus.test.ts`（iframe への blur）、`tests/unit/play/requests.test.ts` の (v) | 運用（#35 による運用。解釈は決めない） |
+| III.D.7（文書に無い API を使わない） | — | 連携層が呼ぶのは IFrame API の文書にある 6 つ（playVideo・pauseVideo・getCurrentTime・getPlayerState・getPlaybackRate・destroy）。host・getVideoData を使わない | `tests/unit/youtube/compliance.test.ts`（ソースを読む） | 済 |
+| III.E.1.a・b（写しを保存・キャッシュしない、オフライン再生しない） | — | SW は YouTube 系の URL を precache せず、親ページの iframe_api は NetworkOnly。採譜しない | `tests/unit/tools/precache.test.ts`、`npm run pwa:check` | 済 |
+| III.E.4.d・e（認められていない API のデータは 30 日まで、その後は消すか取り直す） | S1・S2・段 4 | `hexnote.noembed` は onError 100・101・150 で印を付けた動画 ID を日付なしで持つ（上限 200 件、最初の PLAYING で外す。#105） | — | 未確認（API のデータに当たるかは決めない。当たるなら日付を持たせ 30 日で外す。直しは定数と注記を超えるので別の PR） |
+| III.E.4.i（埋め込みは読込でデータを送る。自動再生は頁の読込から） | S1・S2 | iframe_api と iframe は動画を使う回だけ読む。autoplay なし | m3-verification §12（動画なしの回に youtube.com への要求 0 件） | 済 |
+| III.E.4.j・III.J（Made For Kids の動画、子ども向けのクライアント） | — | 扱っていない | — | 公開前 |
+| III.F.3.a（視聴に課金しない） | — | 課金の機能を作らない | — | 運用 |
+| III.F.3.b（▶ の他の行動を再生の条件にしない） | S2・S4 | 動画の回は待ちを出さない（練習の回は動画を受けず、源 video は固定テンポ）。▶ の前に何も求めない | `tests/unit/app/play-runner-video.test.ts`（練習を併せた回は動画なし）、`tests/unit/practice/practice.test.ts`（effectiveMode） | 済 |
+| III.F.3.c（視聴などに報酬を出さない） | S3・S1 | 動画を使った回は称号・ストリーク・完走印の外（§4.4、手順 8 の門） | `tests/unit/youtube/compliance.test.ts`、`tests/unit/results/reward.test.ts` | 済 |
+| L-3（スコア表示が報酬か、未解決） | S2・S3 | 動画の回もスコアと自己ベストを出す（#5） | — | 運用（#5 による運用。解釈は未解決のまま） |
+| III.I.5（広告を変えない・止めない・差し替えない） | S2 | 広告に触れない。広告中の pauseVideo は照合の件 (3) | — | 未確認（U-06） |
+| III.I.7（音と映像を分けない・差し替えない） | S2 | 動画ありは旋律・伴奏を鳴らさず誤打の打鍵音だけ（L150、#48）。S7c の後のピアノは動画が止まってから。戻りでは ▶ から PLAYING を見る歩までに鳴り始めたピアノ 1 音が重なりうる（#96） | `tests/unit/app/fallback-video.test.ts`（手順 7 の期待値 (3)） | 運用（戻りの 1 音は #96。実 IFrame は m3-verification §3） |
+| III.I.9（背景のプレイヤーで再生しない） | S2 | 再生・同期中・待ちの間は blur・非表示で一時停止。画面を離れる時と作り直しで iframe を壊す（口の dispose） | `tests/unit/input/ime-focus.test.ts`（focusAction）、`tests/unit/youtube/youtube.test.ts`（loadStep の dispose） | 済 |
+| III.I.9 の残り（ゲームの一時停止の間に利用者が iframe で再生してから非表示にする、段 4 の非表示） | S2・段 4 | 止めない（一時停止の間の pause は無視、#35。段 4 は blur・非表示を見ない） | — | 未確認（既定は今の形。§7-16 と同じく利用者の iframe の操作は止めない） |
+| III.I.21（iframe の入れ子に入れない） | S2 | 親ページの直下に 1 つ | m3-verification §12（DOM） | 済 |
+| IFrame API の onError（2・5・100・101・150・153） | S7a・段 4 | 4 組と S7a の文（手順 5） | `tests/unit/youtube/youtube.test.ts`・`compliance.test.ts` | 済 |
+| プログラム操作の一覧（L-5、#11・#94・#95） | S2・段 4 | pauseVideo〔user〕・pauseVideo〔stall〕・playVideo と作り直し（destroy）だけ。seekTo の出し手 0（型には残す）、束に seekTo・setPlaybackRate・.mute( 0 件。開発ページの例外は build に出ない | `tests/unit/play/requests.test.ts`・`tests/unit/youtube/compliance.test.ts`・`tests/unit/tools/precache.test.ts`、`npm run pwa:check` | 済 |
+| 照合の件 (1) iframe の作り直し（「最初から」、段 4 のやり直し・ID の変更・中止・8 拍の後、広告の間） | S2・段 4 | 作り直し → 利用者の ▶ 待ち（#95） | — | 未確認（公式に記述なし。既定は本書の形） |
+| 照合の件 (2) S7a で iframe を外す | S7a | 外してカード（#105） | — | 未確認（公式に記述なし。既定は本書の形） |
+| 照合の件 (3) 広告中の pauseVideo | S2 | 停止検知の出し直し（2.5 s ごと）と Esc 等の user（#34・#106） | — | 未確認（U-06 の JSON で見る） |
+| 照合の件 (4) iframe の属性 | S2・段 4 | referrerpolicy は RMF が勧める値、title は要件なし（読込の後に YouTube が動画の題へ書き換える）。allow は `autoplay; encrypted-media` だけ（文書に allow の一覧は無い）、全画面は上の行 | `tests/unit/youtube/compliance.test.ts` | 未確認（allow の一覧と全画面。referrerpolicy・title は可） |
+| 照合の件 (5) 終わった動画へ再開の playVideo を出さない | S2 | 出さない（手順 2） | `tests/unit/app/play-runner-video.test.ts` の (13) | 済 |
+| 公開前: 同意の保存と読込前の 1 画面、自分の規約とプライバシーポリシーの文、Made for Kids、公開先の Referrer-Policy と origin（meta は付けない）、Compliance Audit の要否（III.D.3 の割当を増やす時の物。IFrame だけの埋め込みは割当を使わない） | — | 公開先を決める時（U-08、#100） | — | 公開前 |
+
+文書: IFrame Player API の説明 https://developers.google.com/youtube/iframe_api_reference ・引数 https://developers.google.com/youtube/player_parameters ・IFrame API の改訂履歴 https://developers.google.com/youtube/iframe_api_revision_history （最新 2025-07-09）・RMF https://developers.google.com/youtube/terms/required-minimum-functionality ・Developer Policies https://developers.google.com/youtube/terms/developer-policies ・手引き https://developers.google.com/youtube/terms/developer-policies-guide ・API Services の利用規約 https://developers.google.com/youtube/terms/api-services-terms-of-service ・規約の改訂履歴 https://developers.google.com/youtube/terms/revision-history （最新 2026-06-01）。確認日はどれも 2026-11-12（頁に最終更新の表示は無い）。
 
 ### 6.2 見送り台帳
 
