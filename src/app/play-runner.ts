@@ -76,6 +76,7 @@ import {
   judgeWaitHit,
   resultsByIndex,
   summarizeJudge,
+  timingPairs,
   timingSamples,
   type JudgeOutcome,
   type JudgeRules,
@@ -124,6 +125,7 @@ import {
   type PlayCollect,
 } from '../telemetry/collect.ts'
 import { controlOf, type ControlInput, type ControlOptions } from './play-control.ts'
+import { calibEligibleOf, calibKindOf, tempoDriftOf, type TempoDrift } from './calibration.ts'
 
 /** 曲の前の助走 ms（t は −LEAD_MS から始まる。play-dev L73、m1-kickoff §7-19） */
 export const LEAD_MS = 2000
@@ -846,8 +848,13 @@ export interface PlayResult {
   readonly rate: number
   /** 練習の要約（通常プレイは null。計測の play 行と S3 の条件） */
   readonly practice: PracticeSummary | null
-  /** 校正 段 2 の母集団に入れるか（固定テンポ・1.0 倍・全鍵・ループ無しの通常プレイ。§2.7） */
+  /**
+   * 校正 段 2 の母集団に入れるか（固定テンポ・1.0 倍・全鍵・ループ無しの通常プレイ。§2.7。M3 の手順 9: 種別が null でなく
+   * 切り替わっていない回だけで、ずれの傾きの注意が立った回は偽）
+   */
   readonly calibEligible: boolean
+  /** ずれの傾き（動画の回で切り替わっていない回だけ。M3 の手順 9） */
+  readonly drift?: TempoDrift | null
   /** 苦手区間（miss が最も多い連続 2 小節。miss が無ければ null） */
   readonly weak: WeakBars | null
   /** 同時押しが合った割合 */
@@ -912,6 +919,10 @@ export function runOutcome(r: Run): PlayResult {
   // 練習はテンポ段の列、他は時計が通った再生レート（動画の回で利用者がレートを変えた回は練習記録、§7-16）
   const rate = recordRate(p === null ? r.clockRates : p.rates)
   const keyset = r.opts.keyset ?? 'all'
+  // 校正の種別（判定の読みと同じ calibKindOf）と、動画の回のずれの傾き（M3 の手順 9）
+  const kind = calibKindOf({ video: r.video !== null, measured: r.song.sync?.sources[0]?.measured })
+  const drift =
+    r.video !== null && r.collect.fallbackT === null ? tempoDriftOf(timingPairs(r.judge)) : null
   const practice: PracticeSummary | null =
     p === null
       ? null
@@ -934,13 +945,17 @@ export function runOutcome(r: Run): PlayResult {
     mode,
     rate,
     practice,
-    // 動画の回は校正 段 2 の外（開くのは手順 9）
+    // 母集団の門（手順 2 の「動画の回は偽」を外し、種別と切替で分ける。傾いた回も外す。M3 の手順 9）
     calibEligible:
-      keyset === 'all' &&
-      mode === 'fixed' &&
-      rate === 1 &&
-      (practice?.loops ?? 0) === 0 &&
-      r.video === null,
+      calibEligibleOf({
+        keyset,
+        mode,
+        rate,
+        loops: practice?.loops ?? 0,
+        fallbackT: r.collect.fallbackT,
+        kind,
+      }) && drift?.warn !== true,
+    ...(drift === null ? {} : { drift }),
     weak: weakBars(r.song.chart.pulse, notes),
     chords: chordRate(notes),
     shapes: chordShapes(notes),

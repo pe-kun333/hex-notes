@@ -321,6 +321,8 @@ export interface CalibTelemetry extends TelemetryBase {
   proposed: number | null
   /** 満たさなかった理由（src/judge/calibration-offset.ts の OffsetVerdict） */
   reason?: 'count' | 'sd' | 'small'
+  /** 校正の種別（youtube の回だけ。audio は欄なし。M3 の手順 9、m3-kickoff §7-38） */
+  source?: 'youtube'
 }
 
 export interface OnboardTelemetry extends TelemetryBase {

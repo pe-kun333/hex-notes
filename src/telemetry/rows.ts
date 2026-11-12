@@ -74,6 +74,8 @@ export function calibRow(
   n: number,
   applied: boolean,
   at: string,
+  /** 校正の種別（youtube の回だけ渡す。M3 の手順 9） */
+  source?: 'youtube',
 ): CalibTelemetry {
   return {
     kind: 'calib',
@@ -84,6 +86,7 @@ export function calibRow(
     applied: verdict.ok && applied,
     proposed: verdict.ok ? verdict.offset : null,
     ...(verdict.ok ? {} : { reason: verdict.reason }),
+    ...(source === undefined ? {} : { source }),
   }
 }
 

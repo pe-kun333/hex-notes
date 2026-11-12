@@ -588,6 +588,17 @@ export function timingSamples(s: JudgeState): number[] {
   return out
 }
 
+/** 時刻のずれの標本と着地の譜面 ms の対（timingSamples と同じ選び方。校正の傾き、M3 の手順 9） */
+export function timingPairs(s: JudgeState): { landMs: number; dtMs: number }[] {
+  const out: { landMs: number; dtMs: number }[] = []
+  s.results.forEach((r, i) => {
+    const n = s.notes[i]
+    if (n !== undefined && r.dtMs !== null && (r.grade === 'perfect' || r.grade === 'great' || r.grade === 'good'))
+      out.push({ landMs: n.tLandMs, dtMs: r.dtMs })
+  })
+  return out
+} // prettier-ignore
+
 /**
  * FAST／SLOW（S2 の HUD・S3 の音ゲー向けの節）: 正しい鍵の当たりのうち perfect 以外（great・good）を dt の符号で数える
  * （dt < 0 が FAST、dt > 0 が SLOW。perfect と dt 0 は数えない。m2-kickoff 手順 9・§7-19、仮）

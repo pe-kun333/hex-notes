@@ -79,6 +79,12 @@ export interface DriveOptions {
   readonly untilMs?: number
   /** 毎フレームの runFrame の後（now は実時刻） */
   readonly onFrame?: (r: Run, now: number) => void
+  /** 判定の校正（rules.offsetMs。既定 0。M3 の手順 9） */
+  readonly offsetMs?: number
+  /** 押下・離しを遅らせる ms（既定 0。関数なら ▶ からの ms ごとの値 ＝ ずれが曲の中で動く回。M3 の手順 9） */
+  readonly delayMs?: number | ((atMs: number) => number)
+  /** sync を段 4 のタップで合わせた形（measured 真）にする（M3 の手順 9） */
+  readonly measured?: boolean
 }
 
 export interface Played {
@@ -111,12 +117,14 @@ const tag = (ev: ClockEvent): string =>
         : `${ev.kind} t=${r2(ev.t)}`
 
 /** 待機の回（切替の後の部は 旋律・伴奏、クリックなし ＝ メトロノーム OFF の既定） */
-export function clickRun(chart: Chart = CLICK): Run {
-  const song = songOf(withVideoId(chart, 'hexDmyPlain'), { layout: 'ableton', limit: 2, fold: 'octave' })
+export function clickRun(chart: Chart = CLICK, o: { readonly offsetMs?: number; readonly measured?: boolean } = {}): Run {
+  const json = withVideoId(chart, 'hexDmyPlain') as Chart
+  const synced = o.measured === true && json.sync !== undefined ? { ...json, sync: { ...json.sync, sources: json.sync.sources.map((x, i) => (i === 0 ? { ...x, measured: true } : x)) } } : json
+  const song = songOf(synced, { layout: 'ableton', limit: 2, fold: 'octave' })
   if (typeof song === 'string') throw new Error(song)
   const grid = buildKeyboardGrid(song.variant.layout, 1, { left: 0, top: 0 })
   const opts: RunOptions = {
-    rules: rulesOf(PROFILES.beginner, { neighbor: neighborOf(grid.byCode) }),
+    rules: rulesOf(PROFILES.beginner, { neighbor: neighborOf(grid.byCode), offsetMs: o.offsetMs ?? 0 }),
     sound: { melody: false, accomp: true, click: false },
     keyclick: false,
     video: { videoId: 'hexDmyPlain' },
@@ -126,7 +134,8 @@ export function clickRun(chart: Chart = CLICK): Run {
 } // prettier-ignore
 
 export function drive(o: DriveOptions = {}): Driven {
-  let r = clickRun(o.chart)
+  let r = clickRun(o.chart, { ...(o.offsetMs === undefined ? {} : { offsetMs: o.offsetMs }), ...(o.measured === undefined ? {} : { measured: o.measured }) })
+  const delay = o.delayMs ?? 0
   const d = createDummyVideo({ stepMs: 15, seed: 7, ...(o.dummy ?? {}) })
   const log: string[] = []
   const reqs: string[] = []
@@ -207,7 +216,8 @@ export function drive(o: DriveOptions = {}): Driven {
     note(sessionTick(r.session, now, sample), now)
     take(runFrame(r, now, FRAME_MS, sample), now)
     o.onFrame?.(r, now)
-    if (o.press !== false) actions.push(...planner.plan(now, r.session.play.source, r.map, d))
+    // 遅らせた押下（全押下・離しを同じだけ後ろへ。M3 の手順 9 の校正の試し）
+    if (o.press !== false) actions.push(...planner.plan(now, r.session.play.source, r.map, d).map((a) => { const dl = typeof delay === 'number' ? delay : delay(a.tsPerf - START_NOW); return dl === 0 ? a : { ...a, tsPerf: a.tsPerf + dl } }))
   }
   return { run: r, frames: f, log, reqs, sounds, stages }
 } // prettier-ignore

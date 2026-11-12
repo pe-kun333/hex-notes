@@ -2,9 +2,11 @@
 // 同時押し上限「テストをやり直す」・校正・データ〔記録の削除・書き出し／取り込み・端末プロファイルの初期化〕・クレジット）、
 // m6 S6 L520–525・renderS6 L907–931（S6 は来た画面へ戻る）、decisions #29 (c)・#45・#50・#52・#53（取り込み）・#55 (b)・#67・
 // #72、m1-kickoff 手順 10・§7-11。選ぶ項目は settings-view.ts（純関数）、同時押しテスト・校正・計測盤は部品（手順 9・4・
-// 12。計測盤は m6 の順でデータの前）。オフラインと更新（SW、手順 13）はデータの後、オフセット（YouTube）は M3-08。
+// 12。計測盤は m6 の順でデータの前）。オフラインと更新（SW、手順 13）はデータの後。
 // M2 の手順 4（M2-06）: データの群に「持ち込み曲」（曲ごとの書き出しと削除、全持ち込み曲の版を作り直す）と、取り込み口で
 // 譜面ファイルも受ける（同梱曲と同じ id は断る、持ち込み済みは上書き。m2-kickoff §7-18、文言は library-view.ts）。
+// M3 の手順 9（M3-08、§7-34）: 校正の群に、門 VIDEO_FEATURE が真のときだけ「オフセット（YouTube）」の行と注記（文は calibText）。
+// 門が偽なら今の 1 行のまま。
 
 import { validateChart } from '../../chart/validate.ts'
 import { defaultLegendKind, legendOf } from '../../layout/legend.ts'
@@ -41,6 +43,10 @@ import { button, frame, h } from './frame.ts'
 import { calibText, limitText } from './home.ts'
 import { termsLine } from '../terms.ts'
 import { VIDEO_FEATURE } from '../video-run.ts'
+
+/** S6 の YouTube の校正の注記（仮、M3 の手順 9） */
+export const YOUTUBE_CALIB_NOTE =
+  'YouTube の値は、段 4 で合わせていない曲を動画で遊んだ回の提案でだけ変わります。'
 
 /** 出どころの言葉（m6 の S1 の曲カードと同じ） */
 const RIGHTS_TEXT: Readonly<Record<string, string>> = {
@@ -172,9 +178,11 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
 
   // ---------- 校正（手順 4） ----------
   const calibState = h(doc, 'b')
+  const calibYoutube = h(doc, 'b')
   const showCalib = (): void => {
     const c = ctx.calibration()
     calibState.textContent = calibText(c.audio === undefined ? null : offsetFor(c, 'audio'))
+    calibYoutube.textContent = calibText(c.youtube === undefined ? null : offsetFor(c, 'youtube'))
   }
   showCalib()
   const calib = calibrationPanel(ctx, {
@@ -189,6 +197,13 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
     { className: 'group' },
     h(doc, 'h2', { text: '校正' }),
     h(doc, 'p', {}, 'オフセット（自前音源）: ', calibState),
+    // YouTube の値は段 2 の提案でだけ変わる（段 1 は自前音源だけ。門の内、M3 の手順 9）
+    ...(VIDEO_FEATURE
+      ? [
+          h(doc, 'p', {}, 'オフセット（YouTube）: ', calibYoutube),
+          h(doc, 'p', { className: 'note', text: YOUTUBE_CALIB_NOTE }),
+        ]
+      : []),
     calib.el,
   )
 

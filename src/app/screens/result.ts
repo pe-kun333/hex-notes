@@ -8,8 +8,8 @@
 // M3 の手順 8（M3-06、m3-kickoff §7-33）: 称号の節は rewardFor の門の後ろ。対象外の回（YouTube 再生・途中で動画なしに
 // 切り替わった回）は記録も同梱曲の id も読まず、集計中…を出さずに対象外の文をその場で置く。
 
-import { proposalFor, proposalText, signedMs } from '../calibration.ts'
-import { DEFAULT_PRACTICE, type PlayResult } from '../play-runner.ts'
+import { appliedText, driftText, proposalFor, proposalText } from '../calibration.ts'
+import { DEFAULT_PRACTICE, type FinishedPlay } from '../play-runner.ts'
 import { practiceEntryText, weakRange } from '../practice-view.ts'
 import { HIST_BAR_MS, HIST_BARS, offTargetLines, resultView, rewardView } from '../result-view.ts'
 import { localDay } from '../../results/awards.ts'
@@ -22,24 +22,31 @@ import { button, frame, h } from './frame.ts'
 
 /**
  * 校正の提案の帯（段 2）。条件を満たせば「適用／今回は見送る」、満たさなければ出さない。calib 行は回ごとに 1 回
- * （適用・見送り・何もせず S3 を離れた・満たさなかった）。片付けた後は出さない
+ * （適用・見送り・何もせず S3 を離れた・満たさなかった）。片付けた後は出さない。M3 の手順 9: 保存先・文・calib 行の source は
+ * 記録の syncUsed.kind（提案が出る回は校正の種別と同じ）。ずれの傾きの注意が立った回は、帯の場所に注意の 1 行（釦も calib 行も無い）
  */
-function proposalBand(ctx: ScreenContext, last: PlayResult): { el: HTMLElement | null; leave(): void } {
-  const v = proposalFor(last)
+function proposalBand(ctx: ScreenContext, last: FinishedPlay): { el: HTMLElement | null; leave(): void } {
   const none = { el: null, leave: () => {} }
+  const { doc } = ctx
+  if (last.drift?.warn === true) {
+    const el = h(doc, 'div', { className: 'band offer' }, h(doc, 'span', { text: driftText(last.drift) }))
+    el.dataset['band'] = 'drift'
+    return { el, leave: () => {} }
+  }
+  const v = proposalFor(last)
   if (v === null || !ctx.proposalOpen()) return none
+  const kind = last.record.syncUsed.kind
   const n = last.samples.length
   const log = (applied: boolean): void => {
     if (!ctx.proposalOpen()) return
     ctx.closeProposal()
-    void ctx.booted.db.appendTelemetry(calibRow('propose', v, n, applied, new Date().toISOString())).catch(() => {})
+    void ctx.booted.db.appendTelemetry(calibRow('propose', v, n, applied, new Date().toISOString(), kind === 'youtube' ? 'youtube' : undefined)).catch(() => {})
   }
   if (!v.ok) {
     log(false)
     return none
   }
-  const { doc } = ctx
-  const t = proposalText(v, n, last.offsetUsed)
+  const t = proposalText(v, n, last.offsetUsed, kind)
   const el = h(doc, 'div', { className: 'band offer' }, h(doc, 'b', { text: t.title }), h(doc, 'span', { text: t.detail }))
   el.dataset['band'] = 'offer'
   const done = (msg: string): void => {
@@ -47,9 +54,9 @@ function proposalBand(ctx: ScreenContext, last: PlayResult): { el: HTMLElement |
   }
   el.append(
     button(doc, '適用', () => {
-      ctx.saveCalibration('audio', { offsetMs: v.offset, at: new Date().toISOString(), via: 'propose' })
+      ctx.saveCalibration(kind, { offsetMs: v.offset, at: new Date().toISOString(), via: 'propose' })
       log(true)
-      done(`自前音源のオフセットを ${signedMs(v.offset)} にしました。`)
+      done(appliedText(kind, v.offset))
     }, 'small primary'),
     button(doc, '今回は見送る', () => {
       log(false)
