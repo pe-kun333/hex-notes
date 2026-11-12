@@ -78,6 +78,12 @@ export interface PressPlanner {
   plan(now: number, source: ClockMode, map: ClockMap, d: DummyVideo): AutoAction[]
 }
 
+/**
+ * 次のフレームまでの窓（now, now ＋ FRAME_MS]。下端は浮動小数の丸め分だけ緩める（着地がちょうどフレームの境に乗ると、前の
+ * フレームの上端を丸めで越え、次のフレームの下端に等しくなって、どちらの窓にも入らないことがある。M3 の手順 7 の 128 音で見つけた）
+ */
+const inWindow = (p: number, now: number): boolean => p > now - 1e-6 && p <= now + FRAME_MS
+
 export function pressPlanner(notes: readonly JudgeNote[], axis: SyncAxis): PressPlanner {
   const order = [...notes].sort((a, b) => a.tLandMs - b.tLandMs || a.index - b.index)
   const pressed = new Set<number>()
@@ -97,7 +103,7 @@ export function pressPlanner(notes: readonly JudgeNote[], axis: SyncAxis): Press
       for (const n of order) {
         if (pressed.has(n.index)) continue
         const p = perfOf(n.tLandMs)
-        if (!(p > now && p <= now + FRAME_MS)) continue
+        if (!inWindow(p, now)) continue
         pressed.add(n.index)
         const h = held.get(n.code)
         if (h !== undefined && !h.released)
@@ -108,7 +114,7 @@ export function pressPlanner(notes: readonly JudgeNote[], axis: SyncAxis): Press
       for (const [code, h] of held) {
         if (h.released) continue
         const p = perfOf(h.tEndMs)
-        if (!(p > now && p <= now + FRAME_MS)) continue
+        if (!inWindow(p, now)) continue
         h.released = true
         out.push({ kind: 'release', code, tsPerf: p, index: h.index })
       }

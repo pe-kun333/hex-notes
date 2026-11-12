@@ -1,7 +1,7 @@
 // 同期中（S7b）の訳（M3 の手順 6、M3-04、m3-kickoff 手順 6・§7-28、仮）。時計の事象と動画への要求 → 同期中の訳と入った now の
 // 純関数。src/youtube/ を import せず、口の事象（自動再生ブロック・プレイヤーが隠れている）は種類の文字列だけ受ける。
-// 訳を持つのは源 video の同期中だけ（一時停止・終了・源 novideo で消える。源 novideo の間の ▶ から読みが動くまでの同期中の訳は
-// 手順 7 が足す）。出どころ: m6 S7b L939・帯 L792、m3 resync L376–382、design §1.3 S2 L79・S7 L89、decisions #33〜#35。
+// 訳を持つのは源 video の同期中と、源 novideo の間に PLAYING を見て戻りを待つ同期中（returnWait。M3 の手順 7）だけ（一時停止・
+// 終了・それ以外の源 novideo で消える）。出どころ: m6 S7b L939・帯 L792、m3 resync L376–382、design §1.3 S2 L79・S7 L89、decisions #33〜#35。
 // 案内の行の文と帯は src/app/sync-notice.ts。
 
 import type { ClockEvent, ClockMode, VideoRequest } from '../clock/types.ts'
@@ -10,9 +10,10 @@ import type { PlayPhase } from './state.ts'
 /**
  * 同期中の訳。grace ＝ 飛び以外の再アンカーの猶予（開始・再開・広告明け…）、jump ＝ 動画の時刻の飛び、buffering ＝ 動画が
  * PLAYING でない（PAUSED・ENDED 以外。BUFFERING・CUED・UNSTARTED）、ad ＝ 停止検知の要求が効かず広告中とみなした、
- * resumeWait ＝ 再開の playVideo から PLAYING まで
+ * resumeWait ＝ 再開の playVideo から PLAYING まで、returnWait ＝ 動画なしへ切り替えた後に PLAYING を見てから読みが動くまで
+ * （M3 の手順 7。2,000 ms 動かなければ広告の文と帯）
  */
-export type SyncCauseKind = 'grace' | 'jump' | 'buffering' | 'ad' | 'resumeWait'
+export type SyncCauseKind = 'grace' | 'jump' | 'buffering' | 'ad' | 'resumeWait' | 'returnWait'
 
 /** 再開の待ちの間に口が知らせた事（最初の 1 つだけ控える） */
 export type ResumeBlock = 'autoplayBlocked' | 'notVisible'
@@ -50,7 +51,8 @@ const isBuffering = (e: ClockEvent): boolean =>
  * 無い歩は前の訳のまま（前が無ければ grace）
  */
 export function syncCauseStep(prev: SyncCause | null, i: SyncCauseInput): SyncCause | null {
-  if (i.phase !== 'syncing' || i.source !== 'video') return null
+  if (i.phase !== 'syncing') return null
+  if (i.source === 'novideo') return returnWaitStep(prev, i)
   let c = prev
   for (const e of i.events) {
     if (e.kind === 'resync')
@@ -69,6 +71,20 @@ export function syncCauseStep(prev: SyncCause | null, i: SyncCauseInput): SyncCa
   if (i.video.some((q) => q.kind === 'playVideo'))
     c = { kind: 'resumeWait', since: i.now, bandFrom: null }
   return c ?? { kind: 'grace', since: i.now, bandFrom: null }
+}
+
+/**
+ * 源 novideo の同期中: PLAYING（時計の held state playing）を見てから再アンカーまでが returnWait。再アンカー（resume・fallback の
+ * 猶予）の後は訳なし
+ */
+function returnWaitStep(prev: SyncCause | null, i: SyncCauseInput): SyncCause | null {
+  let c = prev?.kind === 'returnWait' ? prev : null
+  for (const e of i.events) {
+    if (e.kind === 'resync') c = null
+    else if (e.kind === 'held' && e.state === 'playing' && c === null)
+      c = { kind: 'returnWait', since: i.now, bandFrom: i.now + SYNC_BAND_MS }
+  }
+  return c
 }
 
 /**

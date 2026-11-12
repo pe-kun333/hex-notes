@@ -79,7 +79,13 @@ shell = startShell({
   devPages: DEV_PAGES,
   songs: SONGS,
   updates,
-  ...(dev === null ? {} : { videoPort: dev[1].devVideoPort, devProbe: dev[1].installDevProbe() }),
+  ...(dev === null
+    ? {}
+    : {
+        videoPort: dev[1].devVideoPort,
+        wrapVideoPort: dev[1].wrapRealPort,
+        devProbe: dev[1].installDevProbe(),
+      }),
 })
 for (const f of early) shell.band({ kind: 'storageFail', area: f.area })
 // DEV の読み口 __hexnoteDev.band が殻の帯を点ける（M3 の手順 3）

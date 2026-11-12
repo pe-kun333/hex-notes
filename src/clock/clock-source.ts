@@ -5,6 +5,11 @@
 // 状態は値で持ち、clockTick（毎フレーム、動画の読み 1 つ）と clockCommand（入力のハンドラの now）が新しい状態と出力を
 // 返す純関数。now は値で受け、1 tick に 1 回だけ読む。performance.now の直呼びはこのファイルの perfNow と src/app/ だけ。
 // 校正のオフセットは足さない（手順 8 の judge/calibration-offset.ts）。t は動画の軸（map.ts の toChartMs で譜面の軸へ）。
+// M3 の手順 7（M3-05 後半、m3-kickoff §7-4 の案 A ＝ decisions #96）: 動画なしへ切り替えた後（fellBack）の tick で標本が PLAYING
+// になったら t を止めて held（state playing）を出し、PLAYING を見た後に読みが変わった tick にその読みで resync(return)（「戻す」
+// の命令と同じ再アンカー）。動かない間（広告・凍結）は止めたまま、PLAYING でなくなれば止めた t から resync(resume)。出どころは
+// 見分けない（利用者の ▶ と見なす）。PLAYING の最初の tick で読みがもう動いていれば（▶ から刻みを越えた・一時停止の間に動いていた）
+// 待たずにその場で戻す。
 
 import type { NowFn } from '../shared/types.ts'
 import { estimateQ, lineOf, trimWindow, type FitPoint } from './fit.ts'
@@ -72,6 +77,11 @@ export interface ClockState {
   readonly floorT: number | null
   /** 停止検知の pauseVideo を最後に要求した now */
   readonly reqAt: number
+  /**
+   * 動画なしへ切り替えた（S7c。novideo の間の PLAYING で戻りを待つのはこの時だけ。動画なしで始めた回は標本を受けない。
+   * M3 の手順 7）
+   */
+  readonly fellBack: boolean
 }
 
 export interface ClockStep {
@@ -101,6 +111,7 @@ export function initialClock(opts: ClockOptions): ClockState {
     qHat: 0,
     floorT: null,
     reqAt: -Infinity,
+    fellBack: false,
   }
 }
 
@@ -220,6 +231,7 @@ function toNoVideo(s: ClockState, now: number, events: ClockEvent[]): ClockState
     window: [],
     line: null,
     floorT: null,
+    fellBack: true,
   }
 }
 
@@ -230,7 +242,7 @@ function toNoVideo(s: ClockState, now: number, events: ClockEvent[]): ClockState
 function fallback(s: ClockState, now: number, events: ClockEvent[]): ClockState {
   events.push({ kind: 'novideo', t: s.holdT })
   return anchorNoVideo(
-    { ...s, mode: 'novideo', fresh: false, window: [], line: null },
+    { ...s, mode: 'novideo', fresh: false, window: [], line: null, fellBack: true },
     now,
     s.holdT,
     'fallback',
@@ -264,6 +276,51 @@ function track(s: ClockState, sample: VideoSample, now: number): ClockState {
     lastChange: changed ? now : s.lastChange,
     lastState: sample.state,
   }
+}
+
+/** 動画へ戻す（resync(return)。今の読みで再アンカーし、猶予 300 ms） */
+function toVideo(
+  s: ClockState,
+  now: number,
+  sample: VideoSample,
+  events: ClockEvent[],
+): ClockState {
+  const next = anchorVideo(
+    { ...s, mode: 'video', rate: sample.rate, visible: sample.visible },
+    now,
+    sample.timeMs,
+    0,
+    'return',
+    events,
+  )
+  return { ...next, lastState: sample.state }
+}
+
+/**
+ * 動画なしへ切り替えた後の 1 標本（M3 の手順 7、§7-4 の案 A）。走っている相で PLAYING を見たら t を止めて held（state
+ * playing）を出し、戻りを待つ（phase held）。待つ間に読みが変われば resync(return)、PLAYING でなくなれば止めた t から
+ * resync(resume)。PLAYING の最初の tick で読みがもう前の読みと違えば（▶ から刻みを越えた）待たずに戻す
+ */
+function noVideoSample(
+  s0: ClockState,
+  now: number,
+  sample: VideoSample,
+  events: ClockEvent[],
+): ClockState {
+  const s = { ...s0, visible: sample.visible }
+  const playing = sample.state === 'playing'
+  if (s.phase === 'held') {
+    if (!playing) return anchorNoVideo(track(s, sample, now), now, s.holdT, 'resume', events)
+    if (sample.timeMs !== s.lastRead) return toVideo(s, now, sample, events)
+    return track(s, sample, now)
+  }
+  if (RUNNING.has(s.phase) && playing) {
+    // PLAYING の最初の tick で読みがもう動いていれば（▶ から 1 フレームの間に刻みを越えた・一時停止の間に動いていた）待たずに戻す
+    if (s.lastRead !== null && sample.timeMs !== s.lastRead) return toVideo(s, now, sample, events)
+    events.push({ kind: 'held', state: 'playing', late: false })
+    return hold(track(s, sample, now), now, 'held')
+  }
+  return track(s, sample, now)
 }
 
 function finish(
@@ -317,6 +374,11 @@ export function clockTick(s0: ClockState, now: number, sample0: VideoSample | nu
   let s = s0
   const sample = usable(sample0)
 
+  if (s.mode === 'novideo' && s.fellBack && sample !== null) {
+    // 動画なしへ切り替えた後: 利用者の ▶ で戻る（M3 の手順 7）
+    s = noVideoSample(s, now, sample, events)
+    return finish(s, now, events, requests, dev)
+  }
   if (s.mode === 'novideo' || sample === null) {
     // 動画なしは読みを覚えるだけ（「戻す」の条件）。動画ありで読みが無い tick は外挿を続け、停止検知もしない
     if (sample !== null) s = { ...track(s, sample, now), visible: sample.visible }

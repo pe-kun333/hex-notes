@@ -23,6 +23,9 @@
 // M3 の手順 6（M3-04、m3-kickoff §7-28）: 源 video の同期中は案内の行に訳ごとの文（sync-notice.ts）、長引けば帯 sync、再開の
 // playVideo が効かなければ自動再生ブロックの帯。毎フレーム訳と now から作り直す（1,000・2,000 ms には事象が無い）。口の
 // autoplayBlocked・notVisible は種類だけ回へ（runPortEvent）。画面を離れる時に 2 つの帯を下ろす。
+// M3 の手順 7（M3-05 後半、§7-4 の案 A ＝ #96・§7-14・§7-15・§7-22・§7-31・§7-32）: S7c の帯 videoFallback（fallbackBand。切替・
+// ▶ の案内・戻せない の 3 つの形、毎フレーム作り直し）と「戻す」の釦（▶ の案内に替えるだけ。戻るのは利用者の ▶）、案内の行の
+// S7c の 3 文。予約と打鍵音に門（AudioContext が running）。切替の後の口の失敗は回を続け、行と印だけ書いて以後の標本を渡さない。
 
 import {
   PART_GAINS,
@@ -75,6 +78,8 @@ import {
   runPump,
   runRelease,
   runPortEvent,
+  runVideoGone,
+  untilNextMs,
   type Run,
   type RunEffect,
   type PracticeOptions,
@@ -99,7 +104,14 @@ import { videoRunOf } from '../video-run.ts'
 import { embedFailPlan, isEmbedFail, type EmbedFailEvent, type EmbedView } from '../embed-view.ts'
 import { unmarkNoEmbed } from '../../storage/local.ts'
 import type { SyncCause } from '../../play/sync-cause.ts'
-import { NOT_VISIBLE_DETAIL, NOT_VISIBLE_TITLE, SYNC_TEXT, syncNotice } from '../sync-notice.ts'
+import {
+  NOT_VISIBLE_DETAIL,
+  NOT_VISIBLE_TITLE,
+  S7C_TEXT,
+  SYNC_TEXT,
+  fallbackBand,
+  syncNotice,
+} from '../sync-notice.ts'
 import { placementOf, sizeNote, type Placement } from '../placement.ts'
 import { button, h } from './frame.ts'
 import { pauseOverlay } from './pause.ts'
@@ -123,16 +135,39 @@ export interface PhaseTextInput {
   readonly source: ClockMode
   /** 動画が読めた（口の標本が null でなくなった。動画なしは真） */
   readonly ready: boolean
-  /** 同期中の訳（源 video の同期中だけ。無ければ PHASE_TEXT。M3 の手順 6） */
+  /** 同期中の訳（源 video の同期中と戻りを待つ間だけ。無ければ PHASE_TEXT。M3 の手順 6・7） */
   readonly cause?: SyncCause | null
+  /** 訳 × now の文（sync-notice の syncNotice。渡せば cause より先。戻りを待つ間の 2,000 ms の後の文） */
+  readonly syncText?: string | null
+  /** 動画なしへ切り替えた回（M3 の手順 7） */
+  readonly switched?: boolean
+  /** AudioContext が running か（省けば真。M3 の手順 7） */
+  readonly audioRunning?: boolean
+  /** 戻りの後、次の未判定の音の着地までの ms（play-runner の untilNextMs。M3 の手順 7） */
+  readonly untilNextMs?: number | null
 }
 
-/** HUD の下の 1 行（動画の回の待機は ▶ の案内・読込中、他は PHASE_TEXT） */
+/**
+ * HUD の下の 1 行（動画の回の待機は ▶ の案内・読込中、他は PHASE_TEXT）。勝つ順は 切替の後に音が出ない間 → 戻りの後の
+ * 「あと n 秒」→ 同期中の訳 → 切替の後の再生 → 相の文（入らない窓の知らせと S0d の段階は画面が先に決める。M3 の手順 7）
+ */
 export function phaseText(i: PhaseTextInput): string {
   if (i.source === 'video' && i.phase === 'idle')
     return i.ready ? 'プレイヤーの ▶ を押すと始まります' : '動画を読み込み中…'
-  if (i.source === 'video' && i.phase === 'syncing' && i.cause != null)
-    return SYNC_TEXT[i.cause.kind]
+  const s7c = i.switched === true && i.source === 'novideo'
+  if (s7c && i.phase === 'playing' && i.audioRunning === false) return S7C_TEXT.silent
+  if (
+    (i.phase === 'playing' || i.phase === 'syncing') &&
+    i.untilNextMs != null &&
+    i.untilNextMs > 0
+  )
+    return S7C_TEXT.countdown(i.untilNextMs)
+  if (i.phase === 'syncing') {
+    if (i.syncText != null) return i.syncText
+    if (i.cause != null && (i.source === 'video' || i.cause.kind === 'returnWait'))
+      return SYNC_TEXT[i.cause.kind]
+  }
+  if (s7c && i.phase === 'playing') return S7C_TEXT.piano
   return PHASE_TEXT[i.phase]
 }
 
@@ -189,6 +224,9 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   let playingSeen = false
   // 読んだ曲（S7a の後の作り直し）
   let loadedSong: RunSong | null = null
+  // S7c の帯: 「戻す」を押した（▶ の案内）・切替の後に口が失敗を知らせた（戻せない。以後の標本を渡さない）。M3 の手順 7
+  let fbGuide = false
+  let fbFailed = false
   const videoHost = h(doc, 'div', { className: 'video-host' })
   videoHost.style.cssText = 'width:100%;height:100%'
 
@@ -373,12 +411,7 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       setStatus(
         t !== null && phase === 'idle'
           ? `段階 ${t.stage + 1}／${TUTORIAL_KEYSETS.length}: ${KEYSET_NAMES[tutorialKeyset(t)]} ― Space で開始`
-          : phaseText({
-              phase,
-              source: run.session.play.source,
-              ready: run.video === null || videoReady,
-              cause: run.syncCause,
-            }),
+          : phaseText(textInput(run, perfNow())),
       )
     // S7a の間は案内の行の文と「ホームへ」を隠す（カードの釦が出口）
     if (failed) setStatus('')
@@ -506,7 +539,11 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   /** 口の事象。源が動画の間（相を問わない）の読込の失敗・応答なし・onError は S7a（S7c の後の失敗は手順 7、§7-32） */
   const onVideoEvent = (e: PortEvent): void => {
     if (!alive || failed || run === null || run.video === null) return
-    if (run.session.play.source !== 'video') return
+    // 切替の後（源 novideo）の失敗: 回は続け、行と印だけ書いて以後の標本を渡さない（帯は戻せない形。§7-32）
+    if (run.session.play.source !== 'video') {
+      if (!fbFailed && isEmbedFail(e)) failAfterSwitch(e, run.video.videoId)
+      return
+    }
     // 自動再生ブロック・プレイヤーが隠れている: 再開の待ちの訳に控える（notVisible は口の apply の中で同期に来る。run は
     // apply が先に歩の後の回にしている）
     if (e.kind === 'autoplayBlocked' || e.kind === 'notVisible') {
@@ -526,8 +563,23 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     const r = run
     if (r === null) return
     const n = syncNotice(failed ? null : r.syncCause, now)
-    if (n.text !== null && sizing !== null && runPhase(r) === 'syncing') setStatus(n.text)
+    const phase = runPhase(r)
+    // 案内の行は毎フレーム（「あと n 秒」・2,000 ms の後の文。S0d の待機と S7a は show が決める）
+    if (sizing !== null && !failed && !(ctx.tutorial() !== null && phase === 'idle'))
+      setStatus(phaseText(textInput(r, now)))
     ctx.band({ kind: 'sync', on: n.band })
+    // S7c の帯（切替の後の源 novideo の間。戻りを待つ間は帯 sync だけ。待ちに入ったら ▶ の案内は役目を終える）
+    const waiting = r.syncCause?.kind === 'returnWait'
+    if (waiting) fbGuide = false
+    ctx.band(
+      fallbackBand({
+        switched: switchedOf(r),
+        running: phase !== 'idle' && phase !== 'ended' && !failed,
+        waiting,
+        guide: fbGuide,
+        failed: fbFailed,
+      }),
+    )
     ctx.band(
       n.autoplay === null
         ? { kind: 'autoplayBlocked', on: false }
@@ -540,6 +592,45 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
             }
           : { kind: 'autoplayBlocked', on: true },
     )
+  }
+
+  /** 動画なしへ切り替えた回で、今の源が novideo（S7c の後） */
+  const switchedOf = (r: Run): boolean =>
+    r.collect.fallbackT !== null && r.session.play.source === 'novideo'
+
+  /** 案内の行の入力（訳 × now の文、S7c の 3 文の材料） */
+  function textInput(r: Run, now: number): PhaseTextInput {
+    return {
+      phase: runPhase(r),
+      source: r.session.play.source,
+      ready: r.video === null || videoReady,
+      cause: r.syncCause,
+      syncText: syncNotice(r.syncCause, now).text,
+      switched: switchedOf(r),
+      audioRunning: out !== null && out.ctx.state === 'running',
+      untilNextMs: untilNextMs(r),
+    }
+  }
+
+  /** 切替の後に口が失敗を知らせた: embedError 行（iframe 1 つに 1 回）と印、以後の標本を渡さない。回は続ける（§7-32） */
+  function failAfterSwitch(e: EmbedFailEvent, videoId: string): void {
+    const plan = embedFailPlan(e, videoId, ctx.noEmbed(), failWritten, new Date().toISOString())
+    if (plan.row !== null) {
+      failWritten = true
+      void ctx.booted.db.appendTelemetry(plan.row).catch(() => {})
+    }
+    ctx.setNoEmbed(plan.list)
+    fbFailed = true
+    // 戻りを待つ間に失われたら、止めた t からピアノで続ける（最後の PLAYING を捨てて予約の門を開く）
+    if (run !== null) apply(runVideoGone(run, perfNow()))
+    showSync(perfNow())
+  }
+
+  /** 帯の釦（S7c の「戻す」: ▶ の案内に替えるだけ。戻るのは利用者の ▶、§7-4 の案 A） */
+  function onBandAction(id: string): void {
+    if (id !== 'return' || run === null || !switchedOf(run) || fbFailed) return
+    fbGuide = true
+    showSync(perfNow())
   }
 
   /** S7a に入る（行・印・iframe を外す・回を捨てて待機・カード） */
@@ -581,6 +672,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     wake()
     ctx.setUseVideo(false)
     failed = false
+    fbGuide = false
+    fbFailed = false
     run = newRun(song, runOptionsOf(song, null))
     player.className = 'player'
     player.replaceChildren(sourceCard)
@@ -616,7 +709,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
         mountVideo()
         return
       case 'keyclick':
-        if (out !== null) playKeyclick(out, e.plan)
+        // 門: AudioContext が running の間だけ（suspended の間に予約すると再開の時に重なる。M3 の手順 7）
+        if (out !== null && out.ctx.state === 'running') playKeyclick(out, e.plan)
         return
       case 'cancelSounds':
         if (out !== null) cancelFrom(out, out.ctx.currentTime)
@@ -645,7 +739,9 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     if (r.step === null) return
     if (runPhase(r.step.run) === 'syncing') wake()
     if (r.fresh) {
-      // 新しい回の始め: 予約の遅れの帯を下ろす（#65 (c)）、演出を捨てる
+      // 新しい回の始め: 予約の遅れの帯を下ろす（#65 (c)）、演出を捨てる。S7c の帯の形も初めに戻す（帯は次のフレームで下りる）
+      fbGuide = false
+      fbFailed = false
       lateShown = false
       ctx.band({ kind: 'audioLate', on: false })
       effects = []
@@ -658,6 +754,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       if (!alive || run === null) return
       if (ev.kind === 'press') {
         pressed.add(ev.code)
+        // 切替の後に音が出ない間（AudioContext が止まっている）は押下の中で起こす（§7-14）
+        if (switchedOf(run) && (out === null || out.ctx.state !== 'running')) wake()
         apply(runPress(run, ev, perfNow()))
       } else if (ev.kind === 'release') {
         pressed.delete(ev.code)
@@ -761,9 +859,10 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
         if (lo.changed) ctx.band({ kind: 'lowLoad', level: low.level })
       }
       // 動画の回はこのフレームの読み（読めない・準備前は null）
-      const read = failed ? null : (port?.sample(now) ?? null)
+      // 切替の後の失敗（fbFailed）の後も標本を渡さない（M3 の手順 7）
+      const read = failed || fbFailed ? null : (port?.sample(now) ?? null)
       // 読んだ時に口が失敗を知らせたら（S7a に入った）、その読みも新しい回へ渡さない
-      const sample = failed ? null : read
+      const sample = failed || fbFailed ? null : read
       if (!videoReady && sample !== null) {
         videoReady = true
         show()
@@ -795,7 +894,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   const pumpOnce = (): void => {
     if (!alive || run === null || out === null) return
     const now = perfNow()
-    const p = runPump(run, now, bridgeOf(readAudioClock(out.ctx, now)))
+    // 門: running でない間は予約せず、開いた回に今の譜面 ms へ数え直す（M3 の手順 7）
+    const p = runPump(run, now, bridgeOf(readAudioClock(out.ctx, now)), out.ctx.state === 'running')
     run = p.run
     for (const s of p.play) playScheduled(out, s)
     if (!lateShown && lateBand(run.sched)) {
@@ -824,6 +924,10 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       keyset,
       ...(practice === undefined ? {} : { practice }),
       ...(videoId === null ? {} : { video: { videoId } }),
+      // 動画なしへ切り替えた後の部（旋律は設定のガイド音によらず鳴らす・伴奏は常に・クリックは設定。§7-31）
+      ...(videoId === null
+        ? {}
+        : { fallbackSound: { melody: true, accomp: true, click: settings.audio.metronome } }),
     }
   }
 
@@ -898,6 +1002,7 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     player,
     onInput: onEvents,
     onResize: layout,
+    onBandAction,
     // 矩形と交差してはならない物（帯は殻が足す）。左列の予算は S2 の通常の回だけ見る（S4・S0d は外す、§7-21）
     layoutProbe: () => ({
       outside: [hud, statusRow, sizeLine, practiceLine, tutorialBox, stage, pause.el],
@@ -917,6 +1022,7 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       // 同期中の 2 つの帯は殻にあるので、画面を離れる時に下ろす（S1 へ付いて行かない）
       ctx.band({ kind: 'sync', on: false })
       ctx.band({ kind: 'autoplayBlocked', on: false })
+      ctx.band({ kind: 'videoFallback', on: false })
     },
   }
 }

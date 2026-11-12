@@ -7,6 +7,9 @@
 // 戻して再開）を足し、待ちから入った一時停止の再開は時計を止めたまま待ちに戻す（pausedFrom。decisions #80、m2-kickoff §7-3）。
 // M2 の手順 9（M2-05）: 音ゲー向けのゲージ 0 の途中終了 abort（再生・同期中・待ち → 終了。時計は chartEnd と同じく
 // 止めない ＝ 終了の後は回を捨てる）。
+// M3 の手順 7（m3-kickoff §7-4 の案 A ＝ decisions #96）: 源 novideo の間の PLAYING（時計の held state playing）で同期中に入り、
+// 戻りを待つ（returning）。待つ間の Esc・非表示は pauseVideo〔user〕も出す。源 novideo の間の pause(iframe)（▶ の click が
+// iframe への blur になる）は無視する。
 
 import type { PauseReason } from '../input/focus.ts'
 import type { ClockCommand, ClockEvent, ClockMode, VideoRequest } from '../clock/types.ts'
@@ -23,6 +26,8 @@ export interface PlayState {
   readonly source: ClockMode
   /** 待ちから入った一時停止（再開は待ちに戻す。paused の間だけ持つ） */
   readonly pausedFrom?: 'waiting'
+  /** 源 novideo の間に PLAYING を見て、動画への戻りを待つ同期中（M3 の手順 7） */
+  readonly returning?: true
 }
 
 /**
@@ -73,7 +78,11 @@ function toPaused(s: PlayState, alreadyPaused: boolean): PlayStep {
       ...(s.phase === 'waiting' ? { pausedFrom: 'waiting' as const } : {}),
     },
     clock: [{ kind: 'pause' }],
-    video: s.source === 'video' && !alreadyPaused ? [{ kind: 'pauseVideo', why: 'user' }] : [],
+    // 戻りを待つ間（源 novideo だが動画は PLAYING）も止める
+    video:
+      (s.source === 'video' || s.returning === true) && !alreadyPaused
+        ? [{ kind: 'pauseVideo', why: 'user' }]
+        : [],
   }
 }
 
@@ -95,6 +104,9 @@ function onClock(s: PlayState, ev: ClockEvent): PlayStep {
       // （自動では再生し直さない。decisions #11）。BUFFERING などは同期中、ENDED は終了
       if (ev.state === 'paused') return toPaused(s, true)
       if (ev.state === 'ended') return stay({ ...s, phase: 'ended' })
+      // 源 novideo の間の PLAYING は戻りを待つ同期中（M3 の手順 7）
+      if (ev.state === 'playing' && s.source === 'novideo')
+        return stay({ ...s, phase: 'syncing', returning: true })
       return stay({ ...s, phase: 'syncing' })
     case 'stall':
       // 要求の結果を待つ間（pauseReq）は再生のまま（時計は外挿を続ける）
@@ -139,7 +151,9 @@ export function playStep(s: PlayState, ev: PlayEvent): PlayStep {
   // syncing・playing・waiting
   switch (ev.kind) {
     case 'pause':
-      if (s.phase === 'syncing' && ev.reason === 'iframe') return stay(s)
+      // 同期中と源 novideo の間（▶ の click が iframe への blur になる、M3 の手順 7）の iframe は無視
+      if ((s.phase === 'syncing' || s.source === 'novideo') && ev.reason === 'iframe')
+        return stay(s)
       return toPaused(s, false)
     case 'clock':
       if (s.phase === 'waiting') return stay(s)

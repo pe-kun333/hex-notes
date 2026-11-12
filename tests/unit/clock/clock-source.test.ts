@@ -435,10 +435,10 @@ describe('動画ありの命令（pause・resume・seek・戻す）', () => {
     expect(r.out.t).toBeGreaterThan(10_700)
   })
 
-  it('動画なしの後、動画が動き出すと canReturn、「戻す」で resync(return) して動画の読みに合わせる', () => {
+  it('動画なしの後、利用者の ▶ で PLAYING を見ると t を止めて held(playing)、読みが動いた tick に resync(return)（M3 の手順 7、§7-4 の案 A ＝ #96）', () => {
     const d = createDummyVideo({ pauseLatencyMs: 50 })
     d.play(0)
-    let s = initialClock({ mode: 'video', t0: 0 })
+    const s = initialClock({ mode: 'video', t0: 0 })
     let r = clockTick(s, 0, d.sample(0))
     for (let now = 10; now <= 4000; now += 10) {
       if (now === 1000) d.stuck(10_000, now)
@@ -448,17 +448,49 @@ describe('動画ありの命令（pause・resume・seek・戻す）', () => {
     expect(r.out.mode).toBe('novideo')
     expect(r.out.canReturn).toBe(false)
     expect(clockCommand(r.state, 4000, { kind: 'return' }).out.mode).toBe('novideo')
-    // 利用者が iframe で再生し直す（読みは止めた所から動く）
-    d.setState('playing', 4000)
+    // 利用者が iframe で再生し直す（読みは止めた所から動く）。最初の tick は PLAYING を見て t を止める
+    const before = r.out.t
     d.stuck(0, 4000)
-    r = clockTick(r.state, 4010, d.sample(4010))
-    expect(r.out.canReturn).toBe(true)
-    s = r.state
-    const back = clockCommand(s, 4010, { kind: 'return' })
-    expect(back.out.mode).toBe('video')
+    d.play(4000)
+    r = clockTick(r.state, 4000, d.sample(4000))
+    expect(r.out.events).toEqual([{ kind: 'held', state: 'playing', late: false }])
+    expect([r.out.mode, r.out.phase]).toEqual(['novideo', 'held'])
+    expect(r.out.t).toBeCloseTo(before, 9)
+    // 読みが変わった tick にその読みで戻す（「戻す」の命令と同じ再アンカー。止めた t より前へ巻き戻る）
+    let back = r
+    for (let now = 4001; back.out.mode === 'novideo'; now += 1) {
+      back = clockTick(back.state, now, d.sample(now))
+      if (back.out.mode === 'novideo') expect(back.out.t).toBe(r.out.t)
+    }
+    expect(back.out.t).toBeLessThan(r.out.t)
     expect(back.out.events).toMatchObject([{ kind: 'resync', reason: 'return' }])
-    expect(back.out.t).toBeCloseTo(d.sample(4010).timeMs + 0.5 * back.out.qHat, 9)
-  })
+    expect(back.out.phase).toBe('grace')
+    expect(back.out.t).toBeCloseTo((back.state.lastRead ?? NaN) + 0.5 * back.out.qHat, 9)
+  }) // prettier-ignore
+
+  it('戻りを待つ間に PLAYING でなくなれば止めた t から resync(resume)、動画なしで始めた回は PLAYING を見ても待たない', () => {
+    const d = createDummyVideo({ pauseLatencyMs: 0 })
+    d.play(0)
+    let r = clockTick(initialClock({ mode: 'video', t0: 0 }), 0, d.sample(0))
+    for (let now = 10; now <= 4000; now += 10) {
+      if (now === 1000) d.stuck(600_000, now)
+      r = clockTick(r.state, now, d.sample(now))
+      for (const q of r.out.requests) if (q.kind === 'pauseVideo') d.pauseVideo(now)
+    }
+    // ▶ が play だけ（読みは凍ったまま）→ 待つ間は止めたまま
+    d.play(4000)
+    r = clockTick(r.state, 4000, d.sample(4000))
+    const held = r.out.t
+    r = clockTick(r.state, 6000, d.sample(6000))
+    expect([r.out.phase, r.out.t, r.out.events]).toEqual(['held', held, []])
+    d.setState('paused', 6000)
+    r = clockTick(r.state, 6010, d.sample(6010))
+    expect(r.out.events).toMatchObject([{ kind: 'resync', reason: 'resume', t: held }])
+    expect(r.out.mode).toBe('novideo')
+    // 動画なしで始めた回（fellBack 偽）は今のまま（canReturn の式も変えない）
+    const nv = clockCommand(initialClock({ mode: 'novideo', t0: 0 }), 0, { kind: 'start' }).state
+    expect(clockTick(nv, 1000, play(500)).out.events).toEqual([{ kind: 'graceEnd' }])
+  }) // prettier-ignore
 
   it('PAUSED（利用者が iframe で止めた）・BUFFERING は held、PLAYING で resync(unheld)', () => {
     const d = createDummyVideo()
