@@ -12,6 +12,7 @@
 // （judge.gamer.failed）だけにし、動画が先に終わった回は曲の行の下の注記に「動画が先に終わりました」（切替の注記と同じ所、§7-33）。
 
 import { KEYSET_NAMES, type KeysetId } from '../chart/keyset.ts'
+import { VIDEO_FEATURE } from './video-run.ts'
 import { LAYOUTS } from '../layout/presets.ts'
 import { JUDGE_WORDS } from '../render/canvas/feedback.ts'
 import type { Awards } from '../results/awards.ts'
@@ -43,6 +44,8 @@ export const WAIT_ONLY_LEAN =
 export const HIST_BAR_MS = 30
 /** 動画が曲末より前に終わった回の注記（m3-kickoff §7-16、仮） */
 export const VIDEO_ENDED_NOTE = '動画が先に終わりました'
+/** YouTube 再生の回の注記（m6 L866。手順 8 が称号の節に畳む、m3-kickoff 手順 4） */
+export const YOUTUBE_NOTE = 'YouTube 再生の曲は端末内だけに記録します。'
 export const HIST_BARS = 11
 
 export interface SelfPart {
@@ -57,8 +60,8 @@ export interface ResultView {
   /** 比較の範囲（完了条件。譜面版 id を入れる） */
   readonly scope: string
   readonly song: string
-  /** 曲の行の下の注記（動画が先に終わった回。無ければ null。M3 の手順 2） */
-  readonly note: string | null
+  /** 曲の行の下の注記（動画が先に終わった回〔M3 の手順 2〕・YouTube 再生の回〔手順 4〕。無ければ空） */
+  readonly notes: readonly string[]
   readonly accuracy: string
   readonly rank: string
   readonly rows: readonly (readonly [string, string])[]
@@ -140,13 +143,16 @@ export function shapesText(s: FinishedPlay['shapes']): string {
   return `${pct(s.cluster, s.total)}% ／ ${pct(s.shell, s.total)}% ／ ${pct(s.cross, s.total)}%（${s.total} 和音）`
 }
 
-export function resultView(p: FinishedPlay): ResultView {
+/** S3 の文言。feature は製品の束の門（VIDEO_FEATURE。偽なら YouTube の印と注記を出さない） */
+export function resultView(p: FinishedPlay, feature: boolean = VIDEO_FEATURE): ResultView {
   const r = p.record
   const c = r.counts
   const w = JUDGE_WORDS
   const finished = isFinished(r)
   const g = r.profile === 'gamer' ? p.judge.gamer : null
   const aborted = r.aborted === true
+  // YouTube 再生の回（門の内。M3 の手順 4）
+  const youtube = feature && r.syncUsed.kind === 'youtube'
   // ゲージ 0 の途中終了（動画が先に終わった回はゲージと点が実値、m3-kickoff §7-16、仮）
   const failed = g !== null && g.failed
   const rows: [string, string][] =
@@ -197,8 +203,8 @@ export function resultView(p: FinishedPlay): ResultView {
   return {
     title: practice ? '練習の結果' : aborted ? '途中終了' : '結果',
     scope: `成績の比較は同じ譜面版（${r.variantId}）の中だけです。`,
-    song: `${p.name} ・ ${variantText(r.variantId)} ・ ${PROFILE_NAMES[r.profile]} ・ 自前音源`,
-    note: p.videoEnded ? VIDEO_ENDED_NOTE : null,
+    song: `${p.name} ・ ${variantText(r.variantId)} ・ ${PROFILE_NAMES[r.profile]} ・ ${youtube ? 'YouTube' : '自前音源'}`,
+    notes: [...(p.videoEnded ? [VIDEO_ENDED_NOTE] : []), ...(youtube ? [YOUTUBE_NOTE] : [])],
     accuracy,
     // 判定した音が無い回（全て skipped）は精度もランクも「—」。途中終了もランク「—」（m6 L842）
     rank: accuracy === '—' || aborted ? '—' : r.rank,

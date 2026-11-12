@@ -5,17 +5,22 @@
 // 合う版の自動選択: 配列は設定の配列、ただし ableton 版に落ちる音があり vmpk 版の方が少なければ vmpk を推奨して先頭に。
 // 上限は 2 を選び、端末の上限までは選べる）。M1 で隠す物（プロファイル切替・持ち込み・動画の切替・絞り込み）は出さない。
 // 純関数（DOM は screens/home.ts）。
+// M3 の手順 4（m3-kickoff 手順 4・§7-24）: 音源の印 videoBadge と「動画を使う」の既定 useVideoDefault、カードの自己ベストの clock
+// （CardContext.clock。無ければ novideo）。門（VIDEO_FEATURE）が偽なら youtube の sync 付きの曲も自前音源の印で切替なし。
 
 import { LAYOUTS } from '../layout/presets.ts'
+import { VIDEO_FEATURE, videoRunOf } from './video-run.ts'
 import {
   DEFAULT_CHORD_LIMIT,
   type Chart,
   type ChordLimit,
+  type ClockKind,
   type FoldId,
   type LayoutId,
   type Metrics,
   type Profile,
   type ResultRecord,
+  type SyncSource,
   type Variant,
 } from '../shared/types.ts'
 import { DENSITY_CAUTION, LEAP_CAUTION, variantMetrics } from '../chart/metrics.ts'
@@ -154,6 +159,8 @@ export interface SongCard {
   /** 譜面版の一覧（m6 variantsText: Ableton×{2,3}・VMPK×{2,3}） */
   readonly variants: string
   readonly choice: VersionChoice
+  /** 音源の印（videoBadge。M3 の手順 4） */
+  readonly badge: string
 }
 
 /** 譜面版の一覧の文字（m6 variantsText L606–609） */
@@ -169,7 +176,34 @@ export interface CardContext {
   readonly profile: Profile
   readonly records: readonly ResultRecord[]
   readonly tutorialId: string
+  /** 自己ベストの clock（「動画を使う」の値と門で画面が決める。無ければ novideo） */
+  readonly clock?: ClockKind
 }
+
+/** 音源の印（m6 L763。埋め込み不可の文は手順 5） */
+export const VIDEO_BADGE = '動画あり／なしで遊べる'
+export const AUDIO_BADGE = '自前音源'
+
+/** 動画で遊べる曲か（sources[0] が youtube で動画 ID が正しい・門が真。videoRunOf の use 真・S1） */
+export function videoPlayable(sync: Chart['sync'], feature: boolean = VIDEO_FEATURE): boolean {
+  return videoRunOf(sync, true, false, feature) !== null
+}
+
+/** 音源の印の文字 */
+export function videoBadge(sync: Chart['sync'], feature: boolean = VIDEO_FEATURE): string {
+  return videoPlayable(sync, feature) ? VIDEO_BADGE : AUDIO_BADGE
+}
+
+/** 「動画を使う」の既定（youtube の sync があれば はい。埋め込み不可の一覧の引数は手順 5 が足す） */
+export function useVideoDefault(source: SyncSource | undefined): boolean {
+  return source?.kind === 'youtube'
+}
+
+/** 「動画を使う」の注記（m6 L778–780 の 2 文。埋め込み不可の文は手順 5） */
+export const USE_VIDEO_NOTES = {
+  yes: '動画の音に合わせて遊びます。称号・ストリークの対象外（スコアと自己ベストは残ります）。',
+  no: 'ピアノ音＋伴奏で遊びます。称号・ストリークの対象。',
+} as const
 
 export function songCard(id: string, chart: Chart, c: CardContext): SongCard {
   const choice = versionChoice(chart, c.preferred, c.deviceLimit)
@@ -179,7 +213,7 @@ export function songCard(id: string, chart: Chart, c: CardContext): SongCard {
   const metrics = v === undefined ? undefined : (v.metrics ?? variantMetrics(chart, v))
   const sec = songSeconds(chart)
   const tempo = chart.pulse.tempo
-  const b = pickId === null ? null : bestOf(c.records, { chartId: chart.id, variantId: pickId, profile: c.profile, clock: 'novideo' })
+  const b = pickId === null ? null : bestOf(c.records, { chartId: chart.id, variantId: pickId, profile: c.profile, clock: c.clock ?? 'novideo' })
   return {
     id,
     name: chart.name,
@@ -196,6 +230,7 @@ export function songCard(id: string, chart: Chart, c: CardContext): SongCard {
       : `自己ベスト ${(b.acc * 100).toFixed(1)}% ${b.rank}（${PROFILE_NAMES[c.profile]} ・ ${b.variantId}）`,
     variants: variantsText(chart),
     choice,
+    badge: videoBadge(chart.sync),
   }
 } // prettier-ignore
 

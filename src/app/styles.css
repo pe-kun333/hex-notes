@@ -1028,3 +1028,16 @@ table.tracks th {
 .play .left > p.note:empty {
   display: none;
 }
+
+/* S5 段 4 のプレイヤー（M3 の手順 4）: 480×270 のまま（縮めない。箱の内寸が 480 px 未満なら iframe を作らない）。縁は付けない */
+.sync-player {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  margin: 8px 0;
+  background: #000;
+}
+
+.terms a {
+  color: var(--fg);
+}

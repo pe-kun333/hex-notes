@@ -39,6 +39,8 @@ import { telemetryPanel } from '../telemetry-panel.ts'
 import { updatePanel } from '../update-panel.ts'
 import { button, frame, h } from './frame.ts'
 import { calibText, limitText } from './home.ts'
+import { termsLine } from '../terms.ts'
+import { VIDEO_FEATURE } from '../video-run.ts'
 
 /** 出どころの言葉（m6 の S1 の曲カードと同じ） */
 const RIGHTS_TEXT: Readonly<Record<string, string>> = {
@@ -359,6 +361,8 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
     h(doc, 'p', { text: 'ピアノ音源: Salamander Grand Piano V3 — Alexander Holm、CC BY 3.0（30 音に間引き Opus に変換した改変物。未同梱の間は合成音で鳴ります）。' }),
     h(doc, 'p', { text: '同梱曲:' }),
     songList,
+    // YouTube の規約へのリンクの行（門の内、decisions #100。M3 の手順 4）
+    ...(VIDEO_FEATURE ? [termsLine(doc)] : []),
   ) // prettier-ignore
 
   f.body.append(
