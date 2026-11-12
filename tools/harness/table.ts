@@ -4,6 +4,9 @@
 // 曲は tests/fixtures/charts/m1/ の 6 曲（play-dev と同じ順）、配列は play-dev と同じ ableton・vmpk の limit 2・octave。
 // M2 の手順 5（m2-kickoff §7-21、decisions #56 (d)）: 練習の表（buildPracticeTable。テンポ段 0.75・SD 0 と、隣の鍵 12%）を
 // tests/harness/expected/m2-03.json に分ける。M0 の表（m0-10.json）は変えない（rate・wrongRate は既定なら行に書かない）。
+// M3 の手順 6（m3-kickoff §7-30、仮）: 動画ありの表（buildVideoTable。6 曲 × 2 プロファイル × 2 筋書き〔飛び ＋300・凍結 → S7c〕、
+// ableton、筋書きはフレーム 120）を tests/harness/expected/m3-04.json に。列は入れ子の video（数・文字列・null だけ。diff.ts は
+// 配列を === で比べる）で、行の鍵に筋書きを足す。広告の 2 筋書きは単体の試験だけ（表に載せない）。
 // 純関数（ファイルの読み書きは run.ts）。
 
 import { frameNotes } from '../../src/render/canvas/commands.ts'
@@ -23,6 +26,7 @@ import type {
   Variant,
 } from '../../src/shared/types.ts'
 import { runAutoplay } from './autoplay.ts'
+import { VIDEO_AXIS, VIDEO_DUMMY, runAutoplayVideo, type VideoScenario } from './autoplay-video.ts'
 import { JITTER_SDS, JITTER_SEED, jitterZ } from './jitter.ts'
 
 export const HARNESS_FORMAT = 'hexnote-harness/1' as const
@@ -67,6 +71,25 @@ export interface HarnessRow {
     readonly cleared: boolean
     readonly failed: boolean
   } | null
+  /** 動画ありの表だけ（M3 の手順 6） */
+  readonly video?: HarnessVideo
+}
+
+/** 動画ありの列（値は数・文字列・null だけ） */
+export interface HarnessVideo {
+  readonly scenario: VideoScenario
+  /** 終わりの源 */
+  readonly source: 'video' | 'novideo'
+  /** 再アンカーの理由（出た順に「,」でつなぐ） */
+  readonly resync: string
+  /** 動画なしへ切り替えた時刻（開始からの ms、小数 2 桁）。無ければ null */
+  readonly novideoT: number | null
+  /** 筋書きの再アンカーの時点で残る最初の音の着地 − 再アンカー（ms、小数 2 桁）。開始以外の再アンカーが無ければ null */
+  readonly firstLandMs: number | null
+  /** 動画への要求の数 */
+  readonly requests: number
+  /** 回したフレームの数 */
+  readonly frames: number
 }
 
 export interface HarnessSong {
@@ -215,13 +238,72 @@ export function buildPracticeTable(
   return rows
 } // prettier-ignore
 
-/** 行の鍵（差分で行を突き合わせる。曲・譜面版・プロファイル・SD、練習の表はテンポ段と鍵違いも） */
+/** 動画ありの表の筋書き（m3-kickoff §7-30。広告の 2 筋書きは単体の試験だけ） */
+export const VIDEO_TABLE_SCENARIOS: readonly VideoScenario[] = ['jump', 'freeze']
+/** 筋書きを起こすフレーム（開始から 2,000 ms） */
+export const VIDEO_TABLE_FRAME = 120
+/** 動画ありの表の配列 */
+export const VIDEO_TABLE_LAYOUT: LayoutId = 'ableton'
+
+/** 動画ありの 1 行（揺れ 0。seed はダミー動画の種） */
+export function harnessVideoRow(song: HarnessSong, profile: Profile, scenario: VideoScenario): HarnessRow {
+  const variant = pickVariant(song.chart, VIDEO_TABLE_LAYOUT)
+  const notes = frameNotes(song.chart, variant)
+  const grid = buildKeyboardGrid(VIDEO_TABLE_LAYOUT, 1, { left: 0, top: 0 })
+  const rules = rulesOf(PROFILES[profile], { neighbor: neighborOf(grid.byCode), axis: VIDEO_AXIS })
+  const run = runAutoplayVideo(notes, rules, { scenario, atFrame: VIDEO_TABLE_FRAME })
+  const s = run.summary
+  const novideo = run.events.find((e) => e.kind === 'novideo')
+  const first = run.firstLand[0]
+  return {
+    song: song.song,
+    chartId: song.chart.id,
+    variantId: variant.id,
+    profile,
+    jitterSd: 0,
+    seed: VIDEO_DUMMY.seed ?? 7,
+    notes: notes.length,
+    precision: round(s.acc, 6),
+    rank: s.rank,
+    counts: { ...s.counts },
+    selfRate: { ...s.selfRate },
+    skipped: s.skipped,
+    holds: { ...s.holds },
+    meanMs: roundOrNull(s.meanMs, 2),
+    ur: roundOrNull(s.ur, 2),
+    gamer: s.gamer === null ? null : { ...s.gamer, points: round(s.gamer.points, 6), gauge: round(s.gamer.gauge, 6) },
+    video: {
+      scenario,
+      source: run.source,
+      resync: run.events.filter((e) => e.kind === 'resync').map((e) => e.reason).join(','),
+      novideoT: novideo === undefined ? null : novideo.at,
+      firstLandMs: first === undefined || first === null ? null : round(first, 2),
+      requests: run.requests.length,
+      frames: run.frames,
+    },
+  }
+} // prettier-ignore
+
+/** 動画ありの表（曲 × プロファイル × 筋書きの順） */
+export function buildVideoTable(songs: readonly HarnessSong[]): HarnessRow[] {
+  const rows: HarnessRow[] = []
+  for (const song of songs)
+    for (const profile of HARNESS_PROFILES)
+      for (const sc of VIDEO_TABLE_SCENARIOS) rows.push(harnessVideoRow(song, profile, sc))
+  return rows
+}
+
+/** 行の鍵（差分で行を突き合わせる。曲・譜面版・プロファイル・SD、練習の表はテンポ段と鍵違い、動画ありの表は筋書きも） */
 export function rowKey(
-  r: Pick<HarnessRow, 'song' | 'variantId' | 'profile' | 'jitterSd' | 'rate' | 'wrongRate'>,
+  r: Pick<
+    HarnessRow,
+    'song' | 'variantId' | 'profile' | 'jitterSd' | 'rate' | 'wrongRate' | 'video'
+  >,
 ): string {
   const rate = r.rate === undefined ? '' : ` r${r.rate}`
   const wrong = r.wrongRate === undefined ? '' : ` w${r.wrongRate}`
-  return `${r.song} ${r.variantId} ${r.profile} sd${r.jitterSd}${rate}${wrong}`
+  const video = r.video === undefined ? '' : ` v${r.video.scenario}`
+  return `${r.song} ${r.variantId} ${r.profile} sd${r.jitterSd}${rate}${wrong}${video}`
 }
 
 /** 書き出す文字列（JSON として読める。行は 1 行に 1 つ） */

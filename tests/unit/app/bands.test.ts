@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  AUTOPLAY_DETAIL,
+  AUTOPLAY_TITLE,
   BAND_ORDER,
+  SYNC_BAND_DETAIL,
+  SYNC_BAND_TITLE,
   bandOutside,
   bandStep,
   bandsOf,
@@ -197,8 +201,9 @@ describe('予約の遅れ（#47 (c)）と自動再生ブロック', () => {
     })
   })
 
-  it('IME と S7c 以外の 4 種は「閉じる」を出し、閉じると消える', () => {
+  it('IME と S7c 以外の 5 種は「閉じる」を出し、閉じると消える（M3 の手順 6 で sync）', () => {
     const shown: Record<Exclude<BandKind, 'ime' | 'videoFallback'>, BandEvent> = {
+      sync: { kind: 'sync', on: true },
       autoplayBlocked: { kind: 'autoplayBlocked', on: true },
       audioLate: { kind: 'audioLate', on: true },
       lowLoad: { kind: 'lowLoad', level: 1 },
@@ -211,19 +216,21 @@ describe('予約の遅れ（#47 (c)）と自動再生ブロック', () => {
     }
   })
 
-  it('全部出ていれば BAND_ORDER の順（ime → S7c → 自動再生 → 予約の遅れ → 低負荷 → 保存できません）', () => {
+  it('全部出ていれば BAND_ORDER の順（ime → 同期中 → S7c → 自動再生 → 予約の遅れ → 低負荷 → 保存できません。7 種）', () => {
     const s = run([
       { kind: 'videoFallback', on: true, enabled: true },
+      { kind: 'sync', on: true },
       { kind: 'storageFail', area: 'idb' },
       { kind: 'lowLoad', level: 3 },
       { kind: 'audioLate', on: true },
       { kind: 'autoplayBlocked', on: true },
       { kind: 'ime', on: true },
     ])
-    // m6 L790–803 の ime → 自動再生 → 保存できません の間に、予約の遅れと低負荷、ime の次に S7c（M3 の手順 3。手順 6 で sync が
-    // ime の次に入る）。BAND_ORDER 自身と比べない
+    // m6 L790–803 の ime → 自動再生 → 保存できません の間に、予約の遅れと低負荷、ime の次に S7c（M3 の手順 3）、その前に sync
+    // （M3 の手順 6、期待値 (9)）。BAND_ORDER 自身と比べない
     expect(kinds(s)).toEqual([
       'ime',
+      'sync',
       'videoFallback',
       'autoplayBlocked',
       'audioLate',
@@ -277,6 +284,45 @@ describe('帯の釦と S7c の仮の帯（M3 の手順 3、期待値 (8)、m3-ki
     ])
     expect(bandsOf(all, OFF).every((b) => b.action === undefined)).toBe(true)
   })
+})
+
+describe('同期中の帯 sync と自動再生ブロックの文（M3 の手順 6、期待値 (6)(7)(9)、m3-kickoff §7-22・§7-28）', () => {
+  it('sync: 見出し「同期中」（m6 L792）・本文・閉じるあり・釦なし。同じ on は同じ state、閉じると消え、偽 → 真で開き直す', () => {
+    const s = run([{ kind: 'sync', on: true }])
+    expect(bandsOf(s, OFF)).toEqual([{ kind: 'sync', title: SYNC_BAND_TITLE, detail: SYNC_BAND_DETAIL, dismissible: true }])
+    expect(SYNC_BAND_TITLE).toBe('同期中')
+    expect(SYNC_BAND_DETAIL).toBe('動画が進むのを待っています。広告なら終わるまで待ちます。')
+    expect(bandStep(s, { kind: 'sync', on: true })).toBe(s)
+    const closed = bandStep(s, { kind: 'dismiss', band: 'sync' })
+    expect(kinds(closed)).toEqual([])
+    // 閉じた後の同じ on は開き直さない（長引いている間は閉じたまま）。下りてもう一度点けば開き直す
+    expect(bandStep(closed, { kind: 'sync', on: true })).toBe(closed)
+    expect(kinds(run([{ kind: 'sync', on: false }, { kind: 'sync', on: true }], closed))).toEqual(['sync'])
+    expect(kinds(bandStep(s, { kind: 'sync', on: false }))).toEqual([])
+    const off = initialBands()
+    expect(bandStep(off, { kind: 'sync', on: false })).toBe(off)
+  }) // prettier-ignore
+
+  it('autoplayBlocked: 題・本文を省けば今の文、渡せば 2 つ目の文（プレイヤーが隠れている）。文が替わっても閉じたまま', () => {
+    const a = run([{ kind: 'autoplayBlocked', on: true }])
+    expect(bandsOf(a, OFF)[0]).toMatchObject({ title: AUTOPLAY_TITLE, detail: AUTOPLAY_DETAIL })
+    const nv = { kind: 'autoplayBlocked', on: true, title: 'プレイヤーが隠れています', detail: '半分以上が見える位置に戻し、プレイヤーの ▶ を押してください。' } as const
+    const b = bandStep(a, nv)
+    expect(bandsOf(b, OFF)[0]).toMatchObject({ title: nv.title, detail: nv.detail, dismissible: true })
+    expect(bandStep(b, nv)).toBe(b)
+    // 閉じた後に文だけ替わっても開き直さない。下りてからの on で開き直す
+    const closed = bandStep(b, { kind: 'dismiss', band: 'autoplayBlocked' })
+    expect(kinds(bandStep(closed, { kind: 'autoplayBlocked', on: true }))).toEqual([])
+    expect(kinds(run([{ kind: 'autoplayBlocked', on: false }, { kind: 'autoplayBlocked', on: true }], closed))).toEqual(['autoplayBlocked'])
+    const off = initialBands()
+    expect(bandStep(off, { kind: 'autoplayBlocked', on: false })).toBe(off)
+  }) // prettier-ignore
+
+  it('定数の順は 7 種 ＝ ime → sync → videoFallback → autoplayBlocked → audioLate → lowLoad → storageFail。bands.ts は排他を持たない', () => {
+    expect(BAND_ORDER).toEqual(['ime', 'sync', 'videoFallback', 'autoplayBlocked', 'audioLate', 'lowLoad', 'storageFail'])
+    // sync と videoFallback を同時に点けても両方出る（同時に出さないのは同期中の訳。期待値 (9) は sync-video.test.ts）
+    expect(kinds(run([{ kind: 'videoFallback', on: true, enabled: false }, { kind: 'sync', on: true }]))).toEqual(['sync', 'videoFallback'])
+  }) // prettier-ignore
 })
 
 describe('帯がプレイヤー矩形の外か（dev ビルドの assert）', () => {

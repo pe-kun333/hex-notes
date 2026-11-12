@@ -14,6 +14,8 @@
 // M3 の手順 2（M3-03 前半）: RunOptions.video で動画の回（源 video。時計は動画の軸、Run.t は sync の軸で譜面の ms、判定と
 // 予約は同じ軸で換算）。要求は効果 video で画面が口へ渡す。発音の列は空（誤打の打鍵音だけ、m3-kickoff §7-14）。記録は回の
 // 始めの源・sync の offset と rate・切替の fallbackAt。動画が先に終わった回は aborted（§7-16）、動画の回は校正 段 2 の外。
+// M3 の手順 6（M3-04）: 同期中の訳 Run.syncCause（src/play/sync-cause.ts。歩ごとに時計の事象と動画への要求から）と、口の事象
+// （自動再生ブロック・プレイヤーが隠れている）を回へ渡す runPortEvent。案内の行と帯は画面（sync-notice.ts）。
 
 import { keyclickFor, type KeyclickPlan } from '../audio/keyclick.ts'
 import {
@@ -88,6 +90,12 @@ import {
   type SessionStep,
 } from '../play/session.ts'
 import type { PlayEvent, PlayPhase } from '../play/state.ts'
+import {
+  syncCauseBlock,
+  syncCauseStep,
+  type ResumeBlock,
+  type SyncCause,
+} from '../play/sync-cause.ts'
 import type { FrameNote } from '../render/canvas/cells.ts'
 import { frameNotes } from '../render/canvas/commands.ts'
 import type { FxIntent } from '../render/canvas/feedback.ts'
@@ -214,6 +222,8 @@ export interface Run {
   readonly clockRates: readonly number[]
   /** 曲末より前に動画が終わった（held(ended)。記録の aborted、m3-kickoff §7-16） */
   readonly videoEnded: boolean
+  /** 同期中の訳（源 video の同期中だけ。案内の行と帯、M3 の手順 6） */
+  readonly syncCause: SyncCause | null
   /** 描画層のノート（全部 pending。状態は runNotes で判定から写す） */
   readonly notes: readonly FrameNote[]
   readonly judge: JudgeState
@@ -294,6 +304,7 @@ export function newRun(song: RunSong, opts: RunOptions): Run {
     video,
     clockRates: [practice?.rate ?? 1],
     videoEnded: false,
+    syncCause: null,
     notes,
     judge: initialJudge(notes, o.rules, o.fade),
     lastEndMs: endMs - END_TAIL_MS,
@@ -354,8 +365,8 @@ function applyStep(r: Run, step: SessionStep, realNow: number, effects: RunEffec
   // 動画への要求は出た順に。同じ歩に held(ended) があれば再開の playVideo は出さない（一時停止の間に終わった動画を鳴らし
   // 直さない。状態機械は不変、m3-kickoff §7-16、仮）
   const ended = step.out.events.some((e) => e.kind === 'held' && e.state === 'ended')
-  for (const q of step.video)
-    if (!(ended && q.kind === 'playVideo')) effects.push({ kind: 'video', request: q })
+  const video = step.video.filter((q) => !(ended && q.kind === 'playVideo'))
+  for (const q of video) effects.push({ kind: 'video', request: q })
   const rate = step.session.clock.rate
   const j = judgeClock(r.judge, step.out.events, { map: step.out.map, now: realNow })
   const next: Run = {
@@ -366,12 +377,28 @@ function applyStep(r: Run, step: SessionStep, realNow: number, effects: RunEffec
     clockRates:
       rate === r.clockRates[r.clockRates.length - 1] ? r.clockRates : [...r.clockRates, rate],
     videoEnded: r.videoEnded || (r.video !== null && ended && before !== 'ended'),
+    syncCause: syncCauseStep(r.syncCause, {
+      phase,
+      source: step.session.play.source,
+      events: step.out.events,
+      video,
+      now: realNow,
+    }),
     collect: collectClock(r.collect, step.out),
     judge: j.state,
     sched,
   }
   effects.push(...judgeEffects(next, j.out, realNow))
   return next
+}
+
+/**
+ * 口の事象（自動再生ブロック・プレイヤーが隠れていて playVideo を呼ばなかった。画面が手順 1 の PortEvent の種類だけ渡す）。
+ * 再開の待ちの間の最初の 1 つだけ訳に控え、他では回を変えない
+ */
+export function runPortEvent(r: Run, kind: ResumeBlock): Run {
+  const c = syncCauseBlock(r.syncCause, kind)
+  return c === r.syncCause ? r : { ...r, syncCause: c }
 }
 
 /** 状態機械への事象（start・pause・resume・chartEnd） */

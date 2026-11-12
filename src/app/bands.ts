@@ -6,6 +6,9 @@
 // M3 の手順 3（m3-kickoff §7-22、仮）: 帯に釦 `action`（殻が釦を作り、押下を画面の onBandAction へ返す）と、釦の型と口を
 // 通す仮の帯 videoFallback（S7c の帯。名前と題・活性の 3 つの形 ＝ 切替・▶ の案内・戻せない、は手順 7 で決める）。
 // 題と活性は画面が渡し、ここは canReturn を知らない。「閉じる」なし・釦「戻す」（m6 L797 の「閉じる」は外した）。
+// M3 の手順 6（m3-kickoff §7-22・§7-28、仮）: 同期中の帯 sync（m6 L792。長引くときだけ画面が点ける。釦なし・閉じるあり、出口は
+// Esc → Pause）を ime の次に。自動再生ブロックの帯は題・本文を画面が渡せる（省けば今の文。notVisible の 2 つ目の文）。
+// sync と videoFallback を同時に出さないのはここでなく同期中の訳（源が novideo になれば訳が消えて sync が下りる）。
 
 import { IME_BAND_TEXT } from '../input/ime.ts'
 import { LATE_BAND_MS } from '../audio/scheduler.ts'
@@ -17,18 +20,19 @@ import {
 } from '../storage/fallback.ts'
 
 /**
- * 帯の種類。autoplayBlocked は動画あり（M3）まで文言だけ。lowLoad は低負荷の段が自動で上がったとき、audioLate は発音の
- * 予約の遅れ（#47 (c)）
+ * 帯の種類。sync は同期中が長引いた（M3 の手順 6）、autoplayBlocked は再開の playVideo が効かない（M3 の手順 6）。lowLoad は
+ * 低負荷の段が自動で上がったとき、audioLate は発音の予約の遅れ（#47 (c)）
  */
 export type BandKind =
-  'ime' | 'videoFallback' | 'autoplayBlocked' | 'audioLate' | 'lowLoad' | 'storageFail'
+  'ime' | 'sync' | 'videoFallback' | 'autoplayBlocked' | 'audioLate' | 'lowLoad' | 'storageFail'
 
 /**
  * 並べる順（m6 L790–803 の ime → 自動再生 → 保存できません の間に、低負荷と予約の遅れを入れた。M3 の手順 3 で videoFallback を
- * ime の次に。手順 6 で sync が ime の次に入る、m3-kickoff §7-22）
+ * ime の次に、手順 6 で sync を ime の次に、m3-kickoff §7-22）
  */
 export const BAND_ORDER: readonly BandKind[] = [
   'ime',
+  'sync',
   'videoFallback',
   'autoplayBlocked',
   'audioLate',
@@ -55,6 +59,14 @@ export interface BandAction {
 /** S7c の帯の題の既定（m6 L797 の 19 字。仮） */
 export const VIDEO_FALLBACK_TITLE = '動画が止まったので、ピアノ音で続けます'
 
+/** 同期中の帯（m6 L792 の見出し。本文は自作、仮） */
+export const SYNC_BAND_TITLE = '同期中'
+export const SYNC_BAND_DETAIL = '動画が進むのを待っています。広告なら終わるまで待ちます。'
+
+/** 自動再生ブロックの帯の既定の文（m6 L801） */
+export const AUTOPLAY_TITLE = '再生はクリックで始めます'
+export const AUTOPLAY_DETAIL = '自動再生がブロックされました。プレイヤーの ▶ を押してください。'
+
 export interface BandsState {
   /** IME の帯（入力層の imeBand をそのまま写す） */
   readonly ime: boolean
@@ -63,7 +75,10 @@ export interface BandsState {
   /** 低負荷の段（0 は帯なし） */
   readonly lowLoad: LowLoadLevel
   readonly audioLate: boolean
-  readonly autoplayBlocked: boolean
+  /** 同期中が長引いた（M3 の手順 6） */
+  readonly sync: boolean
+  /** 自動再生ブロックの帯（題・本文は無ければ既定。null は出さない。M3 の手順 6） */
+  readonly autoplayBlocked: { readonly title?: string; readonly detail?: string } | null
   /** S7c の帯（題は無ければ既定、釦「戻す」の活性。null は出さない。M3 の手順 3、仮） */
   readonly videoFallback: { readonly title?: string; readonly enabled: boolean } | null
   /** 「閉じる」で閉じた帯（同じ種類の新しい知らせで開き直す） */
@@ -77,7 +92,11 @@ export type BandEvent =
   | { kind: 'lowLoad'; level: LowLoadLevel }
   /** 予約の遅れ（on は lateBand が真になった。新しい回の始めに false） */
   | { kind: 'audioLate'; on: boolean }
-  | { kind: 'autoplayBlocked'; on: boolean }
+  /** 同期中の帯（M3 の手順 6） */
+  | { kind: 'sync'; on: boolean }
+  /** 自動再生ブロックの帯（題・本文は画面が渡せる。省けば今の文。M3 の手順 6） */
+  | { kind: 'autoplayBlocked'; on: true; title?: string; detail?: string }
+  | { kind: 'autoplayBlocked'; on: false }
   /** S7c の帯（題と釦の活性は画面が渡す。M3 の手順 3、仮） */
   | { kind: 'videoFallback'; on: true; title?: string; enabled: boolean }
   | { kind: 'videoFallback'; on: false }
@@ -89,7 +108,8 @@ export function initialBands(): BandsState {
     storageFail: [],
     lowLoad: 0,
     audioLate: false,
-    autoplayBlocked: false,
+    sync: false,
+    autoplayBlocked: null,
     videoFallback: null,
     closed: [],
   }
@@ -118,11 +138,24 @@ export function bandStep(s: BandsState, ev: BandEvent): BandsState {
         ? { ...s, lowLoad: ev.level, closed: reopen(s.closed, 'lowLoad') }
         : { ...s, lowLoad: ev.level }
     case 'audioLate':
-    case 'autoplayBlocked': {
+    case 'sync': {
       if (s[ev.kind] === ev.on) return s
       return ev.on
         ? { ...s, [ev.kind]: true, closed: reopen(s.closed, ev.kind) }
         : { ...s, [ev.kind]: false }
+    }
+    case 'autoplayBlocked': {
+      if (!ev.on) return s.autoplayBlocked === null ? s : { ...s, autoplayBlocked: null }
+      const cur = s.autoplayBlocked
+      if (cur !== null && cur.title === ev.title && cur.detail === ev.detail) return s
+      const next = {
+        ...(ev.title === undefined ? {} : { title: ev.title }),
+        ...(ev.detail === undefined ? {} : { detail: ev.detail }),
+      }
+      // 出ていない → 出す で開き直す（文だけ替わった時は閉じたまま）
+      return cur === null
+        ? { ...s, autoplayBlocked: next, closed: reopen(s.closed, 'autoplayBlocked') }
+        : { ...s, autoplayBlocked: next }
     }
     case 'videoFallback': {
       if (!ev.on) return s.videoFallback === null ? s : { ...s, videoFallback: null }
@@ -180,15 +213,21 @@ function bandOf(s: BandsState, kind: BandKind, opts: BandsOptions): Band | null 
             action: { id: 'return', label: '戻す', enabled: v.enabled },
           }
     }
-    case 'autoplayBlocked':
-      return s.autoplayBlocked && open
+    case 'sync':
+      return s.sync && open
+        ? { kind, title: SYNC_BAND_TITLE, detail: SYNC_BAND_DETAIL, dismissible: true }
+        : null
+    case 'autoplayBlocked': {
+      const a = s.autoplayBlocked
+      return a !== null && open
         ? {
             kind,
-            title: '再生はクリックで始めます',
-            detail: '自動再生がブロックされました。プレイヤーの ▶ を押してください。',
+            title: a.title ?? AUTOPLAY_TITLE,
+            detail: a.detail ?? AUTOPLAY_DETAIL,
             dismissible: true,
           }
         : null
+    }
     case 'audioLate':
       return s.audioLate && open
         ? {
