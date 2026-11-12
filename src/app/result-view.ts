@@ -10,12 +10,18 @@
 // ランク「—」・点「—」（m6 L837・L842・L850）。
 // M3 の手順 2: 動画が曲末より前に終わった回も途中終了（aborted、m3-kickoff §7-16、仮）。ゲージ終値 0・点「—」はゲージ 0 の回
 // （judge.gamer.failed）だけにし、動画が先に終わった回は曲の行の下の注記に「動画が先に終わりました」（切替の注記と同じ所、§7-33）。
+// M3 の手順 8（M3-06、m3-kickoff 手順 8・§7-17・§7-33、文は仮）: 曲の行の末は 自前音源／YouTube／YouTube（途中で動画なしへ切替）、
+// 完走の行の枝は 途中終了 → 切替 → 中断あり、切替の注記「曲の頭から m:ss で動画なしに切り替わりました。」（譜面の ms を秒で
+// 切り捨て）。対象外の回の称号の節は offTargetLines（m6 L866 の「デイリー」は M4-01 なので抜く。手順 4 の注記はここに畳んだ）。
+// 動画の回の完走の行は「完走印は自前音源の回だけ」（S1 の完走印は対象プレイだけ、§7-33）。
 
 import { KEYSET_NAMES, type KeysetId } from '../chart/keyset.ts'
 import { VIDEO_FEATURE } from './video-run.ts'
 import { LAYOUTS } from '../layout/presets.ts'
 import { JUDGE_WORDS } from '../render/canvas/feedback.ts'
 import type { Awards } from '../results/awards.ts'
+import type { OffTargetWhy } from '../results/reward.ts'
+import { clockText } from './home-view.ts'
 import { isFinished } from '../results/record.ts'
 import type { LayoutId, PlayMode, Profile, ResultRecord, SelfRate } from '../shared/types.ts'
 import { leanWord, signedMs } from './calibration.ts'
@@ -44,8 +50,22 @@ export const WAIT_ONLY_LEAN =
 export const HIST_BAR_MS = 30
 /** 動画が曲末より前に終わった回の注記（m3-kickoff §7-16、仮） */
 export const VIDEO_ENDED_NOTE = '動画が先に終わりました'
-/** YouTube 再生の回の注記（m6 L866。手順 8 が称号の節に畳む、m3-kickoff 手順 4） */
-export const YOUTUBE_NOTE = 'YouTube 再生の曲は端末内だけに記録します。'
+/** 途中で動画なしに切り替わった回の注記（m6 の切替の帯 L363 → S3 の 1 行。時刻は譜面の頭から、秒の切り捨て。M3 の手順 8） */
+export function switchedNote(fallbackAtMs: number): string {
+  return `曲の頭から ${clockText(Math.floor(fallbackAtMs / 1000))} で動画なしに切り替わりました。`
+}
+
+/**
+ * 対象外の回の称号の節（m6 renderS3 L866 の手直し。デイリーは M4-01 なので抜く）。主語は切替の回だけ「途中で動画なしに切り替わった
+ * 回」、括弧は完走（isFinished）の回だけ「スコアと自己ベストは残ります」、他は「スコアは残ります」（M3 の手順 8）
+ */
+export function offTargetLines(why: OffTargetWhy, finished: boolean): readonly string[] {
+  const who = why === 'switched' ? '途中で動画なしに切り替わった回' : 'YouTube 再生の曲'
+  const kept = finished ? 'スコアと自己ベストは残ります' : 'スコアは残ります'
+  return [
+    `この回は対象外です。${who}は端末内だけに記録します。称号・ストリークは自前音源のプレイだけが対象です（${kept}）。`,
+  ]
+}
 export const HIST_BARS = 11
 
 export interface SelfPart {
@@ -151,8 +171,9 @@ export function resultView(p: FinishedPlay, feature: boolean = VIDEO_FEATURE): R
   const finished = isFinished(r)
   const g = r.profile === 'gamer' ? p.judge.gamer : null
   const aborted = r.aborted === true
-  // YouTube 再生の回（門の内。M3 の手順 4）
+  // YouTube 再生の回（門の内。M3 の手順 4）と、途中で動画なしに切り替わった回（戻した回も。M3 の手順 8）
   const youtube = feature && r.syncUsed.kind === 'youtube'
+  const switchedAt = youtube ? r.syncUsed.fallbackAt : undefined
   // ゲージ 0 の途中終了（動画が先に終わった回はゲージと点が実値、m3-kickoff §7-16、仮）
   const failed = g !== null && g.failed
   const rows: [string, string][] =
@@ -190,12 +211,16 @@ export function resultView(p: FinishedPlay, feature: boolean = VIDEO_FEATURE): R
     rows.push([
       '完走',
       finished
-        ? 'はい（固定テンポ・1.0 倍・全鍵）'
+        ? youtube
+          ? 'はい（固定テンポ・1.0 倍・全鍵。完走印は自前音源の回だけ）'
+          : 'はい（固定テンポ・1.0 倍・全鍵）'
         : aborted
           ? 'いいえ（途中終了。自己ベストと完走の対象外）'
-          : r.skipped > 0
-            ? 'いいえ（中断あり。自己ベストと完走の対象外）'
-            : 'いいえ（練習の条件。自己ベストと完走の対象外）',
+          : switchedAt !== undefined
+            ? 'いいえ（途中で動画なしへ切替。自己ベストと完走の対象外）'
+            : r.skipped > 0
+              ? 'いいえ（中断あり。自己ベストと完走の対象外）'
+              : 'いいえ（練習の条件。自己ベストと完走の対象外）',
     ])
   const j = p.judge
   const ch = p.chords
@@ -203,8 +228,11 @@ export function resultView(p: FinishedPlay, feature: boolean = VIDEO_FEATURE): R
   return {
     title: practice ? '練習の結果' : aborted ? '途中終了' : '結果',
     scope: `成績の比較は同じ譜面版（${r.variantId}）の中だけです。`,
-    song: `${p.name} ・ ${variantText(r.variantId)} ・ ${PROFILE_NAMES[r.profile]} ・ ${youtube ? 'YouTube' : '自前音源'}`,
-    notes: [...(p.videoEnded ? [VIDEO_ENDED_NOTE] : []), ...(youtube ? [YOUTUBE_NOTE] : [])],
+    song: `${p.name} ・ ${variantText(r.variantId)} ・ ${PROFILE_NAMES[r.profile]} ・ ${youtube ? (switchedAt === undefined ? 'YouTube' : 'YouTube（途中で動画なしへ切替）') : '自前音源'}`,
+    notes: [
+      ...(p.videoEnded ? [VIDEO_ENDED_NOTE] : []),
+      ...(switchedAt === undefined ? [] : [switchedNote(switchedAt)]),
+    ],
     accuracy,
     // 判定した音が無い回（全て skipped）は精度もランクも「—」。途中終了もランク「—」（m6 L842）
     rank: accuracy === '—' || aborted ? '—' : r.rank,
@@ -238,7 +266,7 @@ export function resultView(p: FinishedPlay, feature: boolean = VIDEO_FEATURE): R
 }
 
 /**
- * S3 の称号・ストリークの節（m6 renderS3 L859–868。M1 は動画の回が無いので、対象外の文は練習記録の物だけ）。途中終了の回は
+ * S3 の称号・ストリークの節（m6 renderS3 L859–868。対象プレイの回だけ。動画の回の対象外の文は offTargetLines）。途中終了の回は
  * 完走にならないがストリークの日には数える（m2-kickoff §7-14。m6 L868 の「途中終了は完走になりません。」）
  */
 export function rewardView(a: Awards, aborted = false): { readonly pills: readonly string[]; readonly lines: readonly string[] } {

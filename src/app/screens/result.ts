@@ -5,12 +5,16 @@
 // （screens/play.ts）。称号・ストリークは手順 11、「練習室で弾く」は M2-03。
 // M2 の手順 9（M2-05）: 音ゲー向けの FULL COMBO（m6 S3 L366）と節（塊／殻／段またぎ・FAST／SLOW・早遅ヒストグラム、
 // m6 S3 L375–379）、途中終了の称号の文。
+// M3 の手順 8（M3-06、m3-kickoff §7-33）: 称号の節は rewardFor の門の後ろ。対象外の回（YouTube 再生・途中で動画なしに
+// 切り替わった回）は記録も同梱曲の id も読まず、集計中…を出さずに対象外の文をその場で置く。
 
 import { proposalFor, proposalText, signedMs } from '../calibration.ts'
 import { DEFAULT_PRACTICE, type PlayResult } from '../play-runner.ts'
 import { practiceEntryText, weakRange } from '../practice-view.ts'
-import { HIST_BAR_MS, HIST_BARS, resultView, rewardView } from '../result-view.ts'
-import { awardsFor, localDay } from '../../results/awards.ts'
+import { HIST_BAR_MS, HIST_BARS, offTargetLines, resultView, rewardView } from '../result-view.ts'
+import { localDay } from '../../results/awards.ts'
+import { isFinished } from '../../results/record.ts'
+import { offTargetWhy, rewardFor, type RewardLoad } from '../../results/reward.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { calibRow } from '../../telemetry/rows.ts'
 import { updatePanel } from '../update-panel.ts'
@@ -126,16 +130,28 @@ export function resultScreen(ctx: ScreenContext): ScreenView {
     if (p.el !== null) offset.append(p.el)
     leave = p.leave
     offset.append(h(doc, 'h3', { text: '苦手区間' }), h(doc, 'p', { text: v.weak ?? 'はずれはありませんでした。' }))
-    // 称号・ストリーク（手順 11。記録を全部読んでから。保存がまだ終わっていなくても、この回の記録は足して数える）
+    // 称号・ストリーク（手順 11。記録を全部読んでから。保存がまだ終わっていなくても、この回の記録は足して数える）。対象外の回は
+    // 門の前で文をその場で置く（集計を呼ばない。M3 の手順 8）
+    const rec = last.record
     const reward = h(doc, 'div', { className: 'card' }, h(doc, 'h3', { text: '称号・ストリーク' }), h(doc, 'p', { className: 'note', text: '集計中…' }))
     f.body.append(h(doc, 'div', { className: 'grid2' }, main, side), offset, reward)
-    void (async () => {
+    const load = async (): Promise<RewardLoad> => {
       const [records, bundledIds] = await Promise.all([booted.db.listResults().catch(() => []), ctx.bundledIds()])
-      if (!alive) return
-      const rv = rewardView(awardsFor(records, last.record, { today: localDay(new Date().toISOString()), bundledIds }), last.record.aborted === true)
-      const pills = h(doc, 'div', { className: 'btnrow' }, ...rv.pills.map((t) => h(doc, 'span', { className: 'pill good', text: t })))
-      reward.replaceChildren(h(doc, 'h3', { text: '称号・ストリーク' }), ...(rv.pills.length > 0 ? [pills] : []), ...rv.lines.map((t, i) => h(doc, 'p', { className: i === 0 ? '' : 'note', text: t })))
-    })()
+      return { records, bundledIds }
+    }
+    const put = (pills: readonly string[], lines: readonly string[]): void => {
+      const row = h(doc, 'div', { className: 'btnrow' }, ...pills.map((t) => h(doc, 'span', { className: 'pill good', text: t })))
+      reward.replaceChildren(h(doc, 'h3', { text: '称号・ストリーク' }), ...(pills.length > 0 ? [row] : []), ...lines.map((t, i) => h(doc, 'p', { className: i === 0 ? '' : 'note', text: t })))
+    }
+    // 対象外はその場で（集計中…を出したままにしない）。対象プレイは門の後ろで集計
+    const why = offTargetWhy(rec)
+    if (why !== null) put([], offTargetLines(why, isFinished(rec)))
+    else
+      void rewardFor(rec, load, { today: localDay(new Date().toISOString()) }).then((g) => {
+        if (!alive || !g.target) return
+        const rv = rewardView(g.awards, rec.aborted === true)
+        put(rv.pills, rv.lines)
+      })
   }
   // 新しい版が待っていれば「更新する」（プレイの合間。手順 13、ADR 0004）
   const upd = updatePanel(ctx, 'S3')

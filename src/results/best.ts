@@ -4,6 +4,7 @@
 // 同じ条件の回が 1 つ以上。keyset dfjk の回は入らない）。純関数（記録は呼ぶ側が IndexedDB の listResults で読む）。
 
 import type { ClockKind, Profile, ResultRecord } from '../shared/types.ts'
+import { isTargetPlay } from './awards.ts'
 import { isFinished } from './record.ts'
 
 /** 自己ベストの単位（§4.3 の索引 best） */
@@ -28,7 +29,10 @@ export function bestOf(records: readonly ResultRecord[], key: BestKey): ResultRe
   return best
 } // prettier-ignore
 
-/** その曲をそのプロファイルで完走したか（譜面版・clock を問わず 1 回以上。曲カードの完走印） */
+/**
+ * その曲をそのプロファイルで完走したか（譜面版を問わず 1 回以上。曲カードの完走印）。対象プレイ（自前音源）の回だけ
+ * （M3 の手順 8、m3-kickoff §7-33。動画の回の自己ベストは clock 別に残す、#5）
+ */
 export function finishedSong(records: readonly ResultRecord[], chartId: string, profile: Profile): boolean {
-  return records.some((r) => r.chartId === chartId && r.profile === profile && isFinished(r))
+  return records.some((r) => r.chartId === chartId && r.profile === profile && isTargetPlay(r) && isFinished(r))
 } // prettier-ignore

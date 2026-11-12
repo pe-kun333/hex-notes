@@ -26,7 +26,7 @@ import {
   type RunSong,
   type RunStep,
 } from '../../../src/app/play-runner.ts'
-import { VIDEO_ENDED_NOTE, YOUTUBE_NOTE, resultView } from '../../../src/app/result-view.ts'
+import { VIDEO_ENDED_NOTE, offTargetLines, resultView } from '../../../src/app/result-view.ts'
 import { PHASE_TEXT, phaseText } from '../../../src/app/screens/play.ts'
 import { songOf } from '../../../src/app/songs.ts'
 import { videoRunOf } from '../../../src/app/video-run.ts'
@@ -377,7 +377,8 @@ describe('動画が先に終わる（期待値 (6)、§7-16）', () => {
     expect(isFinished({ ...f.record, aborted: undefined })).toBe(true)
     const v = resultView(f)
     expect(v.title).toBe('途中終了')
-    expect(v.notes).toEqual([VIDEO_ENDED_NOTE, YOUTUBE_NOTE])
+    // YouTube の注記は手順 8 で称号の節（offTargetLines）に畳んだ
+    expect(v.notes).toEqual([VIDEO_ENDED_NOTE])
     expect(v.notes[0]).toBe('動画が先に終わりました')
     expect(v.song).toMatch(/ ・ YouTube$/)
   })
@@ -392,8 +393,9 @@ describe('動画が先に終わる（期待値 (6)、§7-16）', () => {
     expect(resultView(f).notes).toContain(VIDEO_ENDED_NOTE)
   })
 
-  it('動画が先に終わらない回は YouTube の注記だけ（M3 の手順 4）', () => {
-    expect(resultView(finishedPlay(drive().run, META)).notes).toEqual([YOUTUBE_NOTE])
+  it('動画が先に終わらない回は注記なし（YouTube の注記は手順 8 で称号の節の対象外の文に畳んだ）', () => {
+    expect(resultView(finishedPlay(drive().run, META)).notes).toEqual([])
+    expect(offTargetLines('video', true)[0]).toContain('YouTube 再生の曲は端末内だけに記録します。')
     // 門が偽（build）なら YouTube の印と注記を出さない
     expect(resultView(finishedPlay(drive().run, META), false).notes).toEqual([])
     expect(resultView(finishedPlay(drive().run, META), false).song).toMatch(/ ・ 自前音源$/)
