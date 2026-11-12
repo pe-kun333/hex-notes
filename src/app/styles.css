@@ -182,6 +182,14 @@ a {
   border-radius: 8px;
 }
 
+/* 動画ありの矩形（M3 の手順 3）: 縁・角丸・背景なしで、iframe は矩形ちょうど（480×270。規約の最小 200×200 を割らない） */
+.play .player.video {
+  display: block;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
 .play .source {
   display: grid;
   gap: 4px;
@@ -192,11 +200,20 @@ a {
   color: var(--muted);
 }
 
+/* HUD は S4 と同じ 13 px（左列の予算。M3 の手順 3、m3-kickoff §7-21） */
 .play .hud {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 2px 12px;
   margin: 0;
+  font-size: 13px;
+}
+
+/* 曲名は 1 行で省略（全文は title） */
+.play .hud dd.songname {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .play .hud dt {
@@ -238,6 +255,39 @@ a {
   color: var(--muted);
 }
 
+/*
+ * 案内の行（M3 の手順 3）: 文と「ホームへ」を 1 行に。高さは釦の 28.4 px（待機の外も同じ）、文は釦の左（480 px の左列で
+ * 394 px ＝ 全角 24 字）に 1 行で省略し、全文は title。S4 は「ホームへ」をパネルに持つので行の高さは文のまま
+ */
+.play .statusrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28.4px;
+}
+
+.play .statusrow .status {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.play .statusrow button {
+  flex: 0 0 auto;
+}
+
+.play .player.room ~ .statusrow {
+  min-height: 0;
+}
+
+/* 寸法の注記と入らない窓の文（折り返してよい別の行。空なら下の :empty で消える） */
+.play .sizenote {
+  margin: 0;
+  font-size: 13px;
+}
+
 .play .bands {
   flex: 1 1 auto;
   min-height: 0;
@@ -250,7 +300,8 @@ a {
 
 /*
  * S2 の帯は 1 行に詰める（見出しと「閉じる」を残し、本文は省いて title に全文。内側 1093×514 では帯の場所が約 90 px
- * しかなく、本文を折り返すと 2 件目が隠れるため。decisions #65）
+ * しかなく、本文を折り返すと 2 件目が隠れるため。decisions #65。M3 の手順 3 で左列を詰めた後は音ゲー向け 45.6 px〔帯 1 本〕・
+ * 入門者 91.2 px〔2 本〕、m3-kickoff 手順 3 の期待値 (6)）
  */
 .play .band {
   flex-wrap: nowrap;
@@ -634,6 +685,28 @@ button.song.sel {
   color: var(--muted);
 }
 
+/*
+ * S0d の段階の並びは 1 行に（今の段は太字、済んだ段は ✓。「← いま」は案内の行の「段階 n／3」と重なるので出さない）。吹き出しは
+ * 待機中だけ。1093×514 の入門者で待機は左列ちょうど、演奏中は帯 1 本（M3 の手順 3、m3-kickoff §7-21 の案 A）
+ */
+.play .tutorial-box ol.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.play .tutorial-box ol.steps li + li::before {
+  content: '→ ';
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.play .tutorial-box ol.steps li.on::after {
+  content: none;
+}
+
 /* S6 の項目（見出し・選ぶボタン・注記を 1 行に。狭い窓では折り返す） */
 .group .row {
   display: flex;
@@ -778,10 +851,6 @@ table.tracks th {
 
 .practice-panel .self {
   margin: 2px 0;
-}
-
-.play .player.room + .hud {
-  font-size: 13px;
 }
 
 .play .player.room ~ .note {
@@ -955,11 +1024,7 @@ table.tracks th {
   color: var(--fg);
 }
 
-/* 左列の空の行を詰める（練習の注記が空のとき・「ホームへ」を隠した行の余白。音ゲー向けの HUD が 1093×514 に入るように、M2-05） */
+/* 左列の空の行を詰める（練習の注記・寸法の注記が空のとき。音ゲー向けの HUD が 1093×514 に入るように、M2-05） */
 .play .left > p.note:empty {
   display: none;
-}
-
-.play .left > .btnrow {
-  margin: 0;
 }
