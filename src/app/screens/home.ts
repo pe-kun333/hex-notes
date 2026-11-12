@@ -144,12 +144,17 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
   /** 「版を作る」が失敗したときの 1 行（曲を選び直すと消す） */
   let makeError = ''
   let alive = true
-  const cardContext = (): CardContext => ({ preferred: settings.layout, deviceLimit, profile: settings.profile, records, tutorialId: TUTORIAL_SONG_ID })
+  const cardContext = (): CardContext => ({ preferred: settings.layout, deviceLimit, profile: settings.profile, records, tutorialId: TUTORIAL_SONG_ID, noEmbed: ctx.noEmbed() })
   /** 曲カード（名前は一覧の名前。dev のフィクスチャは「試験:」付き、同梱曲は譜面の name と同じ）。clock は自己ベストの源 */
   const cardOf = (entry: SongEntry, chart: Chart, clock?: ClockKind): SongCard => ({ ...songCard(entry.id, chart, { ...cardContext(), ...(clock === undefined ? {} : { clock }) }), name: entry.name })
   /** 「動画を使う」の選択（選んだ曲だけ。null は既定 useVideoDefault。M3 の手順 4、m3-kickoff §7-24） */
   let videoPick: boolean | null = null
-  const useVideoOf = (l: Loaded): boolean => (l.entry.id === selected && videoPick !== null ? videoPick : useVideoDefault(l.chart.sync?.sources[0]))
+  const useVideoOf = (l: Loaded): boolean => (l.entry.id === selected && videoPick !== null ? videoPick : useVideoDefault(l.chart.sync?.sources[0], ctx.noEmbed()))
+  /** 埋め込み不可を記録した動画の曲か（M3 の手順 5） */
+  const marked = (l: Loaded): boolean => {
+    const id = l.chart.sync?.sources[0]?.videoId
+    return id !== undefined && ctx.noEmbed().includes(id)
+  }
   /** カードの自己ベストの源（動画で遊べる曲で「動画を使う」が はい なら video。門が偽なら novideo） */
   const clockOf = (l: Loaded): ClockKind => (videoPlayable(l.chart.sync) && useVideoOf(l) ? 'video' : 'novideo')
   const shown = (e: SongEntry): boolean => songVisible(e.source, filter, first)
@@ -237,7 +242,7 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
         b.setAttribute('aria-pressed', String(v === use))
         seg.append(b)
       }
-      videoRow.push(h(doc, 'div', { className: 'row' }, h(doc, 'span', { text: '動画を使う' }), seg, h(doc, 'span', { className: 'note', text: use ? USE_VIDEO_NOTES.yes : USE_VIDEO_NOTES.no })))
+      videoRow.push(h(doc, 'div', { className: 'row' }, h(doc, 'span', { text: '動画を使う' }), seg, h(doc, 'span', { className: 'note', text: marked(l) ? USE_VIDEO_NOTES.noEmbed : use ? USE_VIDEO_NOTES.yes : USE_VIDEO_NOTES.no })))
     }
     const play = button(doc, 'この譜面版で遊ぶ → プレイ', () => {
       if (limit === null || missing) return

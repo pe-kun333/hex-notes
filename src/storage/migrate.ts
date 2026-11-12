@@ -43,7 +43,8 @@ export const LEGACY_KEYS = {
   m6: 'hexnote.m6',
 } as const
 
-export type MigrationTarget = keyof typeof LOCAL_KEYS
+/** 旧鍵から運ぶ先（埋め込み不可の一覧は旧鍵に無いので運ばない。M3 の手順 5） */
+export type MigrationTarget = Exclude<keyof typeof LOCAL_KEYS, 'noembed'>
 
 export interface MigrationPlan {
   /** 運ぶ物が無い新しい鍵は null */

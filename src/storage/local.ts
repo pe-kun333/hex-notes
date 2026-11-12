@@ -33,6 +33,8 @@ export const LOCAL_KEYS = {
   calibration: 'hexnote.calibration',
   device: 'hexnote.device',
   fade: 'hexnote.fade',
+  /** 埋め込み不可の動画 ID（M3 の手順 5、m3-kickoff §7-27。控え〔Backup〕には入れない、#53 (a)） */
+  noembed: 'hexnote.noembed',
 } as const
 
 // ---------- 共通 ----------
@@ -371,4 +373,40 @@ export function loadFade(kv: KvStore): FadeState {
 
 export function saveFade(kv: KvStore, f: FadeState): boolean {
   return writeJson(kv, LOCAL_KEYS.fade, { v: 1, ...parseFade(f) })
+}
+
+// ---------- hexnote.noembed（v:1。M3 の手順 5、仮。m3-kickoff §7-27・§7-41） ----------
+
+/** 覚えておく動画 ID の上限（古い方から捨てる。自作値、§7-41） */
+export const NOEMBED_MAX = 200
+
+/** 動画 ID の形（11 文字。youtube/video-id.ts と同じ。保存層は youtube 層を読まない） */
+const isVideoId = (x: unknown): x is string =>
+  typeof x === 'string' && /^[A-Za-z0-9_-]{11}$/.test(x)
+
+/** 埋め込み不可の一覧（古い順）。悪い形は空、形の違う ID と重複は捨てる */
+export function parseNoEmbed(raw: unknown): string[] {
+  if (!isRec(raw) || raw['v'] !== 1 || !Array.isArray(raw['ids'])) return []
+  const out: string[] = []
+  for (const x of raw['ids'] as unknown[]) if (isVideoId(x) && !out.includes(x)) out.push(x)
+  return out.slice(-NOEMBED_MAX)
+}
+
+export function loadNoEmbed(kv: KvStore): string[] {
+  return parseNoEmbed(readJson(kv, LOCAL_KEYS.noembed))
+}
+
+export function saveNoEmbed(kv: KvStore, ids: readonly string[]): boolean {
+  return writeJson(kv, LOCAL_KEYS.noembed, { v: 1, ids: parseNoEmbed({ v: 1, ids }) })
+}
+
+/** 末尾に足す（既にあれば同じ配列、形の違う ID は足さない。上限を超えたら古い方から捨てる） */
+export function markNoEmbed(ids: readonly string[], id: string): readonly string[] {
+  if (!isVideoId(id) || ids.includes(id)) return ids
+  return [...ids, id].slice(-NOEMBED_MAX)
+}
+
+/** 外す（無ければ同じ配列） */
+export function unmarkNoEmbed(ids: readonly string[], id: string): readonly string[] {
+  return ids.includes(id) ? ids.filter((x) => x !== id) : ids
 }

@@ -178,31 +178,49 @@ export interface CardContext {
   readonly tutorialId: string
   /** 自己ベストの clock（「動画を使う」の値と門で画面が決める。無ければ novideo） */
   readonly clock?: ClockKind
+  /** 埋め込み不可の動画 ID（hexnote.noembed。カードの印の文。M3 の手順 5） */
+  readonly noEmbed?: readonly string[]
 }
 
 /** 音源の印（m6 L763。埋め込み不可の文は手順 5） */
 export const VIDEO_BADGE = '動画あり／なしで遊べる'
 export const AUDIO_BADGE = '自前音源'
+/** 埋め込み不可を記録した曲の印（m6 L763、M3 の手順 5） */
+export const NOEMBED_BADGE = '動画なしで遊べます（埋め込み不可を記録）'
 
 /** 動画で遊べる曲か（sources[0] が youtube で動画 ID が正しい・門が真。videoRunOf の use 真・S1） */
 export function videoPlayable(sync: Chart['sync'], feature: boolean = VIDEO_FEATURE): boolean {
   return videoRunOf(sync, true, false, feature) !== null
 }
 
-/** 音源の印の文字 */
-export function videoBadge(sync: Chart['sync'], feature: boolean = VIDEO_FEATURE): string {
-  return videoPlayable(sync, feature) ? VIDEO_BADGE : AUDIO_BADGE
+/** 音源の印の文字（埋め込み不可を記録した動画なら NOEMBED_BADGE） */
+export function videoBadge(
+  sync: Chart['sync'],
+  feature: boolean = VIDEO_FEATURE,
+  noEmbed: readonly string[] = [],
+): string {
+  if (!videoPlayable(sync, feature)) return AUDIO_BADGE
+  const id = sync?.sources[0]?.videoId
+  return id !== undefined && noEmbed.includes(id) ? NOEMBED_BADGE : VIDEO_BADGE
 }
 
-/** 「動画を使う」の既定（youtube の sync があれば はい。埋め込み不可の一覧の引数は手順 5 が足す） */
-export function useVideoDefault(source: SyncSource | undefined): boolean {
-  return source?.kind === 'youtube'
+/** 「動画を使う」の既定（youtube の sync があり、その動画 ID が埋め込み不可の一覧に無ければ はい。M3 の手順 4・5） */
+export function useVideoDefault(
+  source: SyncSource | undefined,
+  noEmbed: readonly string[] = [],
+): boolean {
+  return (
+    source?.kind === 'youtube' &&
+    !(source.videoId !== undefined && noEmbed.includes(source.videoId))
+  )
 }
 
 /** 「動画を使う」の注記（m6 L778–780 の 2 文。埋め込み不可の文は手順 5） */
 export const USE_VIDEO_NOTES = {
   yes: '動画の音に合わせて遊びます。称号・ストリークの対象外（スコアと自己ベストは残ります）。',
   no: 'ピアノ音＋伴奏で遊びます。称号・ストリークの対象。',
+  /** 埋め込み不可を記録した曲（m6 L777。はい／いいえ のどちらでも） */
+  noEmbed: 'この曲は埋め込み不可を記録済みなので「いいえ」が既定です。ピアノ音＋伴奏で遊びます。',
 } as const
 
 export function songCard(id: string, chart: Chart, c: CardContext): SongCard {
@@ -230,7 +248,7 @@ export function songCard(id: string, chart: Chart, c: CardContext): SongCard {
       : `自己ベスト ${(b.acc * 100).toFixed(1)}% ${b.rank}（${PROFILE_NAMES[c.profile]} ・ ${b.variantId}）`,
     variants: variantsText(chart),
     choice,
-    badge: videoBadge(chart.sync),
+    badge: videoBadge(chart.sync, VIDEO_FEATURE, c.noEmbed ?? []),
   }
 } // prettier-ignore
 

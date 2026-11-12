@@ -4,6 +4,8 @@
 // 被せ、プレイヤー矩形の中に釦「▶（ダミー）」を置いた口を返す。外れれば null（殻が実物の口を作る）。筋書きの時刻は ▶ からの
 // ms（tests/unit/app/play-runner-video.test.ts の (9) と同じ作り。手順 4 の段 4 も同じ表を引く）。
 // window.__hexnoteDev（DEV だけ）: ダミーが受けた要求と事象（状態の変化）の列・AudioContext の state・回の相と源・最後の記録。
+// 手順 5 で失敗の筋書き 4 行（onError 150 の ▶ の前・再生中 5 秒、読込の失敗、応答なし。事象は実物と同じく口の作り手の onEvent が
+// 運ぶ。VideoPort の型と dummyPort は変えない）と、口の dispose の回数・失敗の事象の列を足した。
 // 手順 3 で band（帯を点ける。殻の band へ）と actions（帯の釦の押下の記録）を足した。performance.now の直呼びは src/app/ だけ
 // （src/README.md）。
 
@@ -18,6 +20,8 @@ import type { ResultRecord } from '../../shared/types.ts'
 import type { BandEvent } from '../bands.ts'
 import type { DevProbe, DevPlayState, Shell } from '../shell.ts'
 import type { MountOptions } from '../youtube-player.ts'
+import { errorGroupOf } from '../../youtube/errors.ts'
+import type { PortEvent } from '../../youtube/port.ts'
 
 /** 筋書きの 1 手（▶ から at ms に、ダミーへ） */
 export interface ScriptStep {
@@ -33,6 +37,12 @@ export interface DummyScenario {
   /** ダミー動画の作り（既定は 15 ms 切り捨て・種 7） */
   readonly options: DummyVideoOptions
   readonly script: readonly ScriptStep[]
+  /** 失敗の筋書き（mount ＝ 口を作って 300 ms 後、数 ＝ ▶ からの ms。M3 の手順 5） */
+  readonly fail?: {
+    readonly at: 'mount' | number
+    readonly kind: 'error' | 'loadFail' | 'noResponse'
+    readonly code: number
+  }
 }
 
 /** DEV の表（S1 の「試験: クリック 100 BPM」の 5 行と、手順 4 の段 4） */
@@ -62,7 +72,43 @@ export const DUMMY_VIDEOS: readonly DummyScenario[] = [
     options: { pauseLatencyMs: 'never', freezeHold: true, seekFreezeMs: 6_000 },
     script: [{ at: 10_000, run: (d, now) => d.seek(d.trueTime(now), now) }],
   },
+  // 失敗の筋書き（M3 の手順 5。ID は行ごとに 1 つ、見本の動画とも実物の試しの abcdefghijk とも別）
+  {
+    id: 'hexDmyE150p',
+    label: 'onError 150（▶ の前）',
+    options: {},
+    script: [],
+    fail: { at: 'mount', kind: 'error', code: 150 },
+  },
+  {
+    id: 'hexDmyE150r',
+    label: 'onError 150（再生中 5 秒）',
+    options: {},
+    script: [],
+    fail: { at: 5_000, kind: 'error', code: 150 },
+  },
+  {
+    id: 'hexDmyLoadF',
+    label: '読込の失敗',
+    options: {},
+    script: [],
+    fail: { at: 'mount', kind: 'loadFail', code: -1 },
+  },
+  {
+    id: 'hexDmyNoRes',
+    label: '応答なし',
+    options: {},
+    script: [],
+    fail: { at: 'mount', kind: 'noResponse', code: -2 },
+  },
 ]
+
+/** 筋書きの失敗を口の事象の形に（error は手順 1 の errorGroupOf で組を付ける） */
+function failEvent(f: NonNullable<DummyScenario['fail']>, at: number): PortEvent {
+  return f.kind === 'error'
+    ? { kind: 'error', code: f.code, group: errorGroupOf(f.code), at }
+    : { kind: f.kind, code: f.code, at }
+}
 
 export const dummyScenarioOf = (videoId: string): DummyScenario | null =>
   DUMMY_VIDEOS.find((s) => s.id === videoId) ?? null
@@ -129,6 +175,10 @@ interface DevState {
   lastRecord: ResultRecord | null
   /** 帯の釦の押下（id と performance.now。M3 の手順 3） */
   actions: Array<{ at: number; id: string }>
+  /** 口の dispose の回数（口を作るたびに 0 から。M3 の手順 5） */
+  disposes: number
+  /** 筋書きが流した失敗の事象（M3 の手順 5） */
+  fails: Array<{ at: number; kind: PortEvent['kind']; code: number }>
 }
 
 const state: DevState = {
@@ -139,6 +189,8 @@ const state: DevState = {
   play: null,
   lastRecord: null,
   actions: [],
+  disposes: 0,
+  fails: [],
 }
 
 let shell: Shell | null = null
@@ -187,7 +239,24 @@ export function attachShell(s: Shell): void {
 export function devVideoPort(o: MountOptions): VideoPort | null {
   const sc = dummyScenarioOf(o.videoId)
   if (sc === null) return null
-  Object.assign(state, { startAt: null, videoId: o.videoId, requests: [], events: [] })
+  Object.assign(state, {
+    startAt: null,
+    videoId: o.videoId,
+    requests: [],
+    events: [],
+    disposes: 0,
+    fails: [],
+  })
+  let disposed = false
+  let failed = false
+  const fail = (now: number): void => {
+    const f = sc.fail
+    if (f === undefined || failed || disposed) return
+    failed = true
+    state.fails.push({ at: since(now), kind: f.kind, code: f.code })
+    o.onEvent(failEvent(f, now))
+  }
+  if (sc.fail?.at === 'mount') setTimeout(() => fail(performance.now()), 300)
   const sp = scenarioPort(sc, {
     onRequest: (now, q) =>
       state.requests.push({
@@ -220,6 +289,9 @@ export function devVideoPort(o: MountOptions): VideoPort | null {
   o.host.replaceChildren(box)
   return {
     sample: (now) => {
+      const t0 = sp.startedAt()
+      const at = sc.fail?.at
+      if (typeof at === 'number' && t0 !== null && now >= t0 + at) fail(now)
       const s = sp.port.sample(now)
       if (s !== null) {
         const text = `${s.state} ・ 読み ${Math.round(s.timeMs)} ms ・ ×${s.rate}`
@@ -229,6 +301,8 @@ export function devVideoPort(o: MountOptions): VideoPort | null {
     },
     apply: (now, reqs) => sp.port.apply(now, reqs),
     dispose: () => {
+      if (!disposed) state.disposes++
+      disposed = true
       sp.port.dispose()
       o.host.replaceChildren()
     },
