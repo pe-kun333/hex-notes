@@ -171,6 +171,7 @@ export function installDevProbe(): DevProbe {
     bandAction: (id) => {
       state.actions.push({ at: r1(performance.now()), id })
     },
+    dummyVideoId: (DUMMY_VIDEOS[0] as DummyScenario).id,
   }
 }
 

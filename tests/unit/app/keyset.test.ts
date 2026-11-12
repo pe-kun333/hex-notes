@@ -129,7 +129,7 @@ describe('1 曲から 3 段階（完了条件）', () => {
     expect(fs.map((f) => isFinished(f.record))).toEqual([false, false, true])
     expect(fs.map((f) => f.calibEligible)).toEqual([false, false, true])
     expect(fs.map((f) => proposalFor(f) === null)).toEqual([true, true, false])
-    const v = fs.map(resultView)
+    const v = fs.map((p) => resultView(p))
     expect(v.map((x) => x.title)).toEqual(['練習の結果', '練習の結果', '結果'])
     expect(v[1]?.rows.slice(-2)).toEqual([
       ['条件', '固定テンポ・1.0 倍・ホームポジション（D F J K）'],

@@ -9,7 +9,7 @@ import { variantMetrics } from '../chart/metrics.ts'
 import { validateChart } from '../chart/validate.ts'
 import { buildVariant, variantId, type VariantSpec } from '../chart/variants.ts'
 import { localDay } from '../results/awards.ts'
-import type { Chart, Variant } from '../shared/types.ts'
+import type { Chart, SyncSource, Variant } from '../shared/types.ts'
 import { chartFileName } from '../storage/file.ts'
 import { foldOf, type LimitChoice } from './home-view.ts'
 import type { SongEntry } from './songs.ts'
@@ -88,6 +88,14 @@ export function withVariant(chart: Chart, spec: Pick<VariantSpec, 'layout' | 'li
     { ...chart, variants: [...(chart.variants ?? []), made(chart, full)] },
     `withVariant(${id})`,
   )
+}
+
+/**
+ * 同期を載せる・外す（M3 の手順 4。S5 段 4 の保存と、持ち込み直しのやり直し・外す、m3-kickoff §7-25）。withVariant と同じく
+ * 検査し直す。id と版は変えない（sync は id に入らない、§3.3）。source が null なら sources を空に（動画なし）
+ */
+export function withSync(chart: Chart, source: SyncSource | null): Chart {
+  return checked({ ...chart, sync: { sources: source === null ? [] : [source] } }, 'withSync')
 }
 
 // ---------- S6 の作り直し ----------

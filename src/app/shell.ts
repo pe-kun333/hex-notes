@@ -71,6 +71,8 @@ export interface DevProbe {
   finished(r: FinishedPlay): void
   /** 帯の釦が押された（M3 の手順 3） */
   bandAction(id: string): void
+  /** S5 段 4 の「ダミー動画で試す」が入れる ID（DEV の表のダミーの動画 ID。M3 の手順 4） */
+  readonly dummyVideoId: string
 }
 
 /** dev の assert に画面が渡す物（S2・S4。M3 の手順 3、仮） */
@@ -155,8 +157,10 @@ export interface ScreenContext {
   update(): UpdateState
   /** 待っている版に入れ替えてページを読み直す（S6・S3 の「更新する」。S2 には出さない、ADR 0004） */
   applyUpdate(): void
-  /** 「動画を使う」（保存しない・既定 真。切替は M3 の手順 4。video-run.ts の videoRunOf の use） */
+  /** 「動画を使う」（保存しない・既定 真。video-run.ts の videoRunOf の use） */
   useVideo(): boolean
+  /** 「動画を使う」を書く（S1 の釦 2 つと、手順 5 の「ピアノ音で遊ぶ」だけが書く。他は値を保つ、m3-kickoff §7-24） */
+  setUseVideo(v: boolean): void
   /** 動画の口（S2 の動画の回。DEV の差し口が口を返せばそれ、無ければ実物の口。事象はどちらも o.onEvent へ） */
   videoPort(o: MountOptions): VideoPort
   /** 開発時の観測口（build では null） */
@@ -293,6 +297,7 @@ export function startShell(opts: ShellOptions): Shell {
   let proposalOpen = false
   let audio: AudioOut | null = null
   let calibration = booted.calibration
+  let useVideo = true
 
   const handlers: BandHandlers = {
     dismiss: (kind) => band({ kind: 'dismiss', band: kind }),
@@ -418,7 +423,10 @@ export function startShell(opts: ShellOptions): Shell {
       if (route.screen !== 'S2') opts.updates?.apply()
     },
     layoutChanged: () => checkLayout(),
-    useVideo: () => true,
+    useVideo: () => useVideo,
+    setUseVideo: (v) => {
+      useVideo = v
+    },
     videoPort: (o) => opts.videoPort?.(o) ?? createYoutubePlayer(o),
     devProbe: opts.devProbe ?? null,
   }

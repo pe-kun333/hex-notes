@@ -114,7 +114,7 @@ export function embedErrorRow(code: number, at: string): EmbedErrorTelemetry {
 
 /**
  * sync 行（同期タップの 8 拍がそろった回。M2-02、m2-kickoff §7-12）。残差 SD・秒は小数 1 桁、offset（秒）・rate は 4 桁。
- * 動画 ID は入れない
+ * 動画 ID は入れない。M3 の手順 4 から offset・残差は保存する当てはめ（rate 1.0 固定）、rate は診断の値（decisions #98）
  */
 export function syncRow(
   chartId: string,
@@ -132,6 +132,6 @@ export function syncRow(
     elapsedS: r1(r.elapsedS),
     attempts,
     offset: r4(r.fit.offset),
-    rate: r4(r.fit.rate),
+    rate: r4(r.diag.rate),
   }
 }

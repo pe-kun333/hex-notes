@@ -199,23 +199,30 @@ describe('telemetry の sync 行（§7-20）', () => {
   it('8 拍そろった回 → sync 行（丸め）、countByKind に 1、計測盤の種類が 8 で要約が 1 行', () => {
     if (s.result === null) throw new Error('result')
     const row = syncRow('sha256:abcdef0123', s.result, s.attempts, AT)
-    expect(row).toEqual({ kind: 'sync', at: AT, chartId: 'sha256:abcdef0123', residualSd: 7, elapsedS: 5.2, attempts: 1, offset: 1.5033, rate: 1.0004 })
+    // M3 の手順 4 から offset・残差は rate 1.0 固定の当てはめ、rate は診断の値（decisions #98。前は offset 1.5033・残差 7）
+    expect(row).toEqual({ kind: 'sync', at: AT, chartId: 'sha256:abcdef0123', residualSd: 7.1, elapsedS: 5.2, attempts: 1, offset: 1.5025, rate: 1.0004 })
     expect(countByKind([row]).sync).toBe(1)
     expect(Object.keys(KIND_NAMES)).toHaveLength(8)
-    expect(rowBrief(row)).toBe('abcdef01…・残差 SD 7.0 ms・offset 1.503 s・rate 1.0004・5.2 秒・1 回目')
+    expect(rowBrief(row)).toBe('abcdef01…・残差 SD 7.1 ms・offset 1.502 s・rate 1.0004・5.2 秒・1 回目')
     expect(telemetryPanelView([row]).recent.map((r) => r.kind)).toEqual(['同期タップ'])
   }) // prettier-ignore
 })
 
-describe('部品の結果の行 syncResultLines（m6 L497、§7-12）', () => {
-  const at = (sd: number) => ({
-    fit: { offset: 12.418, rate: 1.004, residualSd: sd, maxAbs: 23.4, n: 8 },
+describe('部品の結果の行 syncResultLines（m6 L497、§7-12。M3 の手順 4 で rate は「動画のテンポ（参考）」）', () => {
+  const at = (sd: number, start = 0) => ({
+    fit: { offset: 12.418, rate: 1, residualSd: sd, maxAbs: 23.4, n: 8 },
+    diag: { rate: 1.004, se: 0.001 },
+    start,
     verdict: syncTapVerdict(sd),
     elapsedS: 9.25,
   })
 
-  it('offset・rate・残差・時間と回・判定（保存の可否とおすすめは別）', () => {
+  it('offset・動画のテンポ（参考）・残差・時間と回・判定（保存の可否とおすすめは別）、起点をずらした回と注意の行', () => {
     expect(syncResultLines(at(14), 1).map((l) => l.text)).toEqual(['12.418 s', '1.0040', 'SD 14.0 ms（最大 23 ms）', '9.3 秒（1 回目）', '保存できます。'])
+    expect(syncResultLines(at(14), 1).map((l) => l.label)[1]).toBe('動画のテンポ（参考）')
+    expect(syncResultLines(at(14, 1), 1)[0]?.text).toBe('12.418 s（起点を拍 1 に）')
+    expect(syncResultLines(at(14), 1, { x: 720, warn: true })[5]).toEqual({ label: '注意', text: '動画のテンポが MIDI と違うようです。このままだと曲の終わりで約 ±720 ms ずれます。' })
+    expect(syncResultLines(at(14), 1, { x: 200, warn: false })).toHaveLength(5)
     expect(syncResultLines(at(40), 2)[4]?.text).toBe('保存できます。残差が 30 ms を超えています。「やり直し」をおすすめします。')
     expect(syncResultLines(at(80), 3)[4]?.text).toBe('残差が大きすぎるので保存できません。もう一度タップしてください。')
   }) // prettier-ignore

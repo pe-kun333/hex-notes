@@ -3,6 +3,8 @@
 // rate 0.96〜1.04 の 5 通り。m5 newTruth L517）と推定の誤差を出す（m5 の drawVideo の代わり）。製品画面ではない
 // （導線は開発時だけ、src/main.ts）。performance.now の直呼びは src/app/ だけ（src/README.md）。
 // browser pane が隠れていると rAF とタイマーが間引かれるので、表に出した状態で試す（HANDOFF）。
+// M3 の手順 4: 部品の口が変わった（開始は「▶（ダミー）」＝ 利用者の ▶ の代わり、時計の resync で videoStarted・held で
+// videoStopped、やり直し・中止・8 拍の後は onRetry で動画を止めて次の ▶ を待つ）。真値の rate は 1 を既定に（decisions #98）。
 
 import '../styles.css'
 import { createAudioOut, resumeAudio, type AudioOut } from '../../audio/context.ts'
@@ -11,6 +13,7 @@ import { createClockSource, type ClockSource } from '../../clock/clock-source.ts
 import { createDummyVideo, type DummyVideo } from '../../clock/dummy-video.ts'
 import { fromChartMs } from '../../clock/map.ts'
 import { SYNC_TAP_BEATS, syncTapPlan, type SyncTapResult } from '../../clock/sync-tap.ts'
+import type { ClockOutput } from '../../clock/types.ts'
 import type { Pulse } from '../../shared/types.ts'
 import { syncRow } from '../../telemetry/rows.ts'
 import { attachKeyboard } from '../dom-input.ts'
@@ -18,7 +21,6 @@ import { syncPanel } from '../sync-panel.ts'
 
 const BPM = 100
 const PULSE: Pulse = { resolution: 240, tempo: [{ beat: 0, bpm: BPM }] }
-const PLAN = syncTapPlan(PULSE)
 /** 鳴らすクリックの数（m5 L520 の 16） */
 const CLICKS = 16
 const RATES = [0.96, 0.98, 1, 1.02, 1.04] as const
@@ -30,9 +32,10 @@ const $ = (id: string): HTMLElement => {
 }
 
 const truth = { offset: 1.8, rate: 1 as number }
-const newTruth = (): void => {
+/** 真値を変える（tempo 真なら rate も 5 通りから。既定は rate 1） */
+const newTruth = (tempo = false): void => {
   truth.offset = Math.round((1.2 + Math.random() * 1.6) * 1000) / 1000
-  truth.rate = RATES[Math.floor(Math.random() * RATES.length)] ?? 1
+  truth.rate = tempo ? (RATES[Math.floor(Math.random() * RATES.length)] ?? 1) : 1
 }
 newTruth()
 
@@ -60,12 +63,21 @@ const stopVideo = (): void => {
   cancelAnimationFrame(raf)
 }
 
+/** 時計の事象を部品へ（PLAYING の再アンカー → 走り出し、PLAYING でなくなった → その回を捨てる） */
+const feed = (out: ClockOutput, now: number): void => {
+  for (const ev of out.events)
+    if (ev.kind === 'resync') panel.videoStarted(now)
+    else if (ev.kind === 'held' || ev.kind === 'stall' || ev.kind === 'novideo')
+      panel.videoStopped()
+}
+
 const frame = (): void => {
   const v = video
   const c = clock
   if (v === null || c === null) return
   const now = performance.now()
   const out = c.tick(v.sample(now))
+  feed(out, now)
   const beat = ((out.t / 1000 - truth.offset) * BPM * truth.rate) / 60
   $('video').textContent =
     `動画 ${(out.t / 1000).toFixed(3)} s（真 ${(v.trueTime(now) / 1000).toFixed(3)} s）・時計の相 ${c.state().phase}・拍 ${beat < 0 ? '—' : Math.floor(beat)}`
@@ -95,7 +107,7 @@ const onResult = (r: SyncTapResult, n: number): void => {
   const errOffset = (r.fit.offset - truth.offset) * 1000
   attempts.unshift(
     `${n} 回目: offset ${r.fit.offset.toFixed(3)} s（誤差 ${errOffset.toFixed(0)} ms、出力遅延 ${lat.toFixed(0)} ms を引くと ` +
-      `${(errOffset - lat).toFixed(0)} ms）、rate ${r.fit.rate.toFixed(4)}（誤差 ${((r.fit.rate / truth.rate - 1) * 100).toFixed(2)}%）、` +
+      `${(errOffset - lat).toFixed(0)} ms）、診断の rate ${r.diag.rate.toFixed(4)}（誤差 ${((r.diag.rate / truth.rate - 1) * 100).toFixed(2)}%）、` +
       `残差 SD ${r.fit.residualSd.toFixed(1)} ms、${r.elapsedS.toFixed(1)} 秒、${r.verdict.savable ? '保存できる' : '保存できない'}` +
       `${r.verdict.retry ? '・やり直しをすすめる' : ''}`,
   )
@@ -111,16 +123,26 @@ const onResult = (r: SyncTapResult, n: number): void => {
 
 const panel = syncPanel({
   doc: document,
-  plan: PLAN,
-  startVideo,
-  stopVideo,
+  planOf: (start) => syncTapPlan(PULSE, SYNC_TAP_BEATS, start),
   // タップの瞬間にも 1 回読む（rAF が間引かれていても、写像が古い・保持のままにならないように）
   clockMap: () => {
-    if (video !== null && clock !== null) clock.tick(video.sample(performance.now()))
+    const now = performance.now()
+    if (video !== null && clock !== null) feed(clock.tick(video.sample(now)), now)
     return clock?.read().map ?? { a: 0, b: 0 }
   },
   now: () => performance.now(),
+  drift: { songMs: 180_000, windowMs: 234 },
   onResult,
+  // やり直し・中止・8 拍の後は止めて、次の「▶（ダミー）」を待つ
+  onRetry: () => stopVideo(),
+})
+const play = document.createElement('button')
+play.type = 'button'
+play.className = 'primary'
+play.textContent = '▶（ダミー）'
+play.addEventListener('click', () => {
+  startVideo()
+  play.blur()
 })
 const again = document.createElement('button')
 again.type = 'button'
@@ -129,7 +151,14 @@ again.addEventListener('click', () => {
   newTruth()
   showTruth()
 })
-$('panel').append(panel.el, again)
+const againTempo = document.createElement('button')
+againTempo.type = 'button'
+againTempo.textContent = '真値を変える（テンポも）'
+againTempo.addEventListener('click', () => {
+  newTruth(true)
+  showTruth()
+})
+$('panel').append(play, panel.el, again, againTempo)
 showTruth()
 
 attachKeyboard(window, (events) => panel.onInput(events), { focusTarget: $('app') })

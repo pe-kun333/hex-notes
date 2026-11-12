@@ -14,6 +14,7 @@ import {
   DEFAULT_CHORD_LIMIT,
   type Chart,
   type ChordLimit,
+  type ClockKind,
   type DeviceInfo,
   type LayoutId,
   type ResultRecord,
@@ -24,11 +25,14 @@ import { signedMs } from '../calibration.ts'
 import {
   LIMIT_NOTE,
   SORT_NAMES,
+  USE_VIDEO_NOTES,
   foldOf,
   missingText,
   songCard,
   sortCards,
+  useVideoDefault,
   versionChoice,
+  videoPlayable,
   type CardContext,
   type SongCard,
   type SortKey,
@@ -141,8 +145,13 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
   let makeError = ''
   let alive = true
   const cardContext = (): CardContext => ({ preferred: settings.layout, deviceLimit, profile: settings.profile, records, tutorialId: TUTORIAL_SONG_ID })
-  /** 曲カード（名前は一覧の名前。dev のフィクスチャは「試験:」付き、同梱曲は譜面の name と同じ） */
-  const cardOf = (entry: SongEntry, chart: Chart): SongCard => ({ ...songCard(entry.id, chart, cardContext()), name: entry.name })
+  /** 曲カード（名前は一覧の名前。dev のフィクスチャは「試験:」付き、同梱曲は譜面の name と同じ）。clock は自己ベストの源 */
+  const cardOf = (entry: SongEntry, chart: Chart, clock?: ClockKind): SongCard => ({ ...songCard(entry.id, chart, { ...cardContext(), ...(clock === undefined ? {} : { clock }) }), name: entry.name })
+  /** 「動画を使う」の選択（選んだ曲だけ。null は既定 useVideoDefault。M3 の手順 4、m3-kickoff §7-24） */
+  let videoPick: boolean | null = null
+  const useVideoOf = (l: Loaded): boolean => (l.entry.id === selected && videoPick !== null ? videoPick : useVideoDefault(l.chart.sync?.sources[0]))
+  /** カードの自己ベストの源（動画で遊べる曲で「動画を使う」が はい なら video。門が偽なら novideo） */
+  const clockOf = (l: Loaded): ClockKind => (videoPlayable(l.chart.sync) && useVideoOf(l) ? 'video' : 'novideo')
   const shown = (e: SongEntry): boolean => songVisible(e.source, filter, first)
 
   const songButton = (c: SongCard): HTMLElement => {
@@ -150,13 +159,14 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
       selected = c.id
       layoutPick = null
       limitPick = null
+      videoPick = null
       makeError = ''
       showList()
     }, `song${c.id === selected ? ' sel' : ''}`)
     b.setAttribute('aria-pressed', String(c.id === selected))
     const head = h(doc, 'div', { className: 't' }, h(doc, 'span', { className: 'name', text: c.name }))
     if (c.finished) head.append(h(doc, 'span', { className: 'pill good', text: '完走' }))
-    const pills = h(doc, 'div', { className: 'm' }, h(doc, 'span', { className: 'pill', text: '自前音源' }))
+    const pills = h(doc, 'div', { className: 'm' }, h(doc, 'span', { className: 'pill', text: c.badge }))
     if (c.tutorial) pills.append(h(doc, 'span', { className: 'pill', text: 'チュートリアル' }))
     const axes = h(doc, 'div', { className: 'axes' })
     for (const a of c.axes) {
@@ -214,8 +224,24 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
       b.setAttribute('aria-pressed', String(c.limit === limit))
       lim.append(b)
     }
+    // 「動画を使う」（動画で遊べる曲だけ。はい／いいえの 2 文、m6 L319・L778–780。埋め込み不可の文は手順 5）
+    const use = useVideoOf(l)
+    const videoRow: HTMLElement[] = []
+    if (videoPlayable(l.chart.sync)) {
+      const seg = h(doc, 'div', { className: 'seg' })
+      for (const [v, label] of [[true, 'はい（YouTube）'], [false, 'いいえ（自前音源）']] as const) {
+        const b = button(doc, label, () => {
+          videoPick = v
+          showList()
+        }, 'small')
+        b.setAttribute('aria-pressed', String(v === use))
+        seg.append(b)
+      }
+      videoRow.push(h(doc, 'div', { className: 'row' }, h(doc, 'span', { text: '動画を使う' }), seg, h(doc, 'span', { className: 'note', text: use ? USE_VIDEO_NOTES.yes : USE_VIDEO_NOTES.no })))
+    }
     const play = button(doc, 'この譜面版で遊ぶ → プレイ', () => {
       if (limit === null || missing) return
+      ctx.setUseVideo(use)
       ctx.pickSong(l.entry, 'all', { layout, limit, fold: foldOf(l.chart) })
       ctx.setPractice(null)
       ctx.go('S2')
@@ -224,6 +250,8 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
     // 練習室で弾く（区間なし。練習の設定は既定から、m6 L321・L967、M2 の手順 6）
     const room = button(doc, '練習室で弾く', () => {
       if (limit === null || missing) return
+      // S4 は読まない（回は動画なし、#94）が、S3 の「通しで弾く」へ持ち回るので書く
+      ctx.setUseVideo(use)
       ctx.pickSong(l.entry, 'all', { layout, limit, fold: foldOf(l.chart) })
       ctx.setPractice(DEFAULT_PRACTICE)
       ctx.go('S4')
@@ -237,6 +265,7 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
       h(doc, 'h3', { text: `譜面版を選ぶ: ${l.card.name}` }),
       h(doc, 'div', { className: 'row' }, h(doc, 'span', { text: '配列' }), lay),
       h(doc, 'div', { className: 'row' }, h(doc, 'span', { text: '同時押し上限' }), lim, h(doc, 'span', { className: 'note', text: note })),
+      ...videoRow,
       ...(limit === null ? [h(doc, 'p', { className: 'note', text: missingText(layout, DEFAULT_CHORD_LIMIT, l.card.tutorial) })] : []),
       ...make,
       h(doc, 'div', { className: 'btnrow' }, play, room, h(doc, 'span', { className: 'note', text: '成績の比較は同じ譜面版の中だけ。' })),
@@ -266,7 +295,8 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
   }
 
   function showList(): void {
-    const cards = sortCards(loaded.filter((l) => shown(l.entry)).map((l) => l.card), sortSel.value as SortKey)
+    // 動画で遊べる曲は自己ベストの源が「動画を使う」で変わるので作り直す（他は読んだときのカード）
+    const cards = sortCards(loaded.filter((l) => shown(l.entry)).map((l) => (videoPlayable(l.chart.sync) ? cardOf(l.entry, l.chart, clockOf(l)) : l.card)), sortSel.value as SortKey)
     const bad = failed.filter((x) => shown(x.entry))
     list.replaceChildren(
       ...cards.map(songButton),

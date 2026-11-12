@@ -3,6 +3,9 @@
 // 文言、帯「保存できません」L457）・ACT s5next／s5back／s5save L990–998、m5 の段 1（handleFile L568–577・トラック表 L385–393）、
 // m2-kickoff 手順 2・§7-2（段 4 は M3-03）・§7-6（同じ id は上書き）・§7-18（同梱曲と同じ id は断る）、decisions #79・#83。
 // 段 4（同期）は M2 では無いので 3 の次は 5、5 の前は 3。途中でやめた段の状態は捨てる（殻に持たない）。
+// M3 の手順 4（M3-03 後半、m3-kickoff 手順 4・§7-23・§7-25）: 段 4 は段 5 の「動画を付ける」から入る（動画なしが主経路。段 3 の
+// 次は video が真のときだけ 4）。state に video・videoId・sync（保存する同期。段 4 の結果か、持ち込み直しで前の譜面から写した
+// 物）。保存する sync の形は syncSourceOf、保存の下限と注意は headRoom。門（VIDEO_FEATURE）は画面が見る。
 
 import {
   cautions,
@@ -17,12 +20,26 @@ import type { Smf } from '../chart/smf.ts'
 import { noteName } from '../render/canvas/cells.ts'
 import { barOf } from '../results/analysis.ts'
 import { soundItems, type SoundItem } from '../audio/scheduler.ts'
-import { FOLD_IDS, type Chart, type FoldId, type LayoutId, type Variant } from '../shared/types.ts'
+import { fromChartMs } from '../clock/map.ts'
+import type { SyncTapFit } from '../clock/sync-tap.ts'
+import {
+  FOLD_IDS,
+  type Chart,
+  type FoldId,
+  type LayoutId,
+  type SyncSource,
+  type Variant,
+} from '../shared/types.ts'
 import { clockText } from './home-view.ts'
 
-/** 段（段 4 は M3-03） */
-export type ImportStep = 1 | 2 | 3 | 5
-export const IMPORT_STEPS: readonly ImportStep[] = [1, 2, 3, 5]
+/** 段（段 4 は動画を付けるときだけ。M3 の手順 4） */
+export type ImportStep = 1 | 2 | 3 | 4 | 5
+export const IMPORT_STEPS: readonly ImportStep[] = [1, 2, 3, 4, 5]
+
+/** 今の道の段（動画を付けないなら段 4 を通らない） */
+export function importSteps(s: Pick<ImportState, 'video'>): ImportStep[] {
+  return s.video ? [1, 2, 3, 4, 5] : [1, 2, 3, 5]
+}
 
 export interface ImportFile {
   readonly fileName: string
@@ -39,6 +56,16 @@ export interface ImportState {
   readonly fold: FoldId
   readonly name: string
   readonly composer: string
+  /** 段 4（同期）を通る（段 5 の「動画を付ける」で真、「動画を使わない」で偽） */
+  readonly video: boolean
+  /** 動画 ID（11 文字。未入力は空） */
+  readonly videoId: string
+  /** 保存する同期（段 4 の保存できる結果か、持ち込み直しで前の譜面から写した物。無ければ動画なし） */
+  readonly sync: SyncSource | null
+  /** sync は前の譜面から写した（段 5 に「同期をやり直す」「動画を外す」を出す） */
+  readonly inherited: boolean
+  /** 前の譜面の sync を 1 度写した（外した後に写し直さない） */
+  readonly inheritSeen: boolean
 }
 
 export type ImportEvent =
@@ -52,10 +79,22 @@ export type ImportEvent =
   | { readonly kind: 'fold'; readonly fold: FoldId }
   | { readonly kind: 'name'; readonly text: string }
   | { readonly kind: 'composer'; readonly text: string }
+  /** 段 5 の「動画を付ける」「同期をやり直す」→ 段 4 */
+  | { readonly kind: 'attachVideo' }
+  /** 段 4 の「動画を使わない」→ 段 5（sync を捨てる） */
+  | { readonly kind: 'skipVideo' }
+  /** 段 5 の「動画を外す」（sync を捨てる） */
+  | { readonly kind: 'removeVideo' }
+  /** 動画 ID を替えた（同期の結果だけ捨てる） */
+  | { readonly kind: 'videoId'; readonly id: string }
+  /** 段 4 の結果（保存できる結果なら source、そうでなければ null） */
+  | { readonly kind: 'synced'; readonly source: SyncSource | null }
+  /** 持ち込み直しで前の譜面の sync を写す（段 5。1 度だけ） */
+  | { readonly kind: 'inherit'; readonly source: SyncSource }
 
 /** 段 1 の始まり（fold の既定は設定の fold） */
 export function initialImport(fold: FoldId): ImportState {
-  return { step: 1, file: null, error: null, play: 0, accomp: [], fold, name: '', composer: '' }
+  return { step: 1, file: null, error: null, play: 0, accomp: [], fold, name: '', composer: '', video: false, videoId: '', sync: null, inherited: false, inheritSeen: false } // prettier-ignore
 }
 
 /** 曲名の既定（ファイル名から .mid／.midi を外す。m5 L313） */
@@ -63,9 +102,10 @@ export function fileStem(fileName: string): string {
   return fileName.replace(/\.(mid|midi)$/i, '')
 }
 
-/** その段で「次へ」が押せるか（段 1 は読めたとき、段 5 は無い） */
+/** その段で「次へ」が押せるか（段 1 は読めたとき、段 4 は保存できる結果があるとき、段 5 は無い） */
 export function canNext(s: ImportState): boolean {
   if (s.step === 1) return s.file !== null
+  if (s.step === 4) return s.sync !== null
   return s.step !== 5
 }
 
@@ -74,22 +114,33 @@ export function canSave(s: ImportState): boolean {
   return s.step === 5 && s.file !== null && s.name.trim() !== ''
 }
 
-const NEXT_STEP: Readonly<Record<ImportStep, ImportStep>> = { 1: 2, 2: 3, 3: 5, 5: 5 }
-const BACK_STEP: Readonly<Record<ImportStep, ImportStep>> = { 1: 1, 2: 1, 3: 2, 5: 3 }
+/** 次の段（段 3 の次は video なら 4） */
+function nextStep(s: ImportState): ImportStep {
+  const order = importSteps(s)
+  return order[order.indexOf(s.step) + 1] ?? s.step
+}
+
+/** 前の段（段 5 の前は video なら 4） */
+function backStep(s: ImportState): ImportStep {
+  const order = importSteps(s)
+  const i = order.indexOf(s.step)
+  return i <= 0 ? s.step : (order[i - 1] ?? s.step)
+}
 
 /** 段を進める。'exit' は S1 へ（やめる） */
 export function importStep(s: ImportState, ev: ImportEvent): ImportState | 'exit' {
   switch (ev.kind) {
     case 'loaded': {
       const d = trackDefaults(ev.file.smf)
-      return { ...s, file: ev.file, error: null, play: d.play, accomp: d.accomp, name: fileStem(ev.file.fileName) }
+      // 拍の計画が変わるので同期の結果だけ捨てる（video・videoId は残す。仮）
+      return { ...s, file: ev.file, error: null, play: d.play, accomp: d.accomp, name: fileStem(ev.file.fileName), sync: null, inherited: false, inheritSeen: false }
     }
     case 'failed':
       return { ...s, file: null, error: ev.why }
     case 'next':
-      return canNext(s) ? { ...s, step: NEXT_STEP[s.step] } : s
+      return canNext(s) ? { ...s, step: nextStep(s) } : s
     case 'back':
-      return { ...s, step: BACK_STEP[s.step] }
+      return { ...s, step: backStep(s) }
     case 'cancel':
       return 'exit'
     case 'play':
@@ -107,6 +158,19 @@ export function importStep(s: ImportState, ev: ImportEvent): ImportState | 'exit
       return { ...s, name: ev.text }
     case 'composer':
       return { ...s, composer: ev.text }
+    case 'attachVideo':
+      // 写した同期をやり直すときは、その動画 ID から。前の同期は新しい結果が来るまで残す（戻っても失わない）
+      return { ...s, step: 4, video: true, videoId: s.sync?.videoId ?? s.videoId }
+    case 'skipVideo':
+      return { ...s, step: 5, video: false, sync: null, inherited: false }
+    case 'removeVideo':
+      return s.sync === null ? s : { ...s, sync: null, inherited: false }
+    case 'videoId':
+      return ev.id === s.videoId ? s : { ...s, videoId: ev.id, sync: null, inherited: false }
+    case 'synced':
+      return { ...s, sync: ev.source, inherited: false }
+    case 'inherit':
+      return s.inheritSeen || s.sync !== null ? s : { ...s, sync: ev.source, inherited: true, inheritSeen: true }
   }
 } // prettier-ignore
 
@@ -305,6 +369,58 @@ export function duplicateText(d: Duplicate): string | null {
   if (d === 'bundled') return '同梱曲と同じ曲なので保存しません（同梱曲をそのまま遊べます）。'
   return null
 }
+
+// ---------- 段 4 ----------
+
+/** 段 4 の箱の内寸の下限（プレイヤー 480×270 を縮めない。これ未満は iframe を作らない、m3-kickoff §7-23、仮） */
+export const SYNC_BOX_MIN_W = 480
+/** 狭い窓の文（仮） */
+export const SYNC_NARROW_TEXT = '動画の同期は幅 512 px 以上の窓で行ってください。'
+/** 段 4 に常に出す 1 文（decisions #98） */
+export const SYNC_TEMPO_NOTE = 'テンポが MIDI と違う演奏の動画は、初版では合わせられません。'
+
+/** 段 4 の箱にプレイヤーを置けるか（内寸 px） */
+export const canEmbedSync = (innerWidth: number): boolean => innerWidth >= SYNC_BOX_MIN_W
+
+/**
+ * 保存する sync の形（decisions #98・m3-kickoff §7-34）: youtube・動画 ID・offset（4 桁）・rate 1（rate 1.0 固定の当てはめ）・
+ * measured 真（タップで合わせた印。手順 9 はこの曲の回に youtube の校正を掛けない）。begin・label は書かない
+ */
+export function syncSourceOf(videoId: string, fit: Pick<SyncTapFit, 'offset'>): SyncSource {
+  return {
+    kind: 'youtube',
+    videoId,
+    offset: Math.round(fit.offset * 10000) / 10000,
+    rate: 1,
+    measured: true,
+  }
+}
+
+/** 開始の猶予（最初の音の動画時刻がこれ未満なら判定されないことがある。clock/grace.ts の 300 ms） */
+export const HEAD_GRACE_MS = 300
+/** 流れる時間（入門者の 1.5 s。これ未満なら最初の音が途中から落ちてくる、design L101） */
+export const HEAD_TRAVEL_MS = 1500
+
+export interface HeadRoom {
+  /** 最初の音の動画時刻 ms */
+  readonly ms: number
+  /** 保存できる（0 以上。validateChart は負の offset を通すので段 4 で断る） */
+  readonly savable: boolean
+  readonly notes: readonly string[]
+}
+
+/** 頭の余白（最初の音の動画時刻。仮、m3-kickoff §7-23） */
+export function headRoom(chart: Pick<Chart, 'notes' | 'pulse'>, source: Pick<SyncSource, 'offset' | 'rate'>): HeadRoom {
+  const first = chart.notes.reduce((m, n) => Math.min(m, n.beat), Infinity)
+  const chartMs = Number.isFinite(first) ? buildMsTable(chart.pulse).beatToMs(first) : 0
+  const ms = fromChartMs(chartMs, { offset: source.offset, rate: source.rate })
+  if (ms < 0) return { ms, savable: false, notes: ['最初の音が動画の始まりより前になります。合わせ直してください。'] }
+  const notes = [
+    ...(ms < HEAD_GRACE_MS ? ['最初の音が判定されないことがあります。'] : []),
+    ...(ms < HEAD_TRAVEL_MS ? ['動画の頭から最初の音まで 1.5 秒未満なので、最初の音は途中から落ちてきます。'] : []),
+  ]
+  return { ms, savable: true, notes }
+} // prettier-ignore
 
 /** 保存に失敗したときの箱（m6 L457） */
 export const SAVE_FAIL_TITLE = '保存できません'
