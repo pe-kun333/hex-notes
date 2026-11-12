@@ -16,6 +16,10 @@
 // M3 の手順 3（M3-01 後半＋M3-02）: 左列を 480×270 のまま詰めた（HUD 13 px・「ホームへ」を案内の行へ・曲名 1 行。動画なしの
 // S2 も同じ形、m3-kickoff §7-21）。動画ありの矩形は class `video`（縁・背景なし）。寸法の注記と入らない窓の文は折り返してよい
 // 別の行。dev の assert に配置モデル（placement.ts）と、矩形と交差してはならない物を渡す（layoutProbe、§7-20）。
+// M3 の手順 5（M3-05 前半、m3-kickoff §7-26・§7-27・§7-32）: 源が動画の間に読込の失敗・応答なし・onError を受けたら S7a。
+// embedError 行（iframe 1 つに 1 回）と埋め込み不可の印（100・101・150）、iframe を外して（dispose）矩形の場所にカード（釦
+// 「ピアノ音で遊ぶ」「ホームへ」）。走っていた回は捨てて待機に戻し（記録しない）、以後の標本は渡さない。「ピアノ音で遊ぶ」は
+// 「動画を使う」を偽にして、自前音源の普通の回に作り直す（対象プレイ）。印のある動画で最初の PLAYING が来たら印を外す。
 
 import {
   PART_GAINS,
@@ -71,6 +75,7 @@ import {
   type RunEffect,
   type PracticeOptions,
   type RunOptions,
+  type RunSong,
   type RunStep,
 } from '../play-runner.ts'
 import { practicePanel, type PracticePanel } from '../practice-panel.ts'
@@ -87,6 +92,8 @@ import { onboardRow } from '../../telemetry/rows.ts'
 import { newRecordId } from '../../results/record.ts'
 import type { PortEvent } from '../../youtube/port.ts'
 import { videoRunOf } from '../video-run.ts'
+import { embedFailPlan, isEmbedFail, type EmbedFailEvent, type EmbedView } from '../embed-view.ts'
+import { unmarkNoEmbed } from '../../storage/local.ts'
 import { placementOf, sizeNote, type Placement } from '../placement.ts'
 import { button, h } from './frame.ts'
 import { pauseOverlay } from './pause.ts'
@@ -164,24 +171,27 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   let port: VideoPort | null = null
   // 口の標本が null でなくなった（読込済み）
   let videoReady = false
-  // 動画の読込の失敗・onError の 1 行（S7a は手順 5）
-  let videoNote: string | null = null
+  // S7a に入った（読込の失敗・onError。「ピアノ音で遊ぶ」で戻る。M3 の手順 5）
+  let failed = false
+  // この iframe で embedError 行を書いた（iframe 1 つに 1 回）
+  let failWritten = false
+  // この iframe で PLAYING を見た（印を外すのは最初の 1 回）
+  let playingSeen = false
+  // 読んだ曲（S7a の後の作り直し）
+  let loadedSong: RunSong | null = null
   const videoHost = h(doc, 'div', { className: 'video-host' })
   videoHost.style.cssText = 'width:100%;height:100%'
 
   // 左列: プレイヤー矩形（動画なし形態は音源のカード）→ HUD → 案内 →（待機中だけ）ホームへ → 帯
-  const player = h(
+  // 動画なしの音源のカード（m6 L817–818。S7a の「ピアノ音で遊ぶ」の後もこれに戻す）
+  const sourceCard = h(
     doc,
     'div',
-    { className: 'player' },
-    h(
-      doc,
-      'div',
-      { className: 'card source' },
-      h(doc, 'b', { text: '自前音源' }),
-      h(doc, 'span', { text: 'ピアノ音で鳴らします（動画なし）' }),
-    ),
+    { className: 'card source' },
+    h(doc, 'b', { text: '自前音源' }),
+    h(doc, 'span', { text: 'ピアノ音で鳴らします（動画なし）' }),
   )
+  const player = h(doc, 'div', { className: 'player' }, sourceCard)
   player.id = 'player'
   // S4: 練習の設定（無ければ既定）。S0d の段階は音待ち（自動ループ・自動昇降なし）。通常の S2 は練習なし
   const practiceOf = (): PracticeOptions | undefined =>
@@ -353,14 +363,15 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       setStatus(
         t !== null && phase === 'idle'
           ? `段階 ${t.stage + 1}／${TUTORIAL_KEYSETS.length}: ${KEYSET_NAMES[tutorialKeyset(t)]} ― Space で開始`
-          : (videoNote ??
-              phaseText({
-                phase,
-                source: run.session.play.source,
-                ready: run.video === null || videoReady,
-              })),
+          : phaseText({
+              phase,
+              source: run.session.play.source,
+              ready: run.video === null || videoReady,
+            }),
       )
-    home.hidden = room || phase !== 'idle'
+    // S7a の間は案内の行の文と「ホームへ」を隠す（カードの釦が出口）
+    if (failed) setStatus('')
+    home.hidden = room || phase !== 'idle' || failed
     // S0d の吹き出しは待機中だけ（演奏中は段階の 1 行だけにして帯の場所を空ける。§7-21 の案 A）
     tips.hidden = phase !== 'idle'
     showPractice()
@@ -481,21 +492,68 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     void resumeAudio(out)
   }
 
-  /** 口の事象（読込の失敗・onError は案内文 1 行。S7a・帯は手順 5〜7） */
+  /** 口の事象。源が動画の間（相を問わない）の読込の失敗・応答なし・onError は S7a（S7c の後の失敗は手順 7、§7-32） */
   const onVideoEvent = (e: PortEvent): void => {
-    if (!alive) return
-    if (e.kind === 'loadFail' || e.kind === 'noResponse' || e.kind === 'error') {
-      // 案内の行（全角 24 字の幅、§7-21）に収める。「ホームへ」は待機中なら同じ行の右
-      videoNote = `動画を再生できません（コード ${e.code}）`
-      show()
+    if (!alive || failed || run === null || run.video === null) return
+    if (run.session.play.source !== 'video' || !isEmbedFail(e)) return
+    enterS7a(e, run.video.videoId)
+  }
+
+  /** S7a に入る（行・印・iframe を外す・回を捨てて待機・カード） */
+  function enterS7a(e: EmbedFailEvent, videoId: string): void {
+    const plan = embedFailPlan(e, videoId, ctx.noEmbed(), failWritten, new Date().toISOString())
+    if (plan.row !== null) {
+      failWritten = true
+      void ctx.booted.db.appendTelemetry(plan.row).catch(() => {})
     }
+    ctx.setNoEmbed(plan.list)
+    failed = true
+    port?.dispose()
+    port = null
+    if (out !== null) cancelFrom(out, out.ctx.currentTime)
+    // 走っていた回は捨てる（記録しない）。待機の動画の回に戻し、標本は渡さない
+    const song = loadedSong
+    if (song !== null) run = newRun(song, runOptionsOf(song, videoId))
+    effects = []
+    player.className = 'player'
+    player.replaceChildren(s7aCard(plan.view))
+    show()
+    ctx.layoutChanged()
+  }
+
+  /** S7a のカード（見出し・本文・釦 2 つ。矩形の場所、案 A） */
+  function s7aCard(v: EmbedView): HTMLElement {
+    const piano = button(doc, 'ピアノ音で遊ぶ', () => playPiano(), 'primary')
+    return h(doc, 'div', { className: 'card source s7a' },
+      h(doc, 'b', { text: v.title }),
+      h(doc, 'span', { text: v.body }),
+      h(doc, 'div', { className: 'btnrow' }, piano, button(doc, 'ホームへ', () => goHome())),
+    )
+  } // prettier-ignore
+
+  /** 「ピアノ音で遊ぶ」: 「動画を使う」を偽にして、自前音源の普通の回を待機で作り直す（対象プレイ、§7-24・§7-33） */
+  function playPiano(): void {
+    const song = loadedSong
+    if (!alive || song === null) return
+    wake()
+    ctx.setUseVideo(false)
+    failed = false
+    run = newRun(song, runOptionsOf(song, null))
+    player.className = 'player'
+    player.replaceChildren(sourceCard)
+    showHud(run)
+    show()
+    root.focus({ preventScroll: true })
+    ctx.layoutChanged()
   }
 
   /** 動画の回の口を作る（鍵盤図が入らない窓の間は作らない。描けない回を走らせない、control と同じ訳） */
   const mountVideo = (): void => {
-    if (!alive || port !== null || run === null || run.video === null || sizing === null) return
+    if (!alive || failed || port !== null || run === null || run.video === null || sizing === null)
+      return
     videoReady = false
-    videoNote = null
+    failWritten = false
+    playingSeen = false
     port = ctx.videoPort({ host: videoHost, videoId: run.video.videoId, onEvent: onVideoEvent })
     ctx.layoutChanged()
   }
@@ -531,7 +589,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   }
 
   function control(i: ControlInput): void {
-    if (!alive || run === null) return
+    // S7a の間はカードの釦だけ（Space で始めない）
+    if (!alive || run === null || failed) return
     // 鍵盤図が入らない窓では始めない（描けない回を走らせない）
     if (sizing === null && runPhase(run) === 'idle') return
     const now = perfNow()
@@ -659,10 +718,17 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
         if (lo.changed) ctx.band({ kind: 'lowLoad', level: low.level })
       }
       // 動画の回はこのフレームの読み（読めない・準備前は null）
-      const sample = port?.sample(now) ?? null
+      const read = failed ? null : (port?.sample(now) ?? null)
+      // 読んだ時に口が失敗を知らせたら（S7a に入った）、その読みも新しい回へ渡さない
+      const sample = failed ? null : read
       if (!videoReady && sample !== null) {
         videoReady = true
         show()
+      }
+      // 埋め込み不可の印のある動画で最初の PLAYING が来たら印を外す（再生できた。§7-27）
+      if (!playingSeen && sample?.state === 'playing' && run.video !== null) {
+        playingSeen = true
+        ctx.setNoEmbed(unmarkNoEmbed(ctx.noEmbed(), run.video.videoId))
       }
       apply(runFrame(run, now, ts, sample))
       ctx.devProbe?.play({
@@ -694,6 +760,29 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     }
   }
 
+  /** 回の作り（videoId が null なら動画なし。S7a の後の作り直しも同じ形） */
+  function runOptionsOf(song: RunSong, videoId: string | null): RunOptions {
+    const practice = practiceOf()
+    // 隣は六角の位置だけで決まる（R に依らない）ので、鍵盤図が入らない窓でも規則を作れる
+    const byCode = buildKeyboardGrid(song.variant.layout, 1, { left: 0, top: 0 }).byCode
+    return {
+      rules: rulesOf(prof.rules, {
+        neighbor: neighborOf(byCode),
+        // 動画の回は youtube の校正（未校正 0。measured の分けと段 2 の提案は手順 9）
+        offsetMs: offsetFor(ctx.calibration(), videoId === null ? 'audio' : 'youtube'),
+        // 自力率は見えているラベルで数える（退避はキー文字を必ず出す）
+        labels: shownLabels,
+        fadeFrozen,
+      }),
+      fade: ctx.fade(),
+      sound: { melody: settings.audio.guide, accomp: true, click: settings.audio.metronome },
+      keyclick: settings.audio.keyclick,
+      keyset,
+      ...(practice === undefined ? {} : { practice }),
+      ...(videoId === null ? {} : { video: { videoId } }),
+    }
+  }
+
   const load = async (): Promise<void> => {
     if (entry === null) {
       setStatus('曲が選ばれていません。ホームで選んでください。')
@@ -716,27 +805,9 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       return
     }
     // 動画の回か（sources[0] が youtube・「動画を使う」・練習室でない・門が真。練習〔S0d の段階も〕とは併せない、#94）
-    const practice = practiceOf()
-    const videoId = practice === undefined ? videoRunOf(song.sync, ctx.useVideo(), room) : null
-    // 隣は六角の位置だけで決まる（R に依らない）ので、鍵盤図が入らない窓でも規則を作れる
-    const byCode = buildKeyboardGrid(song.variant.layout, 1, { left: 0, top: 0 }).byCode
-    const opts: RunOptions = {
-      rules: rulesOf(prof.rules, {
-        neighbor: neighborOf(byCode),
-        // 動画の回は youtube の校正（未校正 0。measured の分けと段 2 の提案は手順 9）
-        offsetMs: offsetFor(ctx.calibration(), videoId === null ? 'audio' : 'youtube'),
-        // 自力率は見えているラベルで数える（退避はキー文字を必ず出す）
-        labels: shownLabels,
-        fadeFrozen,
-      }),
-      fade: ctx.fade(),
-      sound: { melody: settings.audio.guide, accomp: true, click: settings.audio.metronome },
-      keyclick: settings.audio.keyclick,
-      keyset,
-      ...(practice === undefined ? {} : { practice }),
-      ...(videoId === null ? {} : { video: { videoId } }),
-    }
-    run = newRun(song, opts)
+    const videoId = practiceOf() === undefined ? videoRunOf(song.sync, ctx.useVideo(), room) : null
+    loadedSong = song
+    run = newRun(song, runOptionsOf(song, videoId))
     if (run.video !== null) {
       // 動画の回: 矩形は口だけ（前に何も置かない、design §2.9。縁・背景なしで iframe は矩形ちょうど、§7-21）
       player.className = 'player video'

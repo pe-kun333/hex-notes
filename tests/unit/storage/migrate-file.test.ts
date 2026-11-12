@@ -494,11 +494,12 @@ describe('記録の検査 parseResult（§4.3 results）', () => {
   })
 })
 
-it('LOCAL_KEYS は §4.3 の 4 つ', () => {
+it('LOCAL_KEYS は §4.3 の 4 つと、M3 の手順 5 の埋め込み不可の一覧（旧鍵からは運ばない）', () => {
   expect(Object.values(LOCAL_KEYS)).toEqual([
     'hexnote.settings',
     'hexnote.calibration',
     'hexnote.device',
     'hexnote.fade',
+    'hexnote.noembed',
   ])
 })

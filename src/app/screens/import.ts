@@ -25,6 +25,7 @@ import { withSync } from '../library-view.ts'
 import { syncPanel, type SyncPanel } from '../sync-panel.ts'
 import { termsLine } from '../terms.ts'
 import { VIDEO_FEATURE } from '../video-run.ts'
+import { embedFailPlan, isEmbedFail, syncFailText } from '../embed-view.ts'
 import { chartFileName, chartFileText } from '../../storage/file.ts'
 import { downloadText } from '../file-io.ts'
 import {
@@ -96,6 +97,8 @@ export function importScreen(ctx: ScreenContext): ScreenView {
   let port: VideoPort | null = null
   let clock: ClockState | null = null
   let raf: number | null = null
+  // この iframe で embedError 行を書いた（iframe 1 つに 1 回。M3 の手順 5）
+  let failWritten = false
   let previewUntil = 0
 
   const steps = h(doc, 'ol', { className: 'steps' })
@@ -362,13 +365,23 @@ export function importScreen(ctx: ScreenContext): ScreenView {
     stopPlayer()
     const st = sync
     if (st === null || !st.wide || s.videoId === '') return
+    failWritten = false
     clock = initialClock({ mode: 'video', t0: 0 })
     port = ctx.videoPort({
       host: st.host,
       videoId: s.videoId,
       onEvent: (e) => {
-        // 読込の失敗・応答なし・onError は 1 行とやり直し（行・鍵・S1 の既定は手順 5、§7-26）
-        if (e.kind === 'loadFail' || e.kind === 'noResponse' || e.kind === 'error') st.msg.textContent = `動画を読み込めませんでした（コード ${e.code}）。ID を確かめて「読み込む」でやり直してください。`
+        // 読込の失敗・応答なし・onError: S2 と同じ行と印、iframe を外して表の見出し＋「動画なしで保存できます。」（M3 の手順 5、
+        // §7-26・§7-38。やり直しは ID の欄から）
+        if (!alive || !isEmbedFail(e)) return
+        const plan = embedFailPlan(e, s.videoId, ctx.noEmbed(), failWritten, new Date().toISOString())
+        if (plan.row !== null) {
+          failWritten = true
+          void booted.db.appendTelemetry(plan.row).catch(() => {})
+        }
+        ctx.setNoEmbed(plan.list)
+        stopPlayer()
+        st.msg.textContent = syncFailText(plan.view)
       },
     })
     raf = requestAnimationFrame(frameSync)

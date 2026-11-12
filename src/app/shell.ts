@@ -22,6 +22,8 @@ import { BOOTED_KEY, isFirstRun } from '../storage/session.ts'
 import {
   LOCAL_KEYS,
   loadCalibration,
+  loadNoEmbed,
+  saveNoEmbed,
   saveCalibration,
   saveDevice,
   saveFade,
@@ -121,6 +123,10 @@ export interface ScreenContext {
   calibration(): Calibration
   /** 1 つの音源種別の校正を保存する（hexnote.calibration。置き場が壊れていてもメモリ内で続く、decisions #50） */
   saveCalibration(kind: SyncKind, entry: CalibEntry): void
+  /** 埋め込み不可の動画 ID（hexnote.noembed。起動で読んだ値にこの後の足す・外すを重ねた物。M3 の手順 5） */
+  noEmbed(): readonly string[]
+  /** 一覧を替える（S7a の印〔100・101・150〕、印のある動画で最初の PLAYING が来たら外す）。鍵に書く */
+  setNoEmbed(ids: readonly string[]): void
   /** 画面を移る（行けない先は無視。router.ts） */
   go(to: ScreenId | 'back'): void
   /** 帯への知らせ（低負荷・予約の遅れなど。IME と保存の失敗は殻が受ける） */
@@ -297,6 +303,7 @@ export function startShell(opts: ShellOptions): Shell {
   let proposalOpen = false
   let audio: AudioOut | null = null
   let calibration = booted.calibration
+  let noEmbed: readonly string[] = loadNoEmbed(booted.local)
   let useVideo = true
 
   const handlers: BandHandlers = {
@@ -361,8 +368,11 @@ export function startShell(opts: ShellOptions): Shell {
     },
     resetDevice: () => {
       booted.local.remove(LOCAL_KEYS.device)
+      // 埋め込み不可の一覧も消す（M3 の手順 5、m3-kickoff §7-27）
+      booted.local.remove(LOCAL_KEYS.noembed)
       booted.session.remove(BOOTED_KEY)
       device = null
+      noEmbed = []
     },
     isFirst: () => isFirstRun(booted.local, booted.session),
     tutorial: () => tutorial,
@@ -423,6 +433,12 @@ export function startShell(opts: ShellOptions): Shell {
       if (route.screen !== 'S2') opts.updates?.apply()
     },
     layoutChanged: () => checkLayout(),
+    noEmbed: () => noEmbed,
+    setNoEmbed: (ids) => {
+      if (ids === noEmbed) return
+      noEmbed = ids
+      saveNoEmbed(booted.local, ids)
+    },
     useVideo: () => useVideo,
     setUseVideo: (v) => {
       useVideo = v
