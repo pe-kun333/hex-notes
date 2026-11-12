@@ -28,6 +28,7 @@ import {
   WRONG_RATE,
   buildPracticeTable,
   buildTable,
+  buildVideoTable,
   harnessRow,
   parseTable,
   pickVariant,
@@ -475,17 +476,25 @@ describe('run.ts（子プロセス）', () => {
       try {
         const exp = path.join(dir, 'expected.json')
         const expP = path.join(dir, 'expected-practice.json')
-        const w = run('--expected', exp, '--expected-practice', expP)
+        // 動画ありの表も一時の置き場へ（渡さないとリポジトリの期待の表 m3-04.json を書き直す。M3 の手順 6）
+        const expV = path.join(dir, 'expected-video.json')
+        const w = run('--expected', exp, '--expected-practice', expP, '--expected-video', expV)
         expect(w.status).toBe(0)
         expect(w.stdout).toContain('144 行')
         expect(w.stdout).toContain('48 行')
+        expect(w.stdout).toContain('24 行')
         expect(readFileSync(exp, 'utf8')).toBe(tableText(TABLE))
         expect(readFileSync(expP, 'utf8')).toBe(tableText(buildPracticeTable(SONGS)))
+        expect(readFileSync(expV, 'utf8')).toBe(tableText(buildVideoTable(SONGS)))
         const out = path.join(dir, 'out')
         const c = run('--check', '--out', out)
         expect(c.status).toBe(0)
         expect(c.stdout).toContain('✓ 回帰ハーネス（M0の表）: 差分なし（144 行）')
         expect(c.stdout).toContain('✓ 回帰ハーネス（練習の表）: 差分なし（48 行）')
+        expect(c.stdout).toContain('✓ 回帰ハーネス（動画ありの表）: 差分なし（24 行）')
+        expect(readFileSync(path.join(out, 'table-m3-04.json'), 'utf8')).toBe(
+          tableText(buildVideoTable(SONGS)),
+        )
         expect(readFileSync(path.join(out, 'table.json'), 'utf8')).toBe(tableText(TABLE))
         expect(readFileSync(path.join(out, 'table-m2-03.json'), 'utf8')).toBe(
           tableText(buildPracticeTable(SONGS)),
@@ -493,6 +502,7 @@ describe('run.ts（子プロセス）', () => {
         const md = readFileSync(path.join(out, 'diff.md'), 'utf8')
         expect(md).toContain(diffText([], 144))
         expect(md).toContain(diffText([], 48))
+        expect(md).toContain(diffText([], 24))
       } finally {
         rmSync(dir, { recursive: true, force: true })
       }

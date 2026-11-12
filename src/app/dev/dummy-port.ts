@@ -6,6 +6,8 @@
 // window.__hexnoteDev（DEV だけ）: ダミーが受けた要求と事象（状態の変化）の列・AudioContext の state・回の相と源・最後の記録。
 // 手順 5 で失敗の筋書き 4 行（onError 150 の ▶ の前・再生中 5 秒、読込の失敗、応答なし。事象は実物と同じく口の作り手の onEvent が
 // 運ぶ。VideoPort の型と dummyPort は変えない）と、口の dispose の回数・失敗の事象の列を足した。
+// 手順 6 で筋書き「playVideo 無効」1 行（手順 1 の dummyPort の pass が playVideo だけ偽 ＝ 呼べたが効かない。再開の Space の後に
+// 自動再生ブロックの帯。利用者の ▶（ダミー）は口を通らないので効く）を足した。
 // 手順 3 で band（帯を点ける。殻の band へ）と actions（帯の釦の押下の記録）を足した。performance.now の直呼びは src/app/ だけ
 // （src/README.md）。
 
@@ -43,6 +45,8 @@ export interface DummyScenario {
     readonly kind: 'error' | 'loadFail' | 'noResponse'
     readonly code: number
   }
+  /** 口の playVideo を呼べたが効かない（自動再生ブロックの模擬。M3 の手順 6） */
+  readonly blockPlay?: true
 }
 
 /** DEV の表（S1 の「試験: クリック 100 BPM」の 5 行と、手順 4 の段 4） */
@@ -101,6 +105,14 @@ export const DUMMY_VIDEOS: readonly DummyScenario[] = [
     script: [],
     fail: { at: 'mount', kind: 'noResponse', code: -2 },
   },
+  // 自動再生ブロックの模擬（M3 の手順 6）: 一時停止 → Space の再開の playVideo が効かない
+  {
+    id: 'hexDmyNoPly',
+    label: 'playVideo 無効（再開の Space が効かない）',
+    options: {},
+    script: [],
+    blockPlay: true,
+  },
 ]
 
 /** 筋書きの失敗を口の事象の形に（error は手順 1 の errorGroupOf で組を付ける） */
@@ -131,7 +143,12 @@ export interface ScenarioPort {
 
 export function scenarioPort(sc: DummyScenario, hooks: ScenarioHooks = {}): ScenarioPort {
   const d = createDummyVideo({ stepMs: 15, seed: 7, ...sc.options })
-  const base = dummyPort(d, hooks.onRequest === undefined ? {} : { onRequest: hooks.onRequest })
+  const base = dummyPort(d, {
+    ...(hooks.onRequest === undefined ? {} : { onRequest: hooks.onRequest }),
+    ...(sc.blockPlay === true
+      ? { pass: (_now: number, q: VideoRequest) => q.kind !== 'playVideo' }
+      : {}),
+  })
   let start: number | null = null
   const done = new Set<number>()
   let last: VideoState = d.state

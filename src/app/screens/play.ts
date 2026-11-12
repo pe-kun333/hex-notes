@@ -20,6 +20,9 @@
 // embedError 行（iframe 1 つに 1 回）と埋め込み不可の印（100・101・150）、iframe を外して（dispose）矩形の場所にカード（釦
 // 「ピアノ音で遊ぶ」「ホームへ」）。走っていた回は捨てて待機に戻し（記録しない）、以後の標本は渡さない。「ピアノ音で遊ぶ」は
 // 「動画を使う」を偽にして、自前音源の普通の回に作り直す（対象プレイ）。印のある動画で最初の PLAYING が来たら印を外す。
+// M3 の手順 6（M3-04、m3-kickoff §7-28）: 源 video の同期中は案内の行に訳ごとの文（sync-notice.ts）、長引けば帯 sync、再開の
+// playVideo が効かなければ自動再生ブロックの帯。毎フレーム訳と now から作り直す（1,000・2,000 ms には事象が無い）。口の
+// autoplayBlocked・notVisible は種類だけ回へ（runPortEvent）。画面を離れる時に 2 つの帯を下ろす。
 
 import {
   PART_GAINS,
@@ -71,6 +74,7 @@ import {
   runPress,
   runPump,
   runRelease,
+  runPortEvent,
   type Run,
   type RunEffect,
   type PracticeOptions,
@@ -94,6 +98,8 @@ import type { PortEvent } from '../../youtube/port.ts'
 import { videoRunOf } from '../video-run.ts'
 import { embedFailPlan, isEmbedFail, type EmbedFailEvent, type EmbedView } from '../embed-view.ts'
 import { unmarkNoEmbed } from '../../storage/local.ts'
+import type { SyncCause } from '../../play/sync-cause.ts'
+import { NOT_VISIBLE_DETAIL, NOT_VISIBLE_TITLE, SYNC_TEXT, syncNotice } from '../sync-notice.ts'
 import { placementOf, sizeNote, type Placement } from '../placement.ts'
 import { button, h } from './frame.ts'
 import { pauseOverlay } from './pause.ts'
@@ -103,7 +109,7 @@ export { LEAD_MS } from '../play-runner.ts'
 /** 相ごとの案内（HUD の下の 1 行） */
 export const PHASE_TEXT: Readonly<Record<PlayPhase, string>> = {
   idle: 'Space で開始',
-  syncing: '同期中（300 ms は判定を猶予します）',
+  syncing: SYNC_TEXT.grace,
   playing: '再生中（Esc で一時停止）',
   waiting: '待ち（正しいキーを押すと進みます。Esc で一時停止）',
   paused: '一時停止中',
@@ -117,12 +123,16 @@ export interface PhaseTextInput {
   readonly source: ClockMode
   /** 動画が読めた（口の標本が null でなくなった。動画なしは真） */
   readonly ready: boolean
+  /** 同期中の訳（源 video の同期中だけ。無ければ PHASE_TEXT。M3 の手順 6） */
+  readonly cause?: SyncCause | null
 }
 
 /** HUD の下の 1 行（動画の回の待機は ▶ の案内・読込中、他は PHASE_TEXT） */
 export function phaseText(i: PhaseTextInput): string {
   if (i.source === 'video' && i.phase === 'idle')
     return i.ready ? 'プレイヤーの ▶ を押すと始まります' : '動画を読み込み中…'
+  if (i.source === 'video' && i.phase === 'syncing' && i.cause != null)
+    return SYNC_TEXT[i.cause.kind]
   return PHASE_TEXT[i.phase]
 }
 
@@ -367,6 +377,7 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
               phase,
               source: run.session.play.source,
               ready: run.video === null || videoReady,
+              cause: run.syncCause,
             }),
       )
     // S7a の間は案内の行の文と「ホームへ」を隠す（カードの釦が出口）
@@ -495,8 +506,40 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   /** 口の事象。源が動画の間（相を問わない）の読込の失敗・応答なし・onError は S7a（S7c の後の失敗は手順 7、§7-32） */
   const onVideoEvent = (e: PortEvent): void => {
     if (!alive || failed || run === null || run.video === null) return
-    if (run.session.play.source !== 'video' || !isEmbedFail(e)) return
+    if (run.session.play.source !== 'video') return
+    // 自動再生ブロック・プレイヤーが隠れている: 再開の待ちの訳に控える（notVisible は口の apply の中で同期に来る。run は
+    // apply が先に歩の後の回にしている）
+    if (e.kind === 'autoplayBlocked' || e.kind === 'notVisible') {
+      run = runPortEvent(run, e.kind)
+      showSync(perfNow())
+      return
+    }
+    if (!isEmbedFail(e)) return
     enterS7a(e, run.video.videoId)
+  }
+
+  /**
+   * 同期中の案内の行の文と帯（毎フレームと口の事象の後。訳 × now から作り直す。変わらなければ殻も描き直さない）。源 video の
+   * 同期中でなければ訳は null で、2 つの帯は下りる
+   */
+  function showSync(now: number): void {
+    const r = run
+    if (r === null) return
+    const n = syncNotice(failed ? null : r.syncCause, now)
+    if (n.text !== null && sizing !== null && runPhase(r) === 'syncing') setStatus(n.text)
+    ctx.band({ kind: 'sync', on: n.band })
+    ctx.band(
+      n.autoplay === null
+        ? { kind: 'autoplayBlocked', on: false }
+        : n.autoplay === 'notVisible'
+          ? {
+              kind: 'autoplayBlocked',
+              on: true,
+              title: NOT_VISIBLE_TITLE,
+              detail: NOT_VISIBLE_DETAIL,
+            }
+          : { kind: 'autoplayBlocked', on: true },
+    )
   }
 
   /** S7a に入る（行・印・iframe を外す・回を捨てて待機・カード） */
@@ -743,6 +786,7 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       }
       showHud(run)
       showPractice()
+      showSync(now)
     }
     draw(now)
     raf = requestAnimationFrame(frame)
@@ -870,6 +914,9 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       if (out !== null) cancelFrom(out, out.ctx.currentTime)
       port?.dispose()
       port = null
+      // 同期中の 2 つの帯は殻にあるので、画面を離れる時に下ろす（S1 へ付いて行かない）
+      ctx.band({ kind: 'sync', on: false })
+      ctx.band({ kind: 'autoplayBlocked', on: false })
     },
   }
 }

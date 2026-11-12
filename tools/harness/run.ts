@@ -1,9 +1,11 @@
 // 回帰ハーネス（M0-10、手順 13）を回す。出どころ: kickoff 手順 13・§1.3 の 5（CI は差分表を upload-artifact で残す）、
 // decisions #56（仮）。表の作り方は table.ts、差分は diff.ts。
-// 使い方: node tools/harness/run.ts [--check] [--expected <file>] [--expected-practice <file>] [--out <dir>]
-// 既定は 6 曲（tests/fixtures/charts/m1/）の表を 2 つ作り、期待の表に書く: M0 の表（tests/harness/expected/m0-10.json）と、
-// 練習の表（テンポ段・鍵違い。tests/harness/expected/m2-03.json。M2 の手順 5、m2-kickoff §7-21・decisions #56 (d)）。
-// --check は書かずに期待の表と比べ、今の表（table.json・table-m2-03.json）と差分表（diff.md。2 つの表の差分を続けて）を
+// 使い方: node tools/harness/run.ts [--check] [--expected <file>] [--expected-practice <file>] [--expected-video <file>]
+// [--out <dir>]
+// 既定は 6 曲（tests/fixtures/charts/m1/）の表を 3 つ作り、期待の表に書く: M0 の表（tests/harness/expected/m0-10.json）と、
+// 練習の表（テンポ段・鍵違い。tests/harness/expected/m2-03.json。M2 の手順 5、m2-kickoff §7-21・decisions #56 (d)）と、
+// 動画ありの表（飛び・凍結。tests/harness/expected/m3-04.json。M3 の手順 6、m3-kickoff §7-30）。
+// --check は書かずに期待の表と比べ、今の表（table.json・table-m2-03.json・table-m3-04.json）と差分表（diff.md。3 つの表の差分を続けて）を
 // --out（既定 tests/harness/out/）に書く。差分が 1 つでもあれば exit 1。引数の誤りは exit 2。
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -17,13 +19,14 @@ import {
   HARNESS_SONGS,
   buildPracticeTable,
   buildTable,
+  buildVideoTable,
   parseTable,
   tableText,
   type HarnessRow,
 } from './table.ts'
 
 const USAGE =
-  '使い方: node tools/harness/run.ts [--check] [--expected <file>] [--expected-practice <file>] [--out <dir>]'
+  '使い方: node tools/harness/run.ts [--check] [--expected <file>] [--expected-practice <file>] [--expected-video <file>] [--out <dir>]'
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const expectedDir = path.join(root, 'tests', 'harness', 'expected')
 
@@ -34,6 +37,7 @@ try {
       check: { type: 'boolean', default: false },
       expected: { type: 'string', default: path.join(expectedDir, 'm0-10.json') },
       'expected-practice': { type: 'string', default: path.join(expectedDir, 'm2-03.json') },
+      'expected-video': { type: 'string', default: path.join(expectedDir, 'm3-04.json') },
       out: { type: 'string', default: path.join(root, 'tests', 'harness', 'out') },
     },
     allowPositionals: false,
@@ -51,6 +55,7 @@ const songs = HARNESS_SONGS.map((song) => {
 const tables = [
   { name: 'M0', expected: args.expected, out: 'table.json', rows: buildTable(songs) },
   { name: '練習', expected: args['expected-practice'], out: 'table-m2-03.json', rows: buildPracticeTable(songs) },
+  { name: '動画あり', expected: args['expected-video'], out: 'table-m3-04.json', rows: buildVideoTable(songs) },
 ] // prettier-ignore
 
 /** SD ごとの精度の平均（目で見る用。M0 の表） */
