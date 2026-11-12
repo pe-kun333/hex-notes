@@ -5,6 +5,8 @@
 // 「再生（ミュート）」と「seekTo」はこのページだけの計測用（decisions #95 の開発ページの例外。mountPlayer の player に直に
 // 呼び、製品の束に呼び出しを残さない）。「pauseVideo を今出す」は利用者の click で口の apply へ 1 件（例外に数えない）。
 // 製品画面ではない（導線は開発時だけ、src/main.ts）。performance.now の直呼びは src/app/ だけ（src/README.md）。
+// M3 の手順 2: 残差の道具（src/clock/residual.ts）の値を読み出しと JSON の residual に出す（m3-kickoff §7-18。完了条件 (b)
+// ＝ 見本の動画を 40 秒以上・可視・rAF 50 回/秒以上で回し、補間後 SD ＜ 直読み SD を数値で残す）。
 
 import '../styles.css'
 import type {
@@ -15,6 +17,7 @@ import type {
   VideoSample,
   VideoState,
 } from '../../clock/types.ts'
+import { residualOf, type ResidualFrame, type ResidualSummary } from '../../clock/residual.ts'
 import type { InputEvent } from '../../input/keyboard.ts'
 import {
   initialSession,
@@ -29,9 +32,8 @@ import { videoIdOf } from '../../youtube/video-id.ts'
 import { moreThanHalfVisible } from '../../youtube/visible.ts'
 import { attachKeyboard } from '../dom-input.ts'
 import { mountPlayer, type MountedPlayer, type YtPlayer } from '../youtube-player.ts'
+import { SAMPLE_VIDEO_ID as SAMPLE_ID } from './dev-songs.ts'
 
-/** 見本の動画（IFrame Player API の説明に使われる公開動画。spikes/coep-youtube/index.html L116。m3-kickoff §5 の聞く事 6） */
-const SAMPLE_ID = 'M7lc1UVf-VE'
 /** 傾きを取る長さ（最初の PLAYING から） */
 const SLOPE_MS = 10_000
 /** 「pauseVideo を今出す」の後に state を残す長さ */
@@ -40,6 +42,14 @@ const WATCH_MS = 500
 const MIN_RAF = 50
 /** JSON に残すフレームの上限 */
 const MAX_FRAMES = 6000
+
+/** 残差の 1 行（n・直読み SD・補間後 SD・平均・q̂・偏り・傾き・再アンカー・対照。数えられる回かも） */
+function residualText(r: ResidualSummary | null, wallMs: number | null): string {
+  if (r === null) return '残差 —（locked・可視・再アンカーから 3 秒以後のフレームを待つ）'
+  const f = (x: number, d = 2): string => x.toFixed(d)
+  const long = wallMs !== null && wallMs >= 40_000
+  return `残差 n ${r.n}  直読み SD ${f(r.rawSd)}  補間後 SD ${f(r.outSd)}${r.outSd < r.rawSd ? '（＜ 直読み）' : '（≥ 直読み）'}  平均 ${f(r.outMean)}  q̂ ${f(r.qHat)}  偏り ${f(r.bias)}  傾き ${f(r.slope, 5)}  再アンカー ${r.resyncs}  対照 ${f(r.ctlSd)}  ${long ? '40 秒以上' : `${Math.round((wallMs ?? 0) / 1000)} 秒（40 秒に満たない）`}`
+}
 
 /** 開発ページだけが呼ぶ口（計測用。製品の型には書かない） */
 interface DevPlayer extends YtPlayer {
@@ -96,6 +106,10 @@ interface DevRecord {
   seeks: SeekMark[]
   deltas: number[]
   slope: { slope: number; advancedMs: number; wallMs: number; n: number; ok: boolean | null } | null
+  /** 残差の道具の値（最初の PLAYING から。数えたフレームが 2 未満なら null） */
+  residual: ResidualSummary | null
+  /** 残差に渡したフレームの長さ（ms。最初と最後の now の差） */
+  residualWallMs: number | null
   events: Array<{ at: number; text: string }>
   requests: Array<{ at: number; kind: string; why?: string }>
   frames: Array<[number, number | null, VideoState | null, number | null, number, string, string]>
@@ -113,6 +127,8 @@ const fresh = (videoId: string): DevRecord => ({
   seeks: [],
   deltas: [],
   slope: null,
+  residual: null,
+  residualWallMs: null,
   events: [],
   requests: [],
   frames: [],
@@ -154,6 +170,14 @@ function main(): void {
   let rec: DevRecord = fresh(SAMPLE_ID)
   let prev: VideoSample | null = null
   let slopePts: Array<[number, number]> = []
+  // 残差の道具に渡すフレーム（読込から。1 秒ごとと JSON の書き出しで数え直す）
+  let resFrames: ResidualFrame[] = []
+  const updateResidual = (): void => {
+    rec.residual = residualOf(resFrames)
+    const a = resFrames[0]
+    const b = resFrames[resFrames.length - 1]
+    rec.residualWallMs = a === undefined || b === undefined ? null : r1(b.now - a.now)
+  }
   let slopeDone = false
   const frameTimes: number[] = []
 
@@ -236,6 +260,7 @@ function main(): void {
     prev = null
     slopePts = []
     slopeDone = false
+    resFrames = []
     $('log').replaceChildren()
     const now = performance.now()
     rec.mountAt = r1(now)
@@ -260,6 +285,7 @@ function main(): void {
   const devPlayer = (): DevPlayer | null => (mounted?.player() as DevPlayer | null) ?? null
 
   const exportJson = (): void => {
+    updateResidual()
     const text = JSON.stringify(
       { page: 'youtube-dev', at: new Date().toISOString(), ...rec },
       null,
@@ -343,6 +369,19 @@ function main(): void {
         o.phase,
         `${session.play.phase}/${session.play.source}`,
       ])
+    if (o !== null && sample !== null) {
+      const rs = o.events.find((e) => e.kind === 'resync')
+      resFrames.push({
+        now,
+        raw: sample.timeMs,
+        out: o.t,
+        phase: o.phase,
+        visible: sample.visible,
+        resync: rs?.kind === 'resync' ? rs.reason : null,
+        qHat: o.qHat,
+      })
+      if (resFrames.length % 60 === 0) updateResidual()
+    }
     const raf = frameTimes.length
     if (mounted !== null && rec.readyMs !== null) rec.rafMin = Math.min(rec.rafMin ?? raf, raf)
     $('readout').textContent = [
@@ -350,6 +389,7 @@ function main(): void {
       `プレイ ${session.play.phase}/${session.play.source}   時計 ${o?.mode ?? '—'}・${o?.phase ?? '—'}   t ${o === null ? '—' : o.t.toFixed(1)} ms`,
       `標本 ${sample === null ? 'null' : `${sample.state} ${sample.timeMs.toFixed(1)} ms ×${sample.rate}`}`,
       `傾き ${rec.slope === null ? `取得中 ${slopePts.length} 点` : `${rec.slope.slope.toFixed(4)}（${rec.slope.ok === null ? '数えない' : rec.slope.ok ? '0.9〜1.1 の中' : '外'}）`}`,
+      residualText(rec.residual, rec.residualWallMs),
     ].join('\n')
     requestAnimationFrame(frame)
   }

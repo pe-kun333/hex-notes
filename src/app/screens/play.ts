@@ -10,6 +10,9 @@
 // m2-kickoff §7-9）。練習の設定は殻の practice()（S4 に入るたびに既定、§7-7）。S0d の段階は音待ちで流す（decisions #61・#82）。
 // M2 の手順 9（M2-05）: 音ゲー向けの HUD（ランク・コンボ・ゲージ・ハイスピード・FAST／SLOW を 3 行に。m6 renderS2
 // L823–826）、流れる時間にハイスピード（settings.hispeed。両プロファイル）、ゲージ 0 の途中終了は play-runner が終了にする。
+// M3 の手順 2（M3-03 前半）: 動画の回（video-run.ts の videoRunOf。門 VIDEO_FEATURE は開発時だけ真）はプレイヤー矩形に
+// ctx.videoPort の口（前に何も置かない。同意の門は mountPlayer）、毎フレームの標本を runFrame へ、要求の効果を口の apply へ。
+// 開始は利用者の ▶ だけ（decisions #95）。音を出す準備は S2 を作る時（S1 の釦の click の中）にも呼ぶ（m3-kickoff §7-14）。
 
 import {
   PART_GAINS,
@@ -23,6 +26,7 @@ import {
 import { PUMP_MS, lateBand } from '../../audio/scheduler.ts'
 import { bridgeOf } from '../../clock/audio-bridge.ts'
 import { perfNow } from '../../clock/clock-source.ts'
+import type { ClockMode, VideoPort } from '../../clock/types.ts'
 import type { InputEvent } from '../../input/keyboard.ts'
 import { neighborOf, rulesOf, summarizeJudge } from '../../judge/judge.ts'
 import { fadeOf, type FadeState } from '../../judge/self-rate.ts'
@@ -78,6 +82,8 @@ import { KEYSET_NAMES, TUTORIAL_KEYSETS } from '../../chart/keyset.ts'
 import { markBooted } from '../../storage/session.ts'
 import { onboardRow } from '../../telemetry/rows.ts'
 import { newRecordId } from '../../results/record.ts'
+import type { PortEvent } from '../../youtube/port.ts'
+import { videoRunOf } from '../video-run.ts'
 import { button, h } from './frame.ts'
 import { pauseOverlay } from './pause.ts'
 
@@ -91,6 +97,22 @@ export const PHASE_TEXT: Readonly<Record<PlayPhase, string>> = {
   waiting: '待ち（正しいキーを押すと進みます。Esc で一時停止）',
   paused: '一時停止中',
   ended: '終わりました',
+}
+
+/** 案内文の入力（束 1 つ。後の手順が欄を足す、m3-kickoff §7-15） */
+export interface PhaseTextInput {
+  readonly phase: PlayPhase
+  /** 回の今の源（動画の回は video、S7c の後は novideo） */
+  readonly source: ClockMode
+  /** 動画が読めた（口の標本が null でなくなった。動画なしは真） */
+  readonly ready: boolean
+}
+
+/** HUD の下の 1 行（動画の回の待機は ▶ の案内・読込中、他は PHASE_TEXT） */
+export function phaseText(i: PhaseTextInput): string {
+  if (i.source === 'video' && i.phase === 'idle')
+    return i.ready ? 'プレイヤーの ▶ を押すと始まります' : '動画を読み込み中…'
+  return PHASE_TEXT[i.phase]
 }
 
 /** 低負荷の段の初め（S6「自動／ON／OFF」。on は段 3 固定、off は段 0 固定、auto は 0 から自動で落とす。#29） */
@@ -134,6 +156,14 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   let pump: ReturnType<typeof setInterval> | null = null
   // 外した後に同じ回の入力・フレーム（「やめる」の後の事象）を効かせない
   let alive = true
+  // 動画の回の口（鍵盤図が入る窓になってから作る。「最初から」と画面を離れる時に dispose）
+  let port: VideoPort | null = null
+  // 口の標本が null でなくなった（読込済み）
+  let videoReady = false
+  // 動画の読込の失敗・onError の 1 行（S7a は手順 5）
+  let videoNote: string | null = null
+  const videoHost = h(doc, 'div', { className: 'video-host' })
+  videoHost.style.cssText = 'width:100%;height:100%'
 
   // 左列: プレイヤー矩形（動画なし形態は音源のカード）→ HUD → 案内 →（待機中だけ）ホームへ → 帯
   const player = h(
@@ -287,6 +317,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     canvas.height = Math.round(box.height * dpr)
     sizing = st.sizing
     grid = buildKeyboardGrid(layoutId, sizing.R, { left: sizing.kbLeft, top: sizing.kbTop }, legend, rowOff)
+    // 窓が広がって鍵盤図が入った: 待っていた動画の回の口を作る
+    mountVideo()
     show()
   } // prettier-ignore
 
@@ -299,7 +331,12 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       status.textContent =
         t !== null && phase === 'idle'
           ? `段階 ${t.stage + 1}／${TUTORIAL_KEYSETS.length}: ${KEYSET_NAMES[tutorialKeyset(t)]} ― Space で開始`
-          : PHASE_TEXT[phase]
+          : (videoNote ??
+            phaseText({
+              phase,
+              source: run.session.play.source,
+              ready: run.video === null || videoReady,
+            }))
     home.hidden = room || phase !== 'idle'
     showPractice()
     if (phase === 'paused') pause.show()
@@ -416,11 +453,44 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     void resumeAudio(out)
   }
 
+  /** 口の事象（読込の失敗・onError は案内文 1 行。S7a・帯は手順 5〜7） */
+  const onVideoEvent = (e: PortEvent): void => {
+    if (!alive) return
+    if (e.kind === 'loadFail' || e.kind === 'noResponse' || e.kind === 'error') {
+      videoNote = `動画を再生できません（コード ${e.code}）。「ホームへ」で戻れます。`
+      show()
+    }
+  }
+
+  /** 動画の回の口を作る（鍵盤図が入らない窓の間は作らない。描けない回を走らせない、control と同じ訳） */
+  const mountVideo = (): void => {
+    if (!alive || port !== null || run === null || run.video === null || sizing === null) return
+    videoReady = false
+    videoNote = null
+    port = ctx.videoPort({ host: videoHost, videoId: run.video.videoId, onEvent: onVideoEvent })
+  }
+
   const effect = (e: RunEffect): void => {
-    if (e.kind === 'fx') effects = [...effects, e.fx]
-    else if (out === null) return
-    else if (e.kind === 'keyclick') playKeyclick(out, e.plan)
-    else cancelFrom(out, out.ctx.currentTime)
+    switch (e.kind) {
+      case 'fx':
+        effects = [...effects, e.fx]
+        return
+      case 'video':
+        port?.apply(perfNow(), [e.request])
+        return
+      case 'videoReset':
+        // 「最初から」: iframe を作り直して利用者の ▶ を待つ（decisions #95）
+        port?.dispose()
+        port = null
+        mountVideo()
+        return
+      case 'keyclick':
+        if (out !== null) playKeyclick(out, e.plan)
+        return
+      case 'cancelSounds':
+        if (out !== null) cancelFrom(out, out.ctx.currentTime)
+        return
+    }
   }
 
   const apply = (step: RunStep): void => {
@@ -471,9 +541,10 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     // 足場外しの α を回の終わりに保存（m4 の判定ごとの保存 → 回の終わり、§7-13）
     ctx.saveFade(r.judge.fade)
     ctx.setLastPlay(o)
+    ctx.devProbe?.finished(o)
     const row = playRow(
       r.collect,
-      { chartId: o.chartId, variantId: o.variantId, profile: prof.profile, clock: 'novideo', mode: o.mode, rate: o.rate, keyset: o.keyset, ...(o.practice === null ? {} : { practice: o.practice }), aborted: o.aborted },
+      { chartId: o.chartId, variantId: o.variantId, profile: prof.profile, clock: o.clock, mode: o.mode, rate: o.rate, keyset: o.keyset, ...(o.practice === null ? {} : { practice: o.practice }), aborted: o.aborted },
       o.judge,
       o.audioLateMaxMs,
       at,
@@ -557,7 +628,18 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
         low = lo.state
         if (lo.changed) ctx.band({ kind: 'lowLoad', level: low.level })
       }
-      apply(runFrame(run, now, ts))
+      // 動画の回はこのフレームの読み（読めない・準備前は null）
+      const sample = port?.sample(now) ?? null
+      if (!videoReady && sample !== null) {
+        videoReady = true
+        show()
+      }
+      apply(runFrame(run, now, ts, sample))
+      ctx.devProbe?.play({
+        phase: runPhase(run),
+        source: run.session.play.source,
+        audio: out?.ctx.state ?? null,
+      })
       if (runPhase(run) === 'ended') {
         finish(run)
         // 画面を移った（unmount の cancel は走っている回に効かない）ので次を取らない
@@ -602,12 +684,16 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       status.textContent = song
       return
     }
+    // 動画の回か（sources[0] が youtube・「動画を使う」・練習室でない・門が真。練習〔S0d の段階も〕とは併せない、#94）
+    const practice = practiceOf()
+    const videoId = practice === undefined ? videoRunOf(song.sync, ctx.useVideo(), room) : null
     // 隣は六角の位置だけで決まる（R に依らない）ので、鍵盤図が入らない窓でも規則を作れる
     const byCode = buildKeyboardGrid(song.variant.layout, 1, { left: 0, top: 0 }).byCode
     const opts: RunOptions = {
       rules: rulesOf(prof.rules, {
         neighbor: neighborOf(byCode),
-        offsetMs: offsetFor(ctx.calibration(), 'audio'),
+        // 動画の回は youtube の校正（未校正 0。measured の分けと段 2 の提案は手順 9）
+        offsetMs: offsetFor(ctx.calibration(), videoId === null ? 'audio' : 'youtube'),
         // 自力率は見えているラベルで数える（退避はキー文字を必ず出す）
         labels: shownLabels,
         fadeFrozen,
@@ -616,9 +702,15 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       sound: { melody: settings.audio.guide, accomp: true, click: settings.audio.metronome },
       keyclick: settings.audio.keyclick,
       keyset,
-      ...(practiceOf() === undefined ? {} : { practice: practiceOf() }),
+      ...(practice === undefined ? {} : { practice }),
+      ...(videoId === null ? {} : { video: { videoId } }),
     }
     run = newRun(song, opts)
+    if (run.video !== null) {
+      // 動画の回: 矩形は口だけ（前に何も置かない、design §2.9）
+      player.replaceChildren(videoHost)
+      mountVideo()
+    }
     if (song.variant.layout !== layoutId) {
       layoutId = song.variant.layout
       layout()
@@ -643,6 +735,9 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
 
   home.hidden = true
   if (room) loopNote.hidden = true
+  // 音を出す準備は S2 を作る時にも（S1 の釦の click の中で同期に走る。動画の回の ▶ は iframe の中の操作なので、そこでは
+  // AudioContext を起こせない。m3-kickoff §7-14）
+  wake()
   layout()
   void load().then(() => {
     if (alive && run === null) home.hidden = false
@@ -663,6 +758,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       raf = null
       pump = null
       if (out !== null) cancelFrom(out, out.ctx.currentTime)
+      port?.dispose()
+      port = null
     },
   }
 }

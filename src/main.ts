@@ -1,6 +1,8 @@
 // 製品の入口（M1 の手順 2）。起動（保存層を開く → 旧鍵の移行 → 記録を読む → 初回なら S0、でなければ S1）の後、殻に
 // 画面を渡す。開発ページ（src/app/dev/*.html）への導線は開発時（vite dev）だけ S1 に出す。build では import.meta.env.DEV が
 // false で一覧ごと消え、dev の HTML も入口に入らない（vite の build は index.html だけを読む）。
+// M3 の手順 2: 開発時の曲（フィクスチャ 6 曲とクリック譜面の 6 行）・ダミー動画の口・pane から読む口 __hexnoteDev は
+// src/app/dev/ を DEV 分岐で動的に読む（build では分岐ごと消え、束に入らない。m3-kickoff §7-13・§7-39）。
 
 import './app/styles.css'
 import { boot } from './app/boot.ts'
@@ -13,7 +15,7 @@ import { playScreen } from './app/screens/play.ts'
 import { resultScreen } from './app/screens/result.ts'
 import { settingsScreen } from './app/screens/settings.ts'
 import { startShell, type DevPage, type ScreenFactory, type Shell } from './app/shell.ts'
-import { BUNDLED_SONGS, FIXTURE_SONGS, type SongEntry } from './app/songs.ts'
+import { BUNDLED_SONGS, type SongEntry } from './app/songs.ts'
 import { registerUpdates } from './app/sw-register.ts'
 import type { StorageFailure } from './storage/fallback.ts'
 import { openIdb } from './storage/idb.ts'
@@ -32,11 +34,13 @@ const DEV_PAGES: readonly DevPage[] = import.meta.env.DEV
     ]
   : []
 
-// 同梱曲（M1 の手順 6）。dev ではフィクスチャ 6 曲（vite dev が tests/ を配る）を「試験:」を付けて後ろに足す
-const SONGS: readonly SongEntry[] = [
-  ...BUNDLED_SONGS,
-  ...(import.meta.env.DEV ? FIXTURE_SONGS.map((s) => ({ ...s, name: `試験: ${s.name}` })) : []),
-]
+// 開発時だけの差し口（曲・ダミー動画の口・pane の観測口）。build では null（分岐ごと消える）
+const dev = import.meta.env.DEV
+  ? await Promise.all([import('./app/dev/dev-songs.ts'), import('./app/dev/dummy-port.ts')])
+  : null
+
+// 同梱曲（M1 の手順 6）。dev ではフィクスチャ 6 曲とクリック譜面の 6 行（vite dev が tests/ を配る）を「試験:」付きで後ろに足す
+const SONGS: readonly SongEntry[] = [...BUNDLED_SONGS, ...(dev?.[0].DEV_SONGS ?? [])]
 
 const SCREENS: Readonly<Record<ScreenId, ScreenFactory>> = {
   S0: onboardScreen,
@@ -75,5 +79,6 @@ shell = startShell({
   devPages: DEV_PAGES,
   songs: SONGS,
   updates,
+  ...(dev === null ? {} : { videoPort: dev[1].devVideoPort, devProbe: dev[1].installDevProbe() }),
 })
 for (const f of early) shell.band({ kind: 'storageFail', area: f.area })

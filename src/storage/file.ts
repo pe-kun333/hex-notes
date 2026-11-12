@@ -238,6 +238,15 @@ function syncUsed(x: unknown): SyncUsed | null {
     if (!isNum(x['fallbackAt']) || x['fallbackAt'] < 0) return null
     out.fallbackAt = x['fallbackAt']
   }
+  // 動画の回の offset・rate（M3 の手順 2）。無い記録も受ける
+  if (x['offset'] !== undefined) {
+    if (!isNum(x['offset'])) return null
+    out.offset = x['offset']
+  }
+  if (x['rate'] !== undefined) {
+    if (!isNum(x['rate']) || !(x['rate'] > 0)) return null
+    out.rate = x['rate']
+  }
   return out
 }
 

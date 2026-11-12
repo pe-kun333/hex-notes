@@ -188,6 +188,9 @@ describe('プレイ後の提案（段 2、#40 (c)・#62）', () => {
     chords: { hit: 0, total: 0 },
     shapes: { total: 0, cluster: 0, shell: 0, cross: 0 },
     aborted: false,
+    clock: 'novideo',
+    syncUsed: { kind: 'audio' },
+    videoEnded: false,
   }
 
   /** 平均 m・SD sd（標本）・n 個の標本（m ± a を交互に、n は偶数） */

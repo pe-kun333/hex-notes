@@ -70,12 +70,14 @@ describe('tools/charts/from-mel.ts', () => {
     expect(run(FROM_MEL, 'a', 'b').status).toBe(2)
   })
 
-  it('validate-charts（strict）で tests/fixtures/charts の 9 件が全て ✓（手順 3 の完了条件）', { timeout: TIMEOUT }, () => {
+  // M3 の手順 2 でクリック譜面（charts/m3/click.hexnote.json、tools/clicktrack/）を足して 10 件
+  it('validate-charts（strict）で tests/fixtures/charts の 10 件が全て ✓（手順 3 の完了条件）', { timeout: TIMEOUT }, () => {
     const r = run(VALIDATE, path.join(FIXTURES, 'charts'))
     expect(r.stderr).toBe('')
     expect(r.status).toBe(0)
     const ok = r.stdout.trim().split('\n').filter((l) => l.startsWith('✓ '))
-    expect(ok.length).toBe(9)
+    expect(ok.length).toBe(10)
+    expect(r.stdout).toContain('m3/click.hexnote.json')
     for (const f of FILES.filter((f) => f.startsWith('charts/'))) expect(r.stdout).toContain(f)
   }) // prettier-ignore
 })
