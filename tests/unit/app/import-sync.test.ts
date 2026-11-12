@@ -376,9 +376,9 @@ describe('部品の走り出しと止まり（期待値 (9)）', () => {
   })
 })
 
-describe('規約へのリンクの行（decisions #100、文と URL は仮）', () => {
-  it('YouTube 利用規約と Google プライバシーポリシー', () => {
+describe('規約へのリンクの行（decisions #100、文は仮）', () => {
+  it('YouTube 利用規約と Google プライバシーポリシー（URL は Developer Policies III.A.1・III.A.2 に書かれた物。M3 の手順 10 で照合）', () => {
     expect(`${TERMS_TEXT.before}${TERMS_TEXT.terms}${TERMS_TEXT.middle}${TERMS_TEXT.privacy}${TERMS_TEXT.after}`).toBe('YouTube の動画は YouTube 利用規約と Google プライバシーポリシーのもとで再生されます。')
-    expect([YOUTUBE_TERMS_URL, GOOGLE_PRIVACY_URL]).toEqual(['https://www.youtube.com/t/terms', 'https://policies.google.com/privacy'])
+    expect([YOUTUBE_TERMS_URL, GOOGLE_PRIVACY_URL]).toEqual(['https://www.youtube.com/t/terms', 'http://www.google.com/policies/privacy'])
   }) // prettier-ignore
 })

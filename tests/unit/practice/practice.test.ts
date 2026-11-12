@@ -108,6 +108,9 @@ describe('待ち wait.ts（§7-3、decisions #80）', () => {
   it('固定テンポは止まらない。源が動画なら常に固定テンポ', () => {
     expect(waitCheck(initialWait('fixed', notes, PULSE), notes, all, 9000).stop).toBe(false)
     expect([effectiveMode('note', 'video'), effectiveMode('phrase', 'video'), effectiveMode('note', 'novideo')]).toEqual(['fixed', 'fixed', 'note'])
+    // 源が動画なら待ちを出さない（III.F.3.b。M3 の手順 10 の照合表、期待値 (9)。練習の回は動画を受けない事は
+    // tests/unit/app/play-runner-video.test.ts の「練習（S4・S0d）を併せた回は動画なし」）
+    expect(effectiveMode('fixed', 'video')).toBe('fixed')
   }) // prettier-ignore
 })
 
