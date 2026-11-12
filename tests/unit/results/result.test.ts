@@ -157,6 +157,9 @@ function play(over: Partial<FinishedPlay> = {}, judgeOver = {}): FinishedPlay {
     chords: { hit: 14, total: 18 },
     shapes: { total: 18, cluster: 11, shell: 7, cross: 2 },
     aborted: false,
+    clock: 'novideo',
+    syncUsed: { kind: 'audio' },
+    videoEnded: false,
     record: resultRecord(META, judge),
     ...over,
   }

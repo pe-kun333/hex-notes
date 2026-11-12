@@ -8,6 +8,8 @@
 // 行は無い）・最大コンボ・ゲージ終値・点・FULL COMBO、塊／殻／段またぎ・FAST／SLOW・早遅ヒストグラム 11 本（30 ms 幅。
 // 計測の hist の 10 ms 幅とは別）、自力率は 3 区分（NEAR 無し、m6 selfRateHtml L611–616）。途中終了は見出し「途中終了」・
 // ランク「—」・点「—」（m6 L837・L842・L850）。
+// M3 の手順 2: 動画が曲末より前に終わった回も途中終了（aborted、m3-kickoff §7-16、仮）。ゲージ終値 0・点「—」はゲージ 0 の回
+// （judge.gamer.failed）だけにし、動画が先に終わった回は曲の行の下の注記に「動画が先に終わりました」（切替の注記と同じ所、§7-33）。
 
 import { KEYSET_NAMES, type KeysetId } from '../chart/keyset.ts'
 import { LAYOUTS } from '../layout/presets.ts'
@@ -39,6 +41,8 @@ const GAMER_WORDS = { hits: 'PERFECT／GREAT／GOOD', miss: 'MISS' } as const
 export const WAIT_ONLY_LEAN =
   '待ちで当てた音はずれに数えません（時刻どおりに当てた音がありません）。'
 export const HIST_BAR_MS = 30
+/** 動画が曲末より前に終わった回の注記（m3-kickoff §7-16、仮） */
+export const VIDEO_ENDED_NOTE = '動画が先に終わりました'
 export const HIST_BARS = 11
 
 export interface SelfPart {
@@ -53,6 +57,8 @@ export interface ResultView {
   /** 比較の範囲（完了条件。譜面版 id を入れる） */
   readonly scope: string
   readonly song: string
+  /** 曲の行の下の注記（動画が先に終わった回。無ければ null。M3 の手順 2） */
+  readonly note: string | null
   readonly accuracy: string
   readonly rank: string
   readonly rows: readonly (readonly [string, string])[]
@@ -141,6 +147,8 @@ export function resultView(p: FinishedPlay): ResultView {
   const finished = isFinished(r)
   const g = r.profile === 'gamer' ? p.judge.gamer : null
   const aborted = r.aborted === true
+  // ゲージ 0 の途中終了（動画が先に終わった回はゲージと点が実値、m3-kickoff §7-16、仮）
+  const failed = g !== null && g.failed
   const rows: [string, string][] =
     g === null
       ? [
@@ -161,11 +169,11 @@ export function resultView(p: FinishedPlay): ResultView {
       ['最大コンボ', String(p.judge.maxCombo)],
       [
         'ゲージ終値',
-        aborted
+        failed
           ? '0（途中終了）'
           : `${Math.floor(g.gauge)}（${g.cleared ? 'クリア' : 'クリアならず'}。クリアは ≥70）`,
       ],
-      ['点', aborted ? '—' : pointsText(g.points)],
+      ['点', failed ? '—' : pointsText(g.points)],
     )
   if (practice)
     rows.push(
@@ -190,6 +198,7 @@ export function resultView(p: FinishedPlay): ResultView {
     title: practice ? '練習の結果' : aborted ? '途中終了' : '結果',
     scope: `成績の比較は同じ譜面版（${r.variantId}）の中だけです。`,
     song: `${p.name} ・ ${variantText(r.variantId)} ・ ${PROFILE_NAMES[r.profile]} ・ 自前音源`,
+    note: p.videoEnded ? VIDEO_ENDED_NOTE : null,
     accuracy,
     // 判定した音が無い回（全て skipped）は精度もランクも「—」。途中終了もランク「—」（m6 L842）
     rank: accuracy === '—' || aborted ? '—' : r.rank,

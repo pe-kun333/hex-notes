@@ -68,7 +68,9 @@ export function newRecordId(
  * 同梱曲の完走の数はここを通る
  */
 export function isFinished(
-  r: Pick<ResultRecord, 'mode' | 'rate' | 'keyset' | 'skipped' | 'looped' | 'aborted'>,
+  r: Pick<ResultRecord, 'mode' | 'rate' | 'keyset' | 'skipped' | 'looped' | 'aborted'> & {
+    readonly syncUsed?: Pick<ResultRecord['syncUsed'], 'fallbackAt'>
+  },
 ): boolean {
   return (
     r.mode === 'fixed' &&
@@ -76,6 +78,8 @@ export function isFinished(
     r.keyset === 'all' &&
     r.skipped === 0 &&
     r.looped !== true &&
-    r.aborted !== true
+    r.aborted !== true &&
+    // 動画なしへ切り替わった回（S7c）は完走・自己ベストの外（M3 の手順 2 の安全弁。m3-kickoff §7-17、仮）
+    r.syncUsed?.fallbackAt === undefined
   )
 }

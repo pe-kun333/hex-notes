@@ -11,6 +11,9 @@
 // #81・#87、m2-kickoff 手順 5・§7-3・§7-10・§7-11）。描画は曲時間軸のまま（テンポ段で跳ばない）。
 // M2 の手順 9（M2-05）: 音ゲー向けのゲージ 0（判定層の score.failed）で PlayEvent の abort を出して終了し、記録に aborted
 // を付ける。練習（S4・S0d）は途中終了しない（区間を繰り返す回を止めない。decisions #91、仮）。
+// M3 の手順 2（M3-03 前半）: RunOptions.video で動画の回（源 video。時計は動画の軸、Run.t は sync の軸で譜面の ms、判定と
+// 予約は同じ軸で換算）。要求は効果 video で画面が口へ渡す。発音の列は空（誤打の打鍵音だけ、m3-kickoff §7-14）。記録は回の
+// 始めの源・sync の offset と rate・切替の fallbackAt。動画が先に終わった回は aborted（§7-16）、動画の回は校正 段 2 の外。
 
 import { keyclickFor, type KeyclickPlan } from '../audio/keyclick.ts'
 import {
@@ -26,9 +29,9 @@ import {
 import { filterKeyset, type KeysetId } from '../chart/keyset.ts'
 import { buildMsTable, type MsTable } from '../chart/mstable.ts'
 import type { AudioBridge } from '../clock/audio-bridge.ts'
-import { perfAt } from '../clock/map.ts'
-import type { ClockMap } from '../clock/types.ts'
-import type { KeyCode, PlayMode } from '../shared/types.ts'
+import { IDENTITY_AXIS, axisOf, perfAt, toChartMs, type SyncAxis } from '../clock/map.ts'
+import type { ClockMap, VideoRequest, VideoSample } from '../clock/types.ts'
+import type { ClockKind, KeyCode, PlayMode, SyncUsed } from '../shared/types.ts'
 import { phraseOfBar } from '../practice/bars.ts'
 import {
   initialLoop,
@@ -103,6 +106,7 @@ import {
   collectClock,
   collectFrame,
   collectPress,
+  fallbackAtMs,
   initialCollect,
   type PlayCollect,
 } from '../telemetry/collect.ts'
@@ -117,6 +121,8 @@ export interface RunSong {
   readonly name: string
   readonly chart: Pick<Chart, 'notes' | 'pulse' | 'accompaniment'>
   readonly variant: Variant
+  /** 譜面の sync（songOf が写す。動画の回の軸と記録の offset・rate） */
+  readonly sync?: Chart['sync']
 }
 
 export interface RunOptions {
@@ -132,6 +138,11 @@ export interface RunOptions {
   readonly keyset?: KeysetId
   /** 練習（S4・S0d。無ければ通常プレイ ＝ 固定テンポ・1.0 倍・ループ無し） */
   readonly practice?: PracticeOptions
+  /**
+   * 動画の回（video-run.ts の videoRunOf が動画 ID を返した回。M3 の手順 2）。練習とは併せて受けない（練習があれば動画なし
+   * の回、decisions #94）
+   */
+  readonly video?: { readonly videoId: string }
 }
 
 /** 練習の設定（殻が持ち、保存しない。m2-kickoff §7-7） */
@@ -189,12 +200,20 @@ export interface PracticeRun {
 export interface Run {
   readonly song: RunSong
   readonly opts: RunOptions
-  /** プレイの状態機械と時計（動画なし。t は譜面の ms、開始は −LEAD_MS） */
+  /** プレイの状態機械と時計（動画なしは t ＝ 譜面の ms で開始は −LEAD_MS。動画の回は動画の軸で、最初の PLAYING から） */
   readonly session: Session
-  /** 最後の歩の写像（次の歩まで。押下の tsPerf → 曲 ms、発音の予約） */
+  /** 最後の歩の写像（時計の軸のまま。次の歩まで。押下の tsPerf → 曲 ms、発音の予約は軸で換算） */
   readonly map: ClockMap
-  /** 最後の歩の t（曲 ms） */
+  /** 最後の歩の t（譜面の ms。動画の回は toChartMs で換算した値） */
   readonly t: number
+  /** 時計の軸 → 譜面の軸（動画なしは恒等。動画の回は sync.sources[0]） */
+  readonly axis: SyncAxis
+  /** 動画の回（RunOptions.video。動画なしは null） */
+  readonly video: { readonly videoId: string } | null
+  /** 回の間に時計が通った再生レート（変わるたびに足す。記録の rate、decisions #87 (e)） */
+  readonly clockRates: readonly number[]
+  /** 曲末より前に動画が終わった（held(ended)。記録の aborted、m3-kickoff §7-16） */
+  readonly videoEnded: boolean
   /** 描画層のノート（全部 pending。状態は runNotes で判定から写す） */
   readonly notes: readonly FrameNote[]
   readonly judge: JudgeState
@@ -215,6 +234,10 @@ export type RunEffect =
   | { readonly kind: 'keyclick'; readonly plan: KeyclickPlan }
   /** 先の予約を止める（再アンカー・一時停止・やり直し。context.ts の cancelFrom を今の時刻で） */
   | { readonly kind: 'cancelSounds' }
+  /** 動画への要求（出た順に口の apply へ。M3 の手順 2） */
+  | { readonly kind: 'video'; readonly request: VideoRequest }
+  /** 動画の回の「最初から」: iframe を作り直して利用者の ▶ を待つ（decisions #95） */
+  | { readonly kind: 'videoReset' }
 
 export interface RunStep {
   readonly run: Run
@@ -247,28 +270,37 @@ function newPractice(song: RunSong, notes: readonly FrameNote[], p: PracticeOpti
   }
 }
 
-/** 待機の回（Space を待つ）。ノート・発音の列はここで 1 回作る */
+/** 待機の回（動画なしは Space、動画の回は利用者の ▶ を待つ）。ノート・発音の列はここで 1 回作る */
 export function newRun(song: RunSong, opts: RunOptions): Run {
   const all = frameNotes(song.chart, song.variant)
   // 鍵数制限で外した音は判定にも描画にも出さない。終わりと進行は曲全体（ガイド音は外さないので最後まで鳴る）
   const notes = [...filterKeyset(all, opts.keyset ?? 'all')]
   const endMs = endAtMs(all)
   const practice = opts.practice === undefined ? null : newPractice(song, notes, opts.practice)
+  // 動画の回は練習と併せない。軸は sync.sources[0]、判定も同じ軸で換算する
+  const video = practice === null ? (opts.video ?? null) : null
+  const axis = video === null ? IDENTITY_AXIS : axisOf(song.sync?.sources ?? [])
+  const o: RunOptions = video === null ? opts : { ...opts, rules: { ...opts.rules, axis } }
   // 始めの区間があれば始点の 1 小節前から（それより前の音は開始の猶予で skipped）
   const range = practice?.loop.range ?? null
   const t0 = range === null || practice === null ? -LEAD_MS : loopSeekMs(practice.ms, song.chart.pulse, range, LEAD_MS)
   return {
     song,
-    opts,
-    session: initialSession({ mode: 'novideo', t0, ...(practice === null ? {} : { rate: practice.rate }) }),
-    map: { a: 0, b: t0 },
-    t: t0,
+    opts: o,
+    session: video !== null ? initialSession({ mode: 'video', t0: 0 }) : initialSession({ mode: 'novideo', t0, ...(practice === null ? {} : { rate: practice.rate }) }),
+    map: { a: 0, b: video === null ? t0 : 0 },
+    t: video === null ? t0 : toChartMs(0, axis),
+    axis,
+    video,
+    clockRates: [practice?.rate ?? 1],
+    videoEnded: false,
     notes,
-    judge: initialJudge(notes, opts.rules, opts.fade),
+    judge: initialJudge(notes, o.rules, o.fade),
     lastEndMs: endMs - END_TAIL_MS,
     endMs,
     collect: initialCollect(),
-    items: soundItems(song.chart, song.variant, opts.sound),
+    // 動画の回は旋律・伴奏・クリックを鳴らさない（誤打の打鍵音だけ。design L150、m3-kickoff §7-14）
+    items: video === null ? soundItems(song.chart, song.variant, o.sound) : [],
     sched: initialScheduler(),
     practice,
   }
@@ -311,20 +343,29 @@ function applyStep(r: Run, step: SessionStep, realNow: number, effects: RunEffec
   let cancel = false
   for (const ev of step.out.events)
     if (ev.kind === 'resync') {
-      // 動画なしは時計の軸 ＝ 譜面の軸
-      sched = seekSchedule(sched, r.items, ev.t)
+      // 予約の列は譜面の ms（動画なしは時計の軸 ＝ 譜面の軸）
+      sched = seekSchedule(sched, r.items, toChartMs(ev.t, r.axis))
       cancel = true
     }
   const phase = step.session.play.phase
   // 一時停止・待ちに入ったら先の予約を止める（待ちの解除は着地から数え直す）
   if ((phase === 'paused' || phase === 'waiting') && before !== phase) cancel = true
   if (cancel) effects.push({ kind: 'cancelSounds' })
+  // 動画への要求は出た順に。同じ歩に held(ended) があれば再開の playVideo は出さない（一時停止の間に終わった動画を鳴らし
+  // 直さない。状態機械は不変、m3-kickoff §7-16、仮）
+  const ended = step.out.events.some((e) => e.kind === 'held' && e.state === 'ended')
+  for (const q of step.video)
+    if (!(ended && q.kind === 'playVideo')) effects.push({ kind: 'video', request: q })
+  const rate = step.session.clock.rate
   const j = judgeClock(r.judge, step.out.events, { map: step.out.map, now: realNow })
   const next: Run = {
     ...r,
     session: step.session,
     map: step.out.map,
-    t: step.out.t,
+    t: toChartMs(step.out.t, r.axis),
+    clockRates:
+      rate === r.clockRates[r.clockRates.length - 1] ? r.clockRates : [...r.clockRates, rate],
+    videoEnded: r.videoEnded || (r.video !== null && ended && before !== 'ended'),
     collect: collectClock(r.collect, step.out),
     judge: j.state,
     sched,
@@ -595,12 +636,19 @@ export function runRelease(
 
 /**
  * 毎フレーム（rAF 1 本）。計測（待機の間は数えない）→ 時計 → 判定の掃き出し → 終了（t が終了の曲 ms を過ぎた再生中は
- * chartEnd）。frameMs は rAF の引数、now は performance.now
+ * chartEnd）。frameMs は rAF の引数、now は performance.now、sample はこのフレームの動画の読み（動画の回だけ使う。読めない
+ * フレームは null）
  */
-export function runFrame(r: Run, now: number, frameMs: number): RunStep {
+export function runFrame(
+  r: Run,
+  now: number,
+  frameMs: number,
+  sample: VideoSample | null = null,
+): RunStep {
   const effects: RunEffect[] = []
   const collect = runPhase(r) === 'idle' ? r.collect : collectFrame(r.collect, frameMs)
-  let next = applyStep({ ...r, collect }, sessionTick(r.session, now, null), now, effects)
+  const read = r.video === null ? null : sample
+  let next = applyStep({ ...r, collect }, sessionTick(r.session, now, read), now, effects)
   // 待ちは掃き出しより先（途切れたフレームの後でも、待つ音を MISS にせず止める）
   if (next.practice !== null) next = waitStopFirst(next, now, effects)
   const j = judgeSweep(next.judge, { map: next.map, now })
@@ -639,7 +687,7 @@ export function runPump(
   now: number,
   bridge: AudioBridge,
 ): { run: Run; play: ScheduledSound[] } {
-  const p = pumpSchedule(r.sched, r.items, { map: r.map, now }, bridge)
+  const p = pumpSchedule(r.sched, r.items, { map: r.map, now, axis: r.axis }, bridge)
   return { run: p.state === r.sched ? r : { ...r, sched: p.state }, play: p.play }
 }
 
@@ -680,8 +728,14 @@ export interface PlayResult {
   readonly chords: ChordRate
   /** 和音の形（塊／殻／段またぎ。S3 の音ゲー向けの節） */
   readonly shapes: ChordShapes
-  /** 途中終了（音ゲー向けのゲージ 0 の通常プレイ。記録の aborted） */
+  /** 途中終了（音ゲー向けのゲージ 0 の通常プレイと、曲末より前に動画が終わった回。記録の aborted） */
   readonly aborted: boolean
+  /** 回の始めの源（記録の clock。M3 の手順 2） */
+  readonly clock: ClockKind
+  /** 使った音源（動画の回は youtube と動画 ID・offset・rate、切り替わった回は fallbackAt） */
+  readonly syncUsed: SyncUsed
+  /** 曲末より前に動画が終わった（S3 の注記「動画が先に終わりました」、m3-kickoff §7-16） */
+  readonly videoEnded: boolean
 }
 
 /** 練習の要約（m6 L451「測ること」: ループの回数・テンポ段の始めと終わり・待った回数、§7-20） */
@@ -712,11 +766,25 @@ function noteOutcomes(r: Run): NoteOutcome[] {
   })
 }
 
+/** 使った音源（動画なしは audio。動画の回は sources[0] の offset・rate を写し、切り替わった回は fallbackAt を譜面の ms で） */
+function syncUsedOf(r: Run): SyncUsed {
+  if (r.video === null) return { kind: 'audio' }
+  const f = fallbackAtMs(r.collect, r.axis)
+  return {
+    kind: 'youtube',
+    videoId: r.video.videoId,
+    offset: r.axis.offset,
+    rate: r.axis.rate,
+    ...(f === undefined ? {} : { fallbackAt: Math.max(0, Math.round(f)) }),
+  }
+}
+
 export function runOutcome(r: Run): PlayResult {
   const notes = noteOutcomes(r)
   const p = r.practice
   const mode = p?.mode ?? 'fixed'
-  const rate = p === null ? 1 : recordRate(p.rates)
+  // 練習はテンポ段の列、他は時計が通った再生レート（動画の回で利用者がレートを変えた回は練習記録、§7-16）
+  const rate = recordRate(p === null ? r.clockRates : p.rates)
   const keyset = r.opts.keyset ?? 'all'
   const practice: PracticeSummary | null =
     p === null
@@ -739,12 +807,20 @@ export function runOutcome(r: Run): PlayResult {
     mode,
     rate,
     practice,
+    // 動画の回は校正 段 2 の外（開くのは手順 9）
     calibEligible:
-      keyset === 'all' && mode === 'fixed' && rate === 1 && (practice?.loops ?? 0) === 0,
+      keyset === 'all' &&
+      mode === 'fixed' &&
+      rate === 1 &&
+      (practice?.loops ?? 0) === 0 &&
+      r.video === null,
     weak: weakBars(r.song.chart.pulse, notes),
     chords: chordRate(notes),
     shapes: chordShapes(notes),
-    aborted: p === null && r.judge.score.failed,
+    aborted: (p === null && r.judge.score.failed) || r.videoEnded,
+    clock: r.video === null ? 'novideo' : 'video',
+    syncUsed: syncUsedOf(r),
+    videoEnded: r.videoEnded,
   }
 }
 
@@ -756,8 +832,8 @@ export interface FinishedPlay extends PlayResult {
 }
 
 /**
- * 終わった回と記録。動画なし（clock novideo・syncUsed audio）。待ち方・テンポ段・ループは練習層の実値（M2-03）、鍵数制限は
- * RunOptions.keyset。id と at は呼ぶ側（crypto.randomUUID と Date）
+ * 終わった回と記録。clock は回の始めの源、syncUsed は使った音源（M3 の手順 2）。待ち方・テンポ段・ループは練習層の実値
+ * （M2-03）、鍵数制限は RunOptions.keyset。id と at は呼ぶ側（crypto.randomUUID と Date）
  */
 export function finishedPlay(
   r: Run,
@@ -770,12 +846,12 @@ export function finishedPlay(
       chartId: o.chartId,
       variantId: o.variantId,
       profile: meta.profile,
-      clock: 'novideo',
+      clock: o.clock,
       mode: o.mode,
       rate: o.rate,
       keyset: o.keyset,
       at: meta.at,
-      syncUsed: { kind: 'audio' },
+      syncUsed: o.syncUsed,
       offsetUsed: o.offsetUsed,
       ...((o.practice?.loops ?? 0) > 0 ? { looped: true } : {}),
       ...(o.aborted ? { aborted: true } : {}),
@@ -809,7 +885,15 @@ export function runControl(
   if (a.kind === 'quit') return { step: null, go: 'S1', fresh: false }
   if (a.kind === 'restart') {
     // 足場外しの α はこの回で動いた所から続ける（M2-04）
-    const s = runInput(newRun(r.song, { ...r.opts, fade: r.judge.fade }), now, { kind: 'start' })
+    const fresh = newRun(r.song, { ...r.opts, fade: r.judge.fade })
+    // 動画の回は start を入れず、待機の新しい回と iframe の作り直し（利用者の ▶ を待つ。decisions #95）
+    if (fresh.video !== null)
+      return {
+        step: { run: fresh, effects: [{ kind: 'cancelSounds' }, { kind: 'videoReset' }] },
+        go: null,
+        fresh: true,
+      }
+    const s = runInput(fresh, now, { kind: 'start' })
     return {
       step: { run: s.run, effects: [{ kind: 'cancelSounds' }, ...s.effects] },
       go: null,

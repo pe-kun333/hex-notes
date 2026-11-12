@@ -29,6 +29,7 @@
     "charts:fixtures": "node tools/charts/from-mel.ts",
     "charts:fixtures:check": "node tools/charts/from-mel.ts --check",
     "charts:validate:fixtures": "node tools/charts/validate-charts.ts tests/fixtures/charts",
+    "charts:clicktrack": "node tools/clicktrack/run.ts",
     "harness": "node tools/harness/run.ts",
     "harness:check": "node tools/harness/run.ts --check"
   },

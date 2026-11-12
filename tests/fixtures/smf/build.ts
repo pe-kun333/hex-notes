@@ -2,68 +2,31 @@
 // 出どころ: m2-kickoff 手順 1 の「作る」（形式 0 の 2 音、形式 1 の旋律＋和音＋ch 10 ドラムの 3 トラック、テンポ変化 2 点、
 // Shift_JIS と UTF-8 のトラック名、mel 形 → 形式 1 の SMF）、M1 の tests/unit/chart/metrics-smf.test.ts の smf()（ここへ移した）。
 
+// M3 の手順 2: 書き手（smfBytes・vlq・tempoEv・END・noteEvents）は tools/charts/smf-write.ts へ移し、ここは再 export（§7-9）。
+
 import type { MelSong } from '../../../tools/charts/mel-songs.ts'
+import {
+  END,
+  ascii,
+  noteEvents,
+  smfBytes,
+  tempoEv,
+  vlq,
+  type SmfEvent,
+} from '../../../tools/charts/smf-write.ts'
 
-/** 1 つのイベント: [差分 tick, バイト列] */
-export type SmfEvent = readonly [number, readonly number[]]
-
-/** 可変長の数 */
-export function vlq(n: number): number[] {
-  const out = [n & 0x7f]
-  for (n >>= 7; n > 0; n >>= 7) out.unshift((n & 0x7f) | 0x80)
-  return out
-}
-
-const ascii = (s: string): number[] => [...s].map((c) => c.charCodeAt(0))
-const u32 = (x: number): number[] => [(x >>> 24) & 255, (x >>> 16) & 255, (x >>> 8) & 255, x & 255]
-const u16 = (x: number): number[] => [(x >>> 8) & 255, x & 255]
-
-/** SMF を組む（形式・division・トラックごとのイベントの列） */
-export function smfBytes(format: number, division: number, tracks: readonly (readonly SmfEvent[])[]): Uint8Array {
-  const out = [...ascii('MThd'), ...u32(6), ...u16(format), ...u16(tracks.length), ...u16(division)]
-  for (const ev of tracks) {
-    const body = ev.flatMap(([dt, b]) => [...vlq(dt), ...b])
-    out.push(...ascii('MTrk'), ...u32(body.length), ...body)
-  }
-  return new Uint8Array(out)
-}
-
-/** テンポ（BPM）のメタ */
-export function tempoEv(bpm: number): number[] {
-  const us = Math.round(60_000_000 / bpm)
-  return [0xff, 0x51, 3, (us >> 16) & 255, (us >> 8) & 255, us & 255]
-}
+export { END, noteEvents, smfBytes, tempoEv, vlq, type SmfEvent }
 
 /** トラック名のメタ（バイト列のまま） */
 export function nameEv(bytes: readonly number[]): number[] {
   return [0xff, 0x03, ...vlq(bytes.length), ...bytes]
 }
 
-export const END: readonly number[] = [0xff, 0x2f, 0]
 export const TEMPO_120: readonly number[] = tempoEv(120)
 
 /** Shift_JIS の「メロ」・UTF-8 の「メロ」 */
 export const SJIS_MERO: readonly number[] = [0x83, 0x81, 0x83, 0x8d]
 export const UTF8_MERO: readonly number[] = [...new TextEncoder().encode('メロ')]
-
-/** 音の列 → 1 チャンネルのイベント（同じ tick の音は同時。off は全て on の後） */
-export function noteEvents(
-  ch: number,
-  notes: readonly { midi: number; tick: number; dtick: number; vel?: number }[],
-): SmfEvent[] {
-  const ev: { tick: number; order: number; bytes: number[] }[] = []
-  for (const n of notes) {
-    ev.push({ tick: n.tick, order: 1, bytes: [0x90 | ch, n.midi, n.vel ?? 100] })
-    ev.push({ tick: n.tick + n.dtick, order: 0, bytes: [0x80 | ch, n.midi, 0] })
-  }
-  ev.sort((a, b) => a.tick - b.tick || a.order - b.order)
-  let at = 0
-  return ev.map((e) => {
-    const dt = e.tick - at
-    at = e.tick
-    return [dt, e.bytes] as const
-  })
-}
 
 /** 形式 0 の 2 音（M1 手順 6 と同じ: on 60 vel 100 @0、off @480、on 64 @480、off @960、tempo 120、PPQ 480） */
 export function format0TwoNotes(): Uint8Array {

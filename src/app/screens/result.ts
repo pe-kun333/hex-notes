@@ -83,6 +83,7 @@ export function resultScreen(ctx: ScreenContext): ScreenView {
         ...(v.fullCombo ? [h(doc, 'div', { className: 'fc' }, h(doc, 'div', { className: 'note', text: 'コンボ' }), h(doc, 'div', { className: 'rank', text: 'FULL COMBO' }))] : []),
       ),
       h(doc, 'p', { className: 'note', text: v.song }),
+      ...(v.note === null ? [] : [h(doc, 'p', { className: 'note', text: v.note })]),
       table,
     )
     const side = h(doc, 'div', { className: 'card' }, h(doc, 'h3', { text: '自力率' }))

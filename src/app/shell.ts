@@ -2,12 +2,16 @@
 // 1 か所に持つ。出どころ: design.md §1.2・§1.3 S2（通知はプレイヤー矩形の外）・§2.8（Enter＝ボタン決定）、decisions #26
 // （演奏・役割の鍵は preventDefault するので、Enter で焦点のボタンを押すのはここ）・#65（帯の置き場、仮）、m6 `render` L946–950
 // （状態 → 描く）。状態は startShell の閉包に持つ（グローバルに置かない）。試験の外（DOM）なので手で確かめる（M1 の手順 14）。
+// M3 の手順 2: 「動画を使う」（useVideo。保存しない・既定 真、切替は手順 4）と動画の口（videoPort。DEV の差し口が返せば
+// それ、無ければ実物の口 createYoutubePlayer）と DEV の観測口（devProbe）を画面へ渡す（m3-kickoff §7-13）。
 
 import { createAudioOut, type AudioOut } from '../audio/context.ts'
 import type { KeysetId } from '../chart/keyset.ts'
 import { validateChart } from '../chart/validate.ts'
 import type { VariantSpec } from '../chart/variants.ts'
+import type { ClockMode, VideoPort } from '../clock/types.ts'
 import type { InputEvent } from '../input/keyboard.ts'
+import type { PlayPhase } from '../play/state.ts'
 import type { FadeState } from '../judge/self-rate.ts'
 import type { DeviceInfo, SyncKind } from '../shared/types.ts'
 import type { OnboardState, TutorialRun } from './onboard-flow.ts'
@@ -38,11 +42,27 @@ import type { FinishedPlay, PracticeOptions } from './play-runner.ts'
 import { navigate, type Route, type ScreenId } from './router.ts'
 import { songList, type SongEntry } from './songs.ts'
 import { INITIAL_UPDATE, type UpdateState } from './sw-update.ts'
+import { createYoutubePlayer, type MountOptions } from './youtube-player.ts'
 
 /** 開発ページへの導線（dev のときだけ S1 に出す。build では空） */
 export interface DevPage {
   readonly href: string
   readonly label: string
+}
+
+/** S2 の回の様子（DEV の観測口へ。毎フレーム） */
+export interface DevPlayState {
+  readonly phase: PlayPhase
+  /** 回の今の源（動画の回は video、S7c の後は novideo） */
+  readonly source: ClockMode
+  /** AudioContext の state（まだ作っていなければ null） */
+  readonly audio: AudioContextState | null
+}
+
+/** 開発時の観測口（src/app/dev/dummy-port.ts の __hexnoteDev が写す。build では無い） */
+export interface DevProbe {
+  play(s: DevPlayState): void
+  finished(r: FinishedPlay): void
 }
 
 /** 画面が殻から受け取る物 */
@@ -115,6 +135,12 @@ export interface ScreenContext {
   update(): UpdateState
   /** 待っている版に入れ替えてページを読み直す（S6・S3 の「更新する」。S2 には出さない、ADR 0004） */
   applyUpdate(): void
+  /** 「動画を使う」（保存しない・既定 真。切替は M3 の手順 4。video-run.ts の videoRunOf の use） */
+  useVideo(): boolean
+  /** 動画の口（S2 の動画の回。DEV の差し口が口を返せばそれ、無ければ実物の口。事象はどちらも o.onEvent へ） */
+  videoPort(o: MountOptions): VideoPort
+  /** 開発時の観測口（build では null） */
+  readonly devProbe: DevProbe | null
 }
 
 /** 画面の DOM と受け口 */
@@ -145,6 +171,10 @@ export interface ShellOptions {
   readonly songs?: readonly SongEntry[]
   /** SW の登録（sw-register.ts。無ければ SW を使わない扱い） */
   readonly updates?: { state(): UpdateState; apply(): void }
+  /** 動画の口の差し口（DEV のダミーの口。null を返せば実物の口。src/app/dev/dummy-port.ts） */
+  readonly videoPort?: (o: MountOptions) => VideoPort | null
+  /** 開発時の観測口（src/app/dev/dummy-port.ts） */
+  readonly devProbe?: DevProbe
 }
 
 export interface Shell {
@@ -317,6 +347,9 @@ export function startShell(opts: ShellOptions): Shell {
       // プレイ中は入れ替えない（S2 は釦を出さないが、念のため殻でも止める。ADR 0004）
       if (route.screen !== 'S2') opts.updates?.apply()
     },
+    useVideo: () => true,
+    videoPort: (o) => opts.videoPort?.(o) ?? createYoutubePlayer(o),
+    devProbe: opts.devProbe ?? null,
   }
 
   const mount = (): void => {

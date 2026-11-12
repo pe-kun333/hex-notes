@@ -1,7 +1,8 @@
 // 曲の一覧と譜面版の選び方（M1 の手順 3。同梱曲は手順 6）。出どころ: m1-kickoff 手順 3（完了条件「手弾きで 6 曲〔フィクスチャ〕を S2 で
 // 通す」。play-dev の曲・配列の select → 設定とプロファイルから）・§7-10（版の自動選択は手順 8）、decisions #7（上限の既定 2）・
 // #23（同梱曲の版は ableton×{2,3}・vmpk×{2,3}、fold octave）。同梱曲（content/charts/）と S1 の一覧は手順 6・8 で、
-// それまでは回帰ハーネスのフィクスチャ 6 曲を dev のときだけ S1 に出す（src/main.ts。build では空）。M2 の手順 2 で持ち込み曲
+// それまでは回帰ハーネスのフィクスチャ 6 曲を dev のときだけ S1 に出す（M3 の手順 2 で src/app/dev/dev-songs.ts へ移した。
+// src/main.ts の DEV 分岐が動的に読み、build の束に tests/ の道が残らない）。M2 の手順 2 で持ち込み曲
 // （IndexedDB の charts）を足した: 一覧の 1 曲は load() で譜面を読む（同梱曲は url の fetch、持ち込みは保存した Chart）。
 
 import { validateChart } from '../chart/validate.ts'
@@ -25,7 +26,7 @@ export interface UrlSong extends SongEntry {
 }
 
 /** url を fetch して JSON を読む（HTTP の失敗は投げる） */
-function urlSong(id: string, name: string, url: string): UrlSong {
+export function urlSong(id: string, name: string, url: string): UrlSong {
   return {
     id,
     name,
@@ -68,18 +69,6 @@ export const BUNDLED_SONGS: readonly UrlSong[] = [
 /** チュートリアル曲（S0d。手順 7 の鍵数制限の 3 段階、手順 9 の導線） */
 export const TUTORIAL_SONG_ID = 'bundled:tutorial/hajime'
 
-/** 手順 3 の曲: tests/fixtures/charts/m1/ の 6 曲（vite dev が配る。play-dev と同じ）。名前は譜面の name */
-export const FIXTURE_SONGS: readonly UrlSong[] = [
-  ['twinkle', 'きらきら星'],
-  ['ode', '歓喜の歌'],
-  ['scale', 'スケール走り'],
-  ['chroma', '半音階ドリル'],
-  ['duet', '二声（旋律＋ベース）'],
-  ['canon', 'カノン進行（三和音）'],
-].map(([id, name]) =>
-  urlSong(`fixture:${id}`, name ?? '', `/tests/fixtures/charts/m1/${id}.hexnote.json`),
-)
-
 /**
  * 譜面にその版があればそれ。譜面が版を持つのにその配列の版が 1 つも無ければ（チュートリアル曲は Ableton 型の 1 版だけ、
  * §1.3 S0d「常に Ableton 型」）作らずに譜面の最初の版、他は作る（持ち込み曲は M2-01 で全部の版を作るので、ここは足りない
@@ -103,5 +92,12 @@ export function songOf(json: unknown, spec: VariantSpec): RunSong | string {
   }
   // validateChart は notes の並び（拍の順・同拍は midi 昇順）も見るので、buildVariant は投げない
   const chart = r.chart
-  return { chartId: chart.id, name: chart.name, chart, variant: variantFor(chart, spec) }
+  // sync は動画の回の軸と記録の offset・rate（M3 の手順 2）
+  return {
+    chartId: chart.id,
+    name: chart.name,
+    chart,
+    variant: variantFor(chart, spec),
+    ...(chart.sync === undefined ? {} : { sync: chart.sync }),
+  }
 }

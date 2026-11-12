@@ -197,6 +197,12 @@ export interface SyncUsed {
   videoId?: string
   /** 途中で動画なしへ切り替わった時刻（曲の ms）。無ければ切替なし */
   fallbackAt?: number
+  /**
+   * 動画の回に使った sources[0] の offset（秒）と rate（design §3.3 L172「履歴は…offset／rate を自分の行に写す」。M3 の
+   * 手順 2）。動画なしの回と、これより前の記録には無い
+   */
+  offset?: number
+  rate?: number
 }
 
 export interface ResultRecord {
@@ -229,7 +235,8 @@ export interface ResultRecord {
   looped?: boolean
   /**
    * 途中終了（音ゲー向けのゲージ 0。完走・自己ベスト・初クリアの対象外、ストリークの対象プレイには入る。M2-05、
-   * m2-kickoff §7-14）。途中終了しなかった回は書かない（無ければ偽）
+   * m2-kickoff §7-14。動画の回で曲末より前に動画が終わった回も、M3 の手順 2、m3-kickoff §7-16、仮）。途中終了しなかった回は
+   * 書かない（無ければ偽）
    */
   aborted?: boolean
 }
