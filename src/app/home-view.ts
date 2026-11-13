@@ -6,10 +6,11 @@
 // 上限は 2 を選び、端末の上限までは選べる）。M1 で隠す物（プロファイル切替・持ち込み・動画の切替・絞り込み）は出さない。
 // 純関数（DOM は screens/home.ts）。
 // M3 の手順 4（m3-kickoff 手順 4・§7-24）: 音源の印 videoBadge と「動画を使う」の既定 useVideoDefault、カードの自己ベストの clock
-// （CardContext.clock。無ければ novideo）。門（VIDEO_FEATURE）が偽なら youtube の sync 付きの曲も自前音源の印で切替なし。
+// （CardContext.clock。無ければ novideo）。M3 の手順 4〜12 は製品の束の門 VIDEO_FEATURE の内だった（門を外す PR で外した、
+// decisions #114）。
 
 import { LAYOUTS } from '../layout/presets.ts'
-import { VIDEO_FEATURE, videoRunOf } from './video-run.ts'
+import { videoRunOf } from './video-run.ts'
 import {
   DEFAULT_CHORD_LIMIT,
   type Chart,
@@ -188,18 +189,14 @@ export const AUDIO_BADGE = '自前音源'
 /** 埋め込み不可を記録した曲の印（m6 L763、M3 の手順 5） */
 export const NOEMBED_BADGE = '動画なしで遊べます（埋め込み不可を記録）'
 
-/** 動画で遊べる曲か（sources[0] が youtube で動画 ID が正しい・門が真。videoRunOf の use 真・S1） */
-export function videoPlayable(sync: Chart['sync'], feature: boolean = VIDEO_FEATURE): boolean {
-  return videoRunOf(sync, true, false, feature) !== null
+/** 動画で遊べる曲か（sources[0] が youtube で動画 ID が正しい。videoRunOf の use 真・S1） */
+export function videoPlayable(sync: Chart['sync']): boolean {
+  return videoRunOf(sync, true, false) !== null
 }
 
 /** 音源の印の文字（埋め込み不可を記録した動画なら NOEMBED_BADGE） */
-export function videoBadge(
-  sync: Chart['sync'],
-  feature: boolean = VIDEO_FEATURE,
-  noEmbed: readonly string[] = [],
-): string {
-  if (!videoPlayable(sync, feature)) return AUDIO_BADGE
+export function videoBadge(sync: Chart['sync'], noEmbed: readonly string[] = []): string {
+  if (!videoPlayable(sync)) return AUDIO_BADGE
   const id = sync?.sources[0]?.videoId
   return id !== undefined && noEmbed.includes(id) ? NOEMBED_BADGE : VIDEO_BADGE
 }
@@ -248,7 +245,7 @@ export function songCard(id: string, chart: Chart, c: CardContext): SongCard {
       : `自己ベスト ${(b.acc * 100).toFixed(1)}% ${b.rank}（${PROFILE_NAMES[c.profile]} ・ ${b.variantId}）`,
     variants: variantsText(chart),
     choice,
-    badge: videoBadge(chart.sync, VIDEO_FEATURE, c.noEmbed ?? []),
+    badge: videoBadge(chart.sync, c.noEmbed ?? []),
   }
 } // prettier-ignore
 

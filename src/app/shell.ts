@@ -22,7 +22,11 @@ import { BOOTED_KEY, isFirstRun } from '../storage/session.ts'
 import {
   LOCAL_KEYS,
   loadCalibration,
+  datedNoEmbed,
   loadNoEmbed,
+  noEmbedExpiry,
+  noEmbedIds,
+  parseNoEmbed,
   saveNoEmbed,
   saveCalibration,
   saveDevice,
@@ -30,6 +34,7 @@ import {
   saveSettings,
   type CalibEntry,
   type Calibration,
+  type NoEmbedMark,
   type Settings,
 } from '../storage/local.ts'
 import {
@@ -126,7 +131,7 @@ export interface ScreenContext {
   calibration(): Calibration
   /** 1 つの音源種別の校正を保存する（hexnote.calibration。置き場が壊れていてもメモリ内で続く、decisions #50） */
   saveCalibration(kind: SyncKind, entry: CalibEntry): void
-  /** 埋め込み不可の動画 ID（hexnote.noembed。起動で読んだ値にこの後の足す・外すを重ねた物。M3 の手順 5） */
+  /** 埋め込み不可の動画 ID（hexnote.noembed。起動で読んだ値にこの後の足す・外すを重ねた物。M3 の手順 5。付けてから 30 日で外れる、decisions #114） */
   noEmbed(): readonly string[]
   /** 一覧を替える（S7a の印〔100・101・150〕、印のある動画で最初の PLAYING が来たら外す）。鍵に書く */
   setNoEmbed(ids: readonly string[]): void
@@ -310,7 +315,9 @@ export function startShell(opts: ShellOptions): Shell {
   let proposalOpen = false
   let audio: AudioOut | null = null
   let calibration = booted.calibration
-  let noEmbed: readonly string[] = loadNoEmbed(booted.local)
+  // 埋め込み不可の印（日付つき。付けてから 30 日で外す、decisions #114）と、その ID（画面が読む形）
+  let noEmbedMarks: readonly NoEmbedMark[] = loadNoEmbed(booted.local, Date.now())
+  let noEmbed: readonly string[] = noEmbedIds(noEmbedMarks)
   let useVideo = true
 
   const handlers: BandHandlers = {
@@ -380,6 +387,7 @@ export function startShell(opts: ShellOptions): Shell {
       booted.local.remove(LOCAL_KEYS.noembed)
       booted.session.remove(BOOTED_KEY)
       device = null
+      noEmbedMarks = []
       noEmbed = []
     },
     isFirst: () => isFirstRun(booted.local, booted.session),
@@ -441,11 +449,24 @@ export function startShell(opts: ShellOptions): Shell {
       if (route.screen !== 'S2') opts.updates?.apply()
     },
     layoutChanged: () => checkLayout(),
-    noEmbed: () => noEmbed,
+    noEmbed: () => {
+      // 開いたままの間に 30 日を過ぎた印も外す（起動の読みと保存でも外れる。decisions #114）
+      const now = Date.now()
+      if (now >= noEmbedExpiry(noEmbedMarks)) {
+        noEmbedMarks = parseNoEmbed({ v: 2, marks: noEmbedMarks }, now)
+        noEmbed = noEmbedIds(noEmbedMarks)
+        saveNoEmbed(booted.local, noEmbedMarks, now)
+      }
+      return noEmbed
+    },
     setNoEmbed: (ids) => {
       if (ids === noEmbed) return
-      noEmbed = ids
-      saveNoEmbed(booted.local, ids)
+      // 前からある ID は付けた日のまま、新しい ID は今の日付（decisions #114）
+      const now = Date.now()
+      const at = new Date(now).toISOString()
+      noEmbedMarks = parseNoEmbed({ v: 2, marks: datedNoEmbed(noEmbedMarks, ids, at) }, now)
+      noEmbed = noEmbedIds(noEmbedMarks)
+      saveNoEmbed(booted.local, noEmbedMarks, now)
     },
     useVideo: () => useVideo,
     setUseVideo: (v) => {

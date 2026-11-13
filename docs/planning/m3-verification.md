@@ -6,11 +6,11 @@
 
 | 試し | 中身 | 結果 | 日付 |
 |---|---|---|---|
-| (a) | iframe の中の ▶ を座標クリックして、音ありの PLAYING が来るか | 未（pane が隠れていた。rAF 1 回／秒） | 2026-11-12 |
-| (b) | 直後に本物のキー入力が親に届くか（合成の keydown は数えない） | 未（同上） | 2026-11-12 |
-| (c) | 一時停止 → 再開の playVideo が音ありで通るか | 未（同上） | 2026-11-12 |
+| (a) | iframe の中の ▶ を座標クリックして、音ありの PLAYING が来るか | 通った（DEV の製品の S2 で。▶ の座標の click で PLAYING → 同期中 → 再生。ミュートしていない利用者の ▶ だが、音は耳で聞いていない。§15） | 2026-11-13 |
+| (b) | 直後に本物のキー入力が親に届くか（合成の keydown は数えない） | 通った（▶ の直後の pane の本物の Esc〔isTrusted〕が親に届いて一時停止、document.hasFocus 真。§15） | 2026-11-13 |
+| (c) | 一時停止 → 再開の playVideo が音ありで通るか | 通った（Space → playVideo → BUFFERING → PLAYING → 再生。音は耳で聞いていない。§15） | 2026-11-13 |
 
-pane が表に出ている時に、開発ページ `/src/app/dev/youtube.html` で 3 つとも取り直す。取り直すまでは、手順 2 以後の (b) は「再生（ミュート）」（開発ページの計測用のスクリプト再生、decisions #95）で回せる分だけを pane で見て、▶ が要る分は §3 の手元の表へ回す。
+pane が表に出ている時に、開発ページ `/src/app/dev/youtube.html` で 3 つとも取り直す（2026-11-13 に製品の S2 で 3 つとも通った〔§15〕。開発ページの #34 の値・10 秒の傾き・残差は、pane が途中で隠れたので §3 の行のまま）。取り直すまでは、手順 2 以後の (b) は「再生（ミュート）」（開発ページの計測用のスクリプト再生、decisions #95）で回せる分だけを pane で見て、▶ が要る分は §3 の手元の表へ回す。
 
 ## 1. 手順 1（YouTube 連携層・実プレイヤー・開発ページ）
 
@@ -44,13 +44,13 @@ pane が表に出ている時に、開発ページ `/src/app/dev/youtube.html` �
 
 | 確かめ | 手順 | 頼む時期 | 結果 |
 |---|---|---|---|
-| 音ありの ▶（プレイヤーの ▶ で音が出て、ページのキーが効く） | 1・2 | 手順 1・2 の PR の後（3・7 日目。まとめて 30 日目でも可） | 未 |
+| 音ありの ▶（プレイヤーの ▶ で音が出て、ページのキーが効く） | 1・2 | 手順 1・2 の PR の後（3・7 日目。まとめて 30 日目でも可） | 一部（2026-11-13、§15: ▶ の後にページのキーが効いた。音は耳で未） |
 | disablekb の効き（プレイヤーの上で Space・矢印を押しても YouTube が動かない） | 1 | 同上 | 未 |
-| 実キーでの焦点の戻り（▶ の後に打ったキーがページに届く） | 1 | 同上 | 未 |
+| 実キーでの焦点の戻り（▶ の後に打ったキーがページに届く） | 1 | 同上 | 一部（2026-11-13、§15: pane の本物のキー入力で届いた。物理のキーボードでは未） |
 | U-06（広告の出る動画の 1 回。§2） | 1 → 6・7 | 17 日目まで | 未 |
 | Firefox で開発ページを 1 回（§2） | 1 → 6・11 | 17 日目まで | 未 |
 | 実 IFrame の残差（開発ページ youtube で見本の動画を 40 秒以上、§4 の表の最後の行） | 2 | pane が表に出た時（主担当）、出せなければ手順 11 の頭 | 未 |
-| DEV の製品の S2 で見本の動画の行を ▶ → 同期中 → 再生 → Esc → 再開（音あり） | 2 | 手順 2 の PR の後（7 日目。まとめて 30 日目でも可） | 未 |
+| DEV の製品の S2 で見本の動画の行を ▶ → 同期中 → 再生 → Esc → 再開（音あり） | 2 | 手順 2 の PR の後（7 日目。まとめて 30 日目でも可） | 一部（2026-11-13、§15: 流れは通った。音は耳で未） |
 | U-02 のクリック動画を上げて動画 ID を返す（§2 の 4） | 2 → 4・11 | 遅くとも 27 日目の前 | 未 |
 | 帯の釦を本物の操作で（押す途中に題・活性が変わっても押せる、Tab で釦に焦点 → Enter） | 3 | 手順 3 の PR の後（まとめて 30 日目でも可） | 未 |
 | Firefox の行高（1093×514 音ゲー向けの帯の残り 3.2 px が負にならないか） | 3 → 11 | M3 末 | 未 |
@@ -62,19 +62,19 @@ pane が表に出ている時に、開発ページ `/src/app/dev/youtube.html` �
 | 153（Referer を送らない設定）・拡張機能のブロック・オフラインで S2 の S7a の見出しと本文 | 5 | 手順 5 の PR の後（まとめて 30 日目でも可） | 未 |
 | Firefox で一時停止 → Space の再開が止められたときの自動再生ブロックの帯（1 秒後、▶ で下りる）。Space の後の状態の列（BUFFERING・CUED が先に来るか）と、onAutoplayBlocked が来るか・いつかも記録する（§8 の開いた点） | 6 | 手順 6 の PR の後（まとめて 30 日目でも可） | 未 |
 | 再生中にプレイヤーのシークバーを触る（iframe への blur で一時停止、再開は resync(resume)。コードの読みだけ） | 6 | 同上 | 未 |
-| 実 IFrame の S7c: 見本の動画で `__hexnoteDev.freeze(10000)` → 2.0〜2.5 秒で帯、iframe の ▶ で戻る。▶ の後の状態の列（BUFFERING を挟むか）とピアノが鳴り直すか、pauseVideo → PAUSED の遅れを記録する | 7 | pane を表に出せる時（主担当）か手順 7 の PR の後 | 未 |
+| 実 IFrame の S7c: 見本の動画で `__hexnoteDev.freeze(10000)` → 2.0〜2.5 秒で帯、iframe の ▶ で戻る。▶ の後の状態の列（BUFFERING を挟むか）とピアノが鳴り直すか、pauseVideo → PAUSED の遅れを記録する | 7 | pane を表に出せる時（主担当）か手順 7 の PR の後 | 未（2026-11-13 に試したが pane が途中で隠れて tick が約 1 秒ごとになり、停止検知の pauseVideo の後の PAUSED を見るのが要求から 500 ms を超えて一時停止に落ちた。数えない。§15） |
 | 切替からピアノ音までの遅れ・▶ の後に鳴り始めるピアノが 1 音まで（耳で）・切替の後の押下が親に届く・Firefox | 7 | 手順 7 の PR の後（まとめて 30 日目でも可） | 未 |
 | 実動画の回の S3 が対象外の文・S1 に完走印なし（耳の 8 拍から S3 までの通しの中で） | 8 → 12 | 手順 12 の通しの時 | 未 |
 | 実 IFrame の動画の回（見本の動画の行。式の sync）で S3 の帯の内訳が「YouTube の…」、「適用」で `hexnote.calibration` の youtube だけ変わる | 9 | pane を表に出せる時（主担当）か手順 11 の U-02 の式の sync の回 | 未 |
 | 段 4 で自分がタップした曲（measured 真）を 1 回弾き、S3 に「適用」の釦が出ない（出たら不具合として書く） | 9 | 手順 9 の PR の後（まとめて 30 日目でも可） | 未 |
-| 実 IFrame の ▶ の後に onError 153 が出ない事と、送られる Referer（DevTools の Network で origin ＋ "/" か） | 10 | pane を表に出せる時（主担当）か手順 11 の頭 | 未 |
+| 実 IFrame の ▶ の後に onError 153 が出ない事と、送られる Referer（DevTools の Network で origin ＋ "/" か） | 10 | pane を表に出せる時（主担当）か手順 11 の頭 | 一部（2026-11-13、§15: DEV の製品の S2 で ▶ の後に 153 なし。Referer の実値は未） |
 | プレイヤーの全画面の釦（allowfullscreen なしの形）の見え方を実 IFrame で見る（照合の件 (4) は未確認のまま） | 10 | 手順 12 の通しの時 | 未 |
 | 実キーの 3 走 × 2 ブラウザ（Chromium・Firefox。UR・刻み・入力遅延。§13 の手引き） | 11 | U-02 の ID が来て、手順 11 の PR の取り込みの後 | 未 |
 | Firefox の開発ページで U-02 を 3 走（残差の表。§13 の手引きの 6） | 11 | M3 末 | 未 |
 | 任意: Firefox の resistFingerprinting を ON にして実キーで 1 走（刻みが 16.667 に出るか） | 11 | M3 末（無ければ U-05 へ） | 未 |
 | 音ありの ▶ の 1 走（U-02 の曲、Chromium） | 11 | 実キーの走と同じ時 | 未 |
-| 門を外す条件 (ii) の 1 回（DEV の製品の S2・実物の口〔見本の動画の行〕で、実 IFrame の ▶ → 再生 → Esc → Space → 曲末 → S3） | 12 | pane を表に出せる時（主担当）か、門を外す PR の前（利用者） | 未 |
-| 門を外した build を hexnote-preview（SW の制御下）で開き、段 4 か S2 の実 iframe が onReady まで読める・動画なしの回に youtube.com への要求 0 件 | 12 | 門を外す PR の時 | 未 |
+| 門を外す条件 (ii) の 1 回（DEV の製品の S2・実物の口〔見本の動画の行〕で、実 IFrame の ▶ → 再生 → Esc → Space → 曲末 → S3） | 12 | pane を表に出せる時（主担当）か、門を外す PR の前（利用者） | 済（2026-11-13、主担当。§15、decisions #114） |
+| 門を外した build を hexnote-preview（SW の制御下）で開き、段 4 か S2 の実 iframe が onReady まで読める・動画なしの回に youtube.com への要求 0 件 | 12 | 門を外す PR の時 | 済（2026-11-13、§15） |
 | M1・M2 の出口の残り（`m1-verification.md` §4・`m2-verification.md` §5。動画なしの S2 は手順 3 の新しい見た目で） | 12 | M3 の出口まで | 未 |
 
 ## 4. 手順 2（時計の接続と S2 の動画の回）
@@ -456,8 +456,48 @@ S2 の動画ありの形（式の sync のダミーの行）、入門者・音�
 | M3-07 実動画の同期と計測 | 試験・行の口（§13） | 実動画の残差 3 走と利用者の走は §13・§3 |
 | M3-08 校正 段 2 | 試験・ダミーの通し（§11・§14.1） | 済（実 IFrame の帯は §3） |
 | M3-09 規約の照合表 | design §6.1 の照合表（§12） | 未確認 8 行は §3 と公開前 |
-| M3-10 通し検証 | この節 | ダミーの口で通った（エラー 0）。実 IFrame の 1 回は §3 |
-| 門 `VIDEO_FEATURE` | 条件 (i) 照合の件 5 つが閉じた（否 0）・(ii) 実 IFrame の 1 回 | 閉じたまま。(ii) が未で、手順 10 の 2 件（プライバシーポリシーの `http://` のリンク、`hexnote.noembed` の 30 日）にも利用者の答えが無い。外す PR は利用者の確かめの後（M4 の手順書の前提に「動画の回は門の内」と書く） |
+| M3-10 通し検証 | この節 | ダミーの口で通った（エラー 0）。実 IFrame の 1 回は 2026-11-13 に通った（§15） |
+| 門 `VIDEO_FEATURE` | 条件 (i) 照合の件 5 つが閉じた（否 0）・(ii) 実 IFrame の 1 回 | 外した（2026-11-13、門を外す PR。(ii) の 1 回と手順 10 の 2 件への利用者の答えが揃った。§15、decisions #114） |
 | build | 期待値 (9) の門が閉じた側（§14.1 の (9)） | dist の DEV の文字列 0 件、束の seekTo 等 0 件、precache 11 件、初回読込 269,528 バイト。S5 に段 4 が無く、S6 で取り込んだ sync 付きの譜面は動画なしで走る（iframe 0・YouTube への要求 0）。SW の制御下の onReady は外す PR へ |
 
 M3 の出口は §3 の手元の表と、門を外す PR を待つ（M1・M2 と同じく、値の無い欄は「未」で閉じる）。
+
+## 15. 門を外す（2026-11-13、decisions #114）
+
+ブランチ `claude/m3-gate-open`。手順 10 の 2 件への利用者の答え（同日）: Google のプライバシーポリシーのリンクは III.A.2 に書かれた宛先を https で開く。`hexnote.noembed` は付けた日を持たせ、付けてから 30 日で外す（v:2）。
+
+### 15.0 環境と、この記録で言えること
+
+- Chromium の browser pane。DEV（`npm run dev`。DEV の S1 の見本の動画の行 ＝ 実物の口）と、門を外した build（`npm run build` の dist を hexnote-preview で。待っていた新しい SW に替えて SW の制御下にした）。
+- pane は始め表に出ていた（rAF 60 回／秒、視口 1024×768）。条件 (ii) の 1 回の途中から隠れ、rAF が約 1 回／秒から 0 回／秒に落ちた。そのため (ii) の回は流れの確かめにだけ使い、遅れと残差の数は取らない（§7-11）。build の確かめは隠れた pane の視口を 1366×668 にして回した（onReady と要求の数は rAF に依らない）。
+- ▶ は pane の座標の click（iframe の中の本物の click）、Esc と Space は pane の本物のキー入力（isTrusted 真）。音は耳で聞いていない。
+
+### 15.1 条件 (ii) の 1 回（DEV、製品の S2、見本の動画の行）
+
+| 順 | 見た物 |
+|---|---|
+| S1 → カード「試験: クリック 100 BPM ・ 見本の動画（実物の口）」→ 動画を使う「はい（YouTube）」→「この譜面版で遊ぶ」（本物の click） | S2。iframe 1 つ（480×270、src は `embed/M7lc1UVf-VE?enablejsapi=1&playsinline=1&disablekb=1&origin=…`）、案内「プレイヤーの ▶ を押すと始まります」、AudioContext は running |
+| iframe の ▶ を座標の click | 相 playing・源 video、案内「再生中（Esc で一時停止）」。焦点はページ（document.hasFocus 真） |
+| Esc（▶ から約 8.6 秒） | 相 paused。動画も止まった。Pause の覆いは右列（矩形の上に物なし） |
+| Space（Esc から約 12 秒） | 同期中 → 再生（約 2 秒。pane が隠れ始めていた） |
+| 曲末 | S3: 精度 0.0%・C（鍵は押していない）、はずれ 61・判定なし（再開の猶予の中）3、曲の行の末「YouTube」、完走「いいえ（中断あり。自己ベストと完走の対象外）」。記録は clock video・syncUsed {kind youtube, videoId 見本の動画, offset 3, rate 1}・offsetUsed 0。コンソールのエラー 0 |
+
+### 15.2 その後の試し（数えない）
+
+- Esc と Space の遅れ（参考。pane が隠れていた間で、値はメッセージの時刻）: 本物の Esc の keydown から YouTube の onStateChange（PAUSED）まで 12 ms。Space の再開の playVideo から BUFFERING 36 ms、PLAYING 298 ms。
+- 実 IFrame の S7c（`__hexnoteDev.freeze(10000)`）: 凍結から約 2.6 秒で停止検知の pauseVideo が効いて PAUSED が来たが、tick が約 1 秒ごとで、PAUSED を見たのが要求から 500 ms を超えた tick だったので、S7c でなく一時停止に落ちた（decisions #34 (b) の境の振る舞い。表に出た窓の 16 ms ごとの tick では起きない見込み、仮）。§3 の S7c の行は未のまま。
+
+### 15.3 門を外した build（hexnote-preview）
+
+| 確かめ | 結果 |
+|---|---|
+| 束と量 | `npm run build` の束は 1 個 247,428 バイト。dist に `iframe_api`・`youtube.com/embed`・「動画を付ける」が 1 件ずつ、`__hexnoteDev`・`dummy`・「ダミー」・`tests/fixtures`・`VIDEO_FEATURE` は 0 件。`npm run size` は初回読込 270,879 バイト（門が閉じた側は 269,528）、`npm run pwa:check` は precache 11 件・YouTube は NetworkOnly・束の seekTo・setPlaybackRate・.mute( は 0 件 |
+| SW | 開いた時は前の SW の束で、新しい SW が waiting。SKIP_WAITING で替えると読み直され、制御下で新しい束になった |
+| S6 | 「オフセット（YouTube）: 未校正」の行と注記、規約の行のリンク 2 つ（https://www.youtube.com/t/terms 、https://www.google.com/policies/privacy ） |
+| S6 で見本の動画の sync を持つクリック譜面を取り込み（同じ id の曲を上書き）→ S1 → S2 | S1 の印「動画あり／なしで遊べる」。S2 の iframe: src `embed/M7lc1UVf-VE`（origin は localhost:4173）、referrerpolicy `strict-origin-when-cross-origin`、allow `autoplay; encrypted-media`、allowfullscreen なし、480×270。initialDelivery → onReady（押してから約 1.6 秒）、onError なし（▶ の前に 153 なし） |
+| 形だけ正しい ID `abcdefghijk` の譜面（前から置き場にあった曲）→ S2 | onReady の後に onError 150 → S7a のカード「この動画は埋め込みで再生できません（コード 150）」。`hexnote.noembed` は v:2 の 1 件（id と付けた時刻） |
+| 動画なしの回（きらきら星。読み直してから S2 → 合成の Space で 6 秒） | youtube.com・ytimg・googlevideo への要求 0 件、iframe 0、`window.YT` なし |
+
+### 15.4 残り
+
+§3 の手元の表の行（音、物理のキーボード、S7c の実物、U-06、U-02 と耳の 8 拍タップ、Firefox、実キーの 3 走、実機と 125%、M1・M2 の出口の残り）。M3 の出口はこの表を待つ。

@@ -58,6 +58,8 @@ m3-kickoff §7-35（照合表の形）。状態は 済（実装で満たし、�
 | Referer（API Client Identity。無いと onError 153） | referrerpolicy で origin を送る。公開先の応答ヘッダ（Referrer-Policy）は公開先を決める時 | 済（localhost の読込で 153 なし）・公開前（公開先） |
 | onError | 6 コードを 4 組に分ける（2 ＝ ID の形、100 ＝ 見つからない・非公開、101・150 ＝ 埋め込み不可、5・153 と一覧に無い値 ＝ 環境。`src/youtube/errors.ts`） | 済（2026-11-12 に一覧と照合。6 つとも一覧にある） |
 | 同意の門 | iframe_api の読込と iframe の前に必ず通す口（`embedGate`、今は常に通す。decisions #100） | 公開前（公開まで III.A.2 の「使う前の同意」は満たさない運用） |
+| 規約のリンク | 段 4 と S6 の 1 行: YouTube 利用規約 https://www.youtube.com/t/terms（III.A.1 の URL のまま）、Google のプライバシーポリシー https://www.google.com/policies/privacy（III.A.2 に書かれた宛先を https で。開くと policies.google.com/privacy へ転送。2026-11-13、利用者の答え、decisions #114） | 済（同意と自分のポリシーの文は公開前） |
+| 埋め込み不可の印 | `hexnote.noembed` v:2（動画 ID と付けた日）。付けてから 30 日で外す（`src/storage/local.ts`。2026-11-13、利用者の答え、decisions #114） | 済（III.E.4.d・e。API のデータに当たるかは決めず、当たっても触れない形） |
 
 ## 出す操作の一覧（プログラムからの動画の操作、decisions #11・#95）
 
@@ -83,4 +85,4 @@ m3-kickoff §7-35（照合表の形）。状態は 済（実装で満たし、�
 
 ## 公開前の行（公開先を決める時、U-08）
 
-同意の保存と読込前の 1 画面（III.A.2）、自分の規約とプライバシーポリシーの文（III.A.1 の後半・III.A.2・API ToS §7）、Made for Kids の扱い（III.E.4.j・III.J）、公開先の Referrer-Policy と origin（RMF の API Client Identity。meta は付けない）、Compliance Audit の要否（Developer Policies III.D.3 の割当を増やす時の物。IFrame だけの埋め込みは割当を使わない）、`hexnote.noembed` が III.E.4.d・e の API のデータに当たるか（当たるなら日付を持たせ 30 日で外す。照合表では未確認）。
+同意の保存と読込前の 1 画面（III.A.2）、自分の規約とプライバシーポリシーの文（III.A.1 の後半・III.A.2・API ToS §7）、Made for Kids の扱い（III.E.4.j・III.J）、公開先の Referrer-Policy と origin（RMF の API Client Identity。meta は付けない）、Compliance Audit の要否（Developer Policies III.D.3 の割当を増やす時の物。IFrame だけの埋め込みは割当を使わない）。（`hexnote.noembed` の III.E.4.d・e は 2026-11-13 に 30 日で外す形にして閉じた、decisions #114。）

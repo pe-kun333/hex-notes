@@ -151,7 +151,7 @@ function render(): void {
     [LOCAL_KEYS.calibration, loadCalibration(local)],
     [LOCAL_KEYS.device, loadDevice(local)],
     [LOCAL_KEYS.fade, loadFade(local)],
-    [LOCAL_KEYS.noembed, loadNoEmbed(local)],
+    [LOCAL_KEYS.noembed, loadNoEmbed(local, Date.now())],
   ]
   $('records').replaceChildren(
     ...recs.map(([k, v]) => {

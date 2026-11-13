@@ -3,8 +3,8 @@
 // L893–905・ACT L990–998、m5 の段 1（ドロップ領域・handleFile L568–577）、m2-kickoff 手順 2・§7-6・§7-18・§7-26（歯車なし）。
 // 保存 ＝ chartFromSmf → putChart。保存層が本物の IndexedDB に書けずメモリへ移ったら（resilientDb の mode が memory）、
 // 帯（殻が出す storageFail）に加えて、この画面で「*.hexnote.json を書き出す」を出す。試験の外（DOM）なので手で確かめる。
-// M3 の手順 4（M3-03 後半、m3-kickoff 手順 4・§7-23・§7-25）: 段 4（同期）。段 5 の「動画を付ける」から入る（門 VIDEO_FEATURE の
-// 内）。ID の欄 → プレイヤー（ctx.videoPort、480×270。開始は利用者の ▶）→ 規約のリンクの行 → 同期タップの部品。毎フレームの
+// M3 の手順 4（M3-03 後半、m3-kickoff 手順 4・§7-23・§7-25）: 段 4（同期）。段 5 の「動画を付ける」から入る。
+// ID の欄 → プレイヤー（ctx.videoPort、480×270。開始は利用者の ▶）→ 規約のリンクの行 → 同期タップの部品。毎フレームの
 // 標本を video の時計に流し、resync で走り出し・held で捨てる。止める要求は流さない（要求 0 件）。やり直し・中止・8 拍の後は
 // 口を作り直して ▶ を待つ（§7-3）。保存は withSync。同じ MIDI の持ち込み直しは前の sync を引き継ぎ、段 5 に「同期をやり直す」
 // 「動画を外す」。
@@ -24,7 +24,6 @@ import { songSeconds } from '../home-view.ts'
 import { withSync } from '../library-view.ts'
 import { syncPanel, type SyncPanel } from '../sync-panel.ts'
 import { termsLine } from '../terms.ts'
-import { VIDEO_FEATURE } from '../video-run.ts'
 import { embedFailPlan, isEmbedFail, syncFailText } from '../embed-view.ts'
 import { chartFileName, chartFileText } from '../../storage/file.ts'
 import { downloadText } from '../file-io.ts'
@@ -306,8 +305,8 @@ export function importScreen(ctx: ScreenContext): ScreenView {
       dupLine.hidden = d === null
       dupLine.textContent = d ?? ''
       refresh()
-      // 持ち込み直し: 前の譜面の sync を 1 度写す（何もしなければ引き継ぐ。門の内、§7-25）
-      if (VIDEO_FEATURE && s.step === 5 && built.prevSync !== null && !s.inheritSeen && s.sync === null) send({ kind: 'inherit', source: built.prevSync })
+      // 持ち込み直し: 前の譜面の sync を 1 度写す（何もしなければ引き継ぐ、§7-25）
+      if (s.step === 5 && built.prevSync !== null && !s.inheritSeen && s.sync === null) send({ kind: 'inherit', source: built.prevSync })
     })()
     const kv = h(doc, 'dl', { className: 'kv' },
       h(doc, 'dt', { text: '曲名' }), h(doc, 'dd', {}, nameIn),
@@ -320,9 +319,8 @@ export function importScreen(ctx: ScreenContext): ScreenView {
     return [kv, ...videoBox(), dupLine, nav(save)]
   }
 
-  /** 段 5 の動画の箱（門の内）: 付ける／やり直す・外す */
+  /** 段 5 の動画の箱: 付ける／やり直す・外す */
   function videoBox(): HTMLElement[] {
-    if (!VIDEO_FEATURE) return []
     const src = s.sync
     if (src === null)
       return [h(doc, 'p', { className: 'note' }, 'この曲は動画を使いません（自前音源）。', button(doc, '動画を付ける（段 4 へ）', () => send({ kind: 'attachVideo' }), 'small'))]
