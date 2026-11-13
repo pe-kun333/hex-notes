@@ -5,8 +5,8 @@
 // 12。計測盤は m6 の順でデータの前）。オフラインと更新（SW、手順 13）はデータの後。
 // M2 の手順 4（M2-06）: データの群に「持ち込み曲」（曲ごとの書き出しと削除、全持ち込み曲の版を作り直す）と、取り込み口で
 // 譜面ファイルも受ける（同梱曲と同じ id は断る、持ち込み済みは上書き。m2-kickoff §7-18、文言は library-view.ts）。
-// M3 の手順 9（M3-08、§7-34）: 校正の群に、門 VIDEO_FEATURE が真のときだけ「オフセット（YouTube）」の行と注記（文は calibText）。
-// 門が偽なら今の 1 行のまま。
+// M3 の手順 9（M3-08、§7-34）: 校正の群に「オフセット（YouTube）」の行と注記（文は calibText）。手順 12 までは製品の束の門
+// VIDEO_FEATURE の内で、門を外す PR（decisions #114）から製品にも出る。
 
 import { validateChart } from '../../chart/validate.ts'
 import { defaultLegendKind, legendOf } from '../../layout/legend.ts'
@@ -42,7 +42,6 @@ import { updatePanel } from '../update-panel.ts'
 import { button, frame, h } from './frame.ts'
 import { calibText, limitText } from './home.ts'
 import { termsLine } from '../terms.ts'
-import { VIDEO_FEATURE } from '../video-run.ts'
 
 /** S6 の YouTube の校正の注記（仮、M3 の手順 9） */
 export const YOUTUBE_CALIB_NOTE =
@@ -197,13 +196,9 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
     { className: 'group' },
     h(doc, 'h2', { text: '校正' }),
     h(doc, 'p', {}, 'オフセット（自前音源）: ', calibState),
-    // YouTube の値は段 2 の提案でだけ変わる（段 1 は自前音源だけ。門の内、M3 の手順 9）
-    ...(VIDEO_FEATURE
-      ? [
-          h(doc, 'p', {}, 'オフセット（YouTube）: ', calibYoutube),
-          h(doc, 'p', { className: 'note', text: YOUTUBE_CALIB_NOTE }),
-        ]
-      : []),
+    // YouTube の値は段 2 の提案でだけ変わる（段 1 は自前音源だけ。M3 の手順 9）
+    h(doc, 'p', {}, 'オフセット（YouTube）: ', calibYoutube),
+    h(doc, 'p', { className: 'note', text: YOUTUBE_CALIB_NOTE }),
     calib.el,
   )
 
@@ -376,8 +371,8 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
     h(doc, 'p', { text: 'ピアノ音源: Salamander Grand Piano V3 — Alexander Holm、CC BY 3.0（30 音に間引き Opus に変換した改変物。未同梱の間は合成音で鳴ります）。' }),
     h(doc, 'p', { text: '同梱曲:' }),
     songList,
-    // YouTube の規約へのリンクの行（門の内、decisions #100。M3 の手順 4）
-    ...(VIDEO_FEATURE ? [termsLine(doc)] : []),
+    // YouTube の規約へのリンクの行（decisions #100。M3 の手順 4）
+    termsLine(doc),
   ) // prettier-ignore
 
   f.body.append(

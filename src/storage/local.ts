@@ -375,29 +375,75 @@ export function saveFade(kv: KvStore, f: FadeState): boolean {
   return writeJson(kv, LOCAL_KEYS.fade, { v: 1, ...parseFade(f) })
 }
 
-// ---------- hexnote.noembed（v:1。M3 の手順 5、仮。m3-kickoff §7-27・§7-41） ----------
+// ---------- hexnote.noembed（v:2。M3 の手順 5、仮。m3-kickoff §7-27・§7-41） ----------
+// 門を外す PR（2026-11-13、decisions #114）で v:1 {ids} → v:2 {marks: [{id, at}]} にし、付けてから 30 日で外す形にした
+// （Developer Policies III.E.4.d・e「認められていない API のデータは 30 日まで、その後は消すか取り直す」。印が API のデータに
+// 当たるかは決めず、当たっても触れない形を採った。利用者の答え）。v:1 は付けた日が分からないので読まずに捨てる。
 
 /** 覚えておく動画 ID の上限（古い方から捨てる。自作値、§7-41） */
 export const NOEMBED_MAX = 200
+
+/** 印を覚えておく長さ（付けてから 30 日。III.E.4.d・e、decisions #114） */
+export const NOEMBED_TTL_MS = 30 * 24 * 60 * 60 * 1000
+
+/** 埋め込み不可の印 1 件（at は印を付けた時刻の ISO 文字列） */
+export interface NoEmbedMark {
+  readonly id: string
+  readonly at: string
+}
 
 /** 動画 ID の形（11 文字。youtube/video-id.ts と同じ。保存層は youtube 層を読まない） */
 const isVideoId = (x: unknown): x is string =>
   typeof x === 'string' && /^[A-Za-z0-9_-]{11}$/.test(x)
 
-/** 埋め込み不可の一覧（古い順）。悪い形は空、形の違う ID と重複は捨てる */
-export function parseNoEmbed(raw: unknown): string[] {
-  if (!isRec(raw) || raw['v'] !== 1 || !Array.isArray(raw['ids'])) return []
-  const out: string[] = []
-  for (const x of raw['ids'] as unknown[]) if (isVideoId(x) && !out.includes(x)) out.push(x)
+/** 印が生きているか（付けてから 30 日未満。時計を戻した等で 30 日以上先の日付も生きていない） */
+export function noEmbedAlive(at: string, nowMs: number): boolean {
+  const t = Date.parse(at)
+  return Number.isFinite(t) && nowMs - t < NOEMBED_TTL_MS && t - nowMs < NOEMBED_TTL_MS
+}
+
+/** 埋め込み不可の印（古い順）。v:2 だけ読み、v:1 と悪い形は空。形の違う ID・日付の無い物・重複・30 日を過ぎた物は捨てる */
+export function parseNoEmbed(raw: unknown, nowMs: number): NoEmbedMark[] {
+  if (!isRec(raw) || raw['v'] !== 2 || !Array.isArray(raw['marks'])) return []
+  const out: NoEmbedMark[] = []
+  for (const x of raw['marks'] as unknown[]) {
+    if (!isRec(x)) continue
+    const id = x['id']
+    const at = x['at']
+    if (!isVideoId(id) || typeof at !== 'string' || !noEmbedAlive(at, nowMs)) continue
+    if (out.some((m) => m.id === id)) continue
+    out.push({ id, at })
+  }
   return out.slice(-NOEMBED_MAX)
 }
 
-export function loadNoEmbed(kv: KvStore): string[] {
-  return parseNoEmbed(readJson(kv, LOCAL_KEYS.noembed))
+export function loadNoEmbed(kv: KvStore, nowMs: number): NoEmbedMark[] {
+  return parseNoEmbed(readJson(kv, LOCAL_KEYS.noembed), nowMs)
 }
 
-export function saveNoEmbed(kv: KvStore, ids: readonly string[]): boolean {
-  return writeJson(kv, LOCAL_KEYS.noembed, { v: 1, ids: parseNoEmbed({ v: 1, ids }) })
+export function saveNoEmbed(kv: KvStore, marks: readonly NoEmbedMark[], nowMs: number): boolean {
+  return writeJson(kv, LOCAL_KEYS.noembed, { v: 2, marks: parseNoEmbed({ v: 2, marks }, nowMs) })
+}
+
+/** 印の動画 ID（S1・S7a が読む形。古い順） */
+export function noEmbedIds(marks: readonly NoEmbedMark[]): string[] {
+  return marks.map((m) => m.id)
+}
+
+/** ID の一覧に日付を付ける（前からある ID は前の日付のまま、新しい ID は at。並びは ids のまま） */
+export function datedNoEmbed(
+  prev: readonly NoEmbedMark[],
+  ids: readonly string[],
+  at: string,
+): NoEmbedMark[] {
+  return ids.map((id) => ({ id, at: prev.find((m) => m.id === id)?.at ?? at }))
+}
+
+/** 次に印が切れる時刻 ms（無ければ Infinity） */
+export function noEmbedExpiry(marks: readonly NoEmbedMark[]): number {
+  let t = Infinity
+  for (const m of marks) t = Math.min(t, Date.parse(m.at) + NOEMBED_TTL_MS)
+  return t
 }
 
 /** 末尾に足す（既にあれば同じ配列、形の違う ID は足さない。上限を超えたら古い方から捨てる） */

@@ -16,7 +16,6 @@
 // 動画の回の完走の行は「完走印は自前音源の回だけ」（S1 の完走印は対象プレイだけ、§7-33）。
 
 import { KEYSET_NAMES, type KeysetId } from '../chart/keyset.ts'
-import { VIDEO_FEATURE } from './video-run.ts'
 import { LAYOUTS } from '../layout/presets.ts'
 import { JUDGE_WORDS } from '../render/canvas/feedback.ts'
 import type { Awards } from '../results/awards.ts'
@@ -163,16 +162,16 @@ export function shapesText(s: FinishedPlay['shapes']): string {
   return `${pct(s.cluster, s.total)}% ／ ${pct(s.shell, s.total)}% ／ ${pct(s.cross, s.total)}%（${s.total} 和音）`
 }
 
-/** S3 の文言。feature は製品の束の門（VIDEO_FEATURE。偽なら YouTube の印と注記を出さない） */
-export function resultView(p: FinishedPlay, feature: boolean = VIDEO_FEATURE): ResultView {
+/** S3 の文言 */
+export function resultView(p: FinishedPlay): ResultView {
   const r = p.record
   const c = r.counts
   const w = JUDGE_WORDS
   const finished = isFinished(r)
   const g = r.profile === 'gamer' ? p.judge.gamer : null
   const aborted = r.aborted === true
-  // YouTube 再生の回（門の内。M3 の手順 4）と、途中で動画なしに切り替わった回（戻した回も。M3 の手順 8）
-  const youtube = feature && r.syncUsed.kind === 'youtube'
+  // YouTube 再生の回（M3 の手順 4）と、途中で動画なしに切り替わった回（戻した回も。M3 の手順 8）
+  const youtube = r.syncUsed.kind === 'youtube'
   const switchedAt = youtube ? r.syncUsed.fallbackAt : undefined
   // ゲージ 0 の途中終了（動画が先に終わった回はゲージと点が実値、m3-kickoff §7-16、仮）
   const failed = g !== null && g.failed

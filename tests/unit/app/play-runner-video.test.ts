@@ -397,9 +397,6 @@ describe('動画が先に終わる（期待値 (6)、§7-16）', () => {
   it('動画が先に終わらない回は注記なし（YouTube の注記は手順 8 で称号の節の対象外の文に畳んだ）', () => {
     expect(resultView(finishedPlay(drive().run, META)).notes).toEqual([])
     expect(offTargetLines('video', true)[0]).toContain('YouTube 再生の曲は端末内だけに記録します。')
-    // 門が偽（build）なら YouTube の印と注記を出さない
-    expect(resultView(finishedPlay(drive().run, META), false).notes).toEqual([])
-    expect(resultView(finishedPlay(drive().run, META), false).song).toMatch(/ ・ 自前音源$/)
   })
 })
 
@@ -514,7 +511,7 @@ describe('DEV の筋書き（期待値 (9)）', () => {
   it('表の ID は形だけ正しい 11 文字（videoIdOf を通る）で重ならない', () => {
     const ids = DUMMY_VIDEOS.map((s) => s.id)
     expect(new Set(ids).size).toBe(ids.length)
-    for (const id of ids) expect(videoRunOf({ sources: [{ kind: 'youtube', videoId: id, offset: 0, rate: 1 }] }, true, false, true)).toBe(id)
+    for (const id of ids) expect(videoRunOf({ sources: [{ kind: 'youtube', videoId: id, offset: 0, rate: 1 }] }, true, false)).toBe(id)
   }) // prettier-ignore
 })
 
@@ -522,22 +519,18 @@ describe('動画の回の述語（期待値 (12)）', () => {
   const yt = (videoId: string): Sync => ({
     sources: [{ kind: 'youtube', videoId, offset: 3, rate: 1 }],
   })
-  it('youtube・ID 11 文字・use 真・S2・門が真 → 動画 ID', () => {
-    expect(videoRunOf(yt('M7lc1UVf-VE'), true, false, true)).toBe('M7lc1UVf-VE')
-  })
-  it('練習室（S4）・use 偽・ID 10 文字・URL の形・sources 空・先頭が audio・門が偽（build）→ null', () => {
-    expect(videoRunOf(yt('M7lc1UVf-VE'), true, true, true)).toBe(null)
-    expect(videoRunOf(yt('M7lc1UVf-VE'), false, false, true)).toBe(null)
-    expect(videoRunOf(yt('M7lc1UVf-V'), true, false, true)).toBe(null)
-    expect(videoRunOf(yt('https://youtu.be/M7lc1UVf-VE'), true, false, true)).toBe(null)
-    expect(videoRunOf({ sources: [] }, true, false, true)).toBe(null)
-    expect(videoRunOf(undefined, true, false, true)).toBe(null)
-    expect(videoRunOf({ sources: [{ kind: 'audio', offset: 0, rate: 1 }, ...yt('M7lc1UVf-VE').sources] }, true, false, true)).toBe(null)
-    expect(videoRunOf(yt('M7lc1UVf-VE'), true, false, false)).toBe(null)
-  }) // prettier-ignore
-  it('試験の中の門（import.meta.env.DEV）は真', () => {
+  it('youtube・ID 11 文字・use 真・S2 → 動画 ID（門 VIDEO_FEATURE は decisions #114 で外した）', () => {
     expect(videoRunOf(yt('M7lc1UVf-VE'), true, false)).toBe('M7lc1UVf-VE')
   })
+  it('練習室（S4）・use 偽・ID 10 文字・URL の形・sources 空・先頭が audio → null', () => {
+    expect(videoRunOf(yt('M7lc1UVf-VE'), true, true)).toBe(null)
+    expect(videoRunOf(yt('M7lc1UVf-VE'), false, false)).toBe(null)
+    expect(videoRunOf(yt('M7lc1UVf-V'), true, false)).toBe(null)
+    expect(videoRunOf(yt('https://youtu.be/M7lc1UVf-VE'), true, false)).toBe(null)
+    expect(videoRunOf({ sources: [] }, true, false)).toBe(null)
+    expect(videoRunOf(undefined, true, false)).toBe(null)
+    expect(videoRunOf({ sources: [{ kind: 'audio', offset: 0, rate: 1 }, ...yt('M7lc1UVf-VE').sources] }, true, false)).toBe(null)
+  }) // prettier-ignore
   it('練習（S4・S0d）を併せた回は動画なし（RunOptions.video を受けない、#94）', () => {
     const song = clickSong()
     const r = newRun(song, { ...optsOf(song), practice: { mode: 'fixed', rate: 1, loop: null, autoLoop: false, autoTempo: false } })

@@ -17,8 +17,12 @@ import type { Backup } from '../../../src/storage/file.ts'
 import {
   LOCAL_KEYS,
   NOEMBED_MAX,
+  NOEMBED_TTL_MS,
+  datedNoEmbed,
   loadNoEmbed,
   markNoEmbed,
+  noEmbedExpiry,
+  noEmbedIds,
   parseNoEmbed,
   readJson,
   saveNoEmbed,
@@ -72,27 +76,47 @@ describe('S7a の表（期待値 (1)）', () => {
   }) // prettier-ignore
 })
 
-describe('埋め込み不可の一覧 hexnote.noembed（期待値 (2)〜(6)）', () => {
-  it('(2) 読み: 鍵が無い・壊れた JSON・v 2 → 空。重複・形の違う ID・数は捨てる', () => {
-    const s = kv()
-    expect(loadNoEmbed(s)).toEqual([])
-    s.set(LOCAL_KEYS.noembed, '{broken')
-    expect(loadNoEmbed(s)).toEqual([])
-    expect(parseNoEmbed({ v: 2, ids: [A] })).toEqual([])
-    expect(parseNoEmbed({ v: 1, ids: [A, A, 'bad id', 5, 'M7lc1UVf-V', B] })).toEqual([A, B])
-  })
+describe('埋め込み不可の一覧 hexnote.noembed（期待値 (2)〜(6)。門を外す PR で v:2〔日付つき・30 日〕、decisions #114）', () => {
+  const NOW = Date.parse(AT)
+  const DAY = 24 * 60 * 60 * 1000
+  const iso = (ms: number): string => new Date(ms).toISOString()
 
-  it('(3) 足す: 空に A → {"v":1,"ids":["M7lc1UVf-VE"]}（29 文字）、もう一度 A → 同じ配列、short は足さない', () => {
+  it('(2) 読み: 鍵が無い・壊れた JSON・v 1（日付が無い）→ 空。重複・形の違う ID・日付の無い物・数は捨てる', () => {
+    const s = kv()
+    expect(loadNoEmbed(s, NOW)).toEqual([])
+    s.set(LOCAL_KEYS.noembed, '{broken')
+    expect(loadNoEmbed(s, NOW)).toEqual([])
+    expect(parseNoEmbed({ v: 1, ids: [A, B] }, NOW)).toEqual([])
+    const raw = { v: 2, marks: [{ id: A, at: AT }, { id: A, at: AT }, { id: 'bad id', at: AT }, { id: B }, 5, { id: 'M7lc1UVf-V', at: AT }, { id: B, at: 'yesterday' }, { id: B, at: AT }] }
+    expect(parseNoEmbed(raw, NOW)).toEqual([{ id: A, at: AT }, { id: B, at: AT }])
+  }) // prettier-ignore
+
+  it('(3) 足す・保存: 空に A → {"v":2,"marks":[{"id":"M7lc1UVf-VE","at":"2026-11-12T00:00:00.000Z"}]}、もう一度 A → 同じ配列、short は足さない', () => {
     const s = kv()
     const one = markNoEmbed([], A)
     expect(one).toEqual([A])
-    saveNoEmbed(s, one)
-    const text = s.get(LOCAL_KEYS.noembed)
-    expect(text).toBe('{"v":1,"ids":["M7lc1UVf-VE"]}')
-    expect(text).toHaveLength(29)
+    saveNoEmbed(s, datedNoEmbed([], one, AT), NOW)
+    expect(s.get(LOCAL_KEYS.noembed)).toBe('{"v":2,"marks":[{"id":"M7lc1UVf-VE","at":"2026-11-12T00:00:00.000Z"}]}')
+    expect(loadNoEmbed(s, NOW)).toEqual([{ id: A, at: AT }])
     expect(markNoEmbed(one, A)).toBe(one)
     expect(markNoEmbed(one, 'short')).toBe(one)
-  })
+  }) // prettier-ignore
+
+  it('30 日: 付けてから 30 日 − 1 ms は残り、ちょうど 30 日で消える。30 日以上先の日付も消える。前からある ID は付けた日のまま', () => {
+    const m = [{ id: A, at: AT }]
+    expect(NOEMBED_TTL_MS).toBe(2_592_000_000)
+    expect(parseNoEmbed({ v: 2, marks: m }, NOW + 30 * DAY - 1)).toEqual(m)
+    expect(parseNoEmbed({ v: 2, marks: m }, NOW + 30 * DAY)).toEqual([])
+    expect(parseNoEmbed({ v: 2, marks: [{ id: A, at: iso(NOW + 30 * DAY) }] }, NOW)).toEqual([])
+    expect(parseNoEmbed({ v: 2, marks: [{ id: A, at: iso(NOW + 29 * DAY) }] }, NOW)).toHaveLength(1)
+    const later = iso(NOW + 10 * DAY)
+    const two = datedNoEmbed(m, [A, B], later)
+    expect(two).toEqual([{ id: A, at: AT }, { id: B, at: later }])
+    expect(noEmbedIds(two)).toEqual([A, B])
+    expect([noEmbedExpiry([]), noEmbedExpiry(two)]).toEqual([Infinity, NOW + 30 * DAY])
+    // A の 30 日の後は B だけ残る（S1 の既定は A の曲で はい に戻り、まだ埋め込めなければ S7a でまた印が付く）
+    expect(noEmbedIds(parseNoEmbed({ v: 2, marks: two }, NOW + 30 * DAY))).toEqual([B])
+  }) // prettier-ignore
 
   it('(4) 外す: [A, B] から A → [B]、無い ID → 同じ配列', () => {
     const ab = [A, B]
@@ -147,9 +171,10 @@ describe('控えと初期化（期待値 (11)）', () => {
     const b: Record<keyof Backup, unknown> = { format: 0, exportedAt: 0, settings: 0, fade: 0, charts: 0, results: 0 }
     expect(Object.keys(b)).toEqual(keys)
     const s = kv()
-    saveNoEmbed(s, [A])
+    const now = Date.parse(AT)
+    saveNoEmbed(s, datedNoEmbed([], [A], AT), now)
     s.remove(LOCAL_KEYS.noembed)
-    expect([s.get(LOCAL_KEYS.noembed), readJson(s, LOCAL_KEYS.noembed), loadNoEmbed(s)]).toEqual([null, undefined, []])
+    expect([s.get(LOCAL_KEYS.noembed), readJson(s, LOCAL_KEYS.noembed), loadNoEmbed(s, now)]).toEqual([null, undefined, []])
   }) // prettier-ignore
 })
 

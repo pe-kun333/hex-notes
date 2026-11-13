@@ -330,13 +330,6 @@ describe('S1 の印・既定・自己ベストの clock（期待値 (8)）', () 
     expect(songCard('x', yt, ctx()).best).toMatch(/^自己ベスト 94\.2% /)
   })
 
-  it('門が偽（build）→ youtube の曲も印「自前音源」・切替なし（clock は novideo で 94.2%）', () => {
-    expect([videoBadge(yt.sync, false), videoPlayable(yt.sync, false)]).toEqual([
-      AUDIO_BADGE,
-      false,
-    ])
-  })
-
   it('「動画を使う」の注記は はい／いいえ の 2 文（m6 L778–780）', () => {
     // 手順 5 で埋め込み不可を記録した曲の 1 文（noEmbed）を足した
     expect(USE_VIDEO_NOTES).toMatchObject({
@@ -379,6 +372,6 @@ describe('部品の走り出しと止まり（期待値 (9)）', () => {
 describe('規約へのリンクの行（decisions #100、文は仮）', () => {
   it('YouTube 利用規約と Google プライバシーポリシー（URL は Developer Policies III.A.1・III.A.2 に書かれた物。M3 の手順 10 で照合）', () => {
     expect(`${TERMS_TEXT.before}${TERMS_TEXT.terms}${TERMS_TEXT.middle}${TERMS_TEXT.privacy}${TERMS_TEXT.after}`).toBe('YouTube の動画は YouTube 利用規約と Google プライバシーポリシーのもとで再生されます。')
-    expect([YOUTUBE_TERMS_URL, GOOGLE_PRIVACY_URL]).toEqual(['https://www.youtube.com/t/terms', 'http://www.google.com/policies/privacy'])
+    expect([YOUTUBE_TERMS_URL, GOOGLE_PRIVACY_URL]).toEqual(['https://www.youtube.com/t/terms', 'https://www.google.com/policies/privacy'])
   }) // prettier-ignore
 })

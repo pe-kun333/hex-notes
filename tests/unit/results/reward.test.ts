@@ -200,7 +200,7 @@ function play(r: ResultRecord, over: Partial<FinishedPlay> = {}): FinishedPlay {
 
 describe('S3 の曲の行・完走の行・切替の注記（期待値 (7)）', () => {
   const v = (r: ResultRecord, over: Partial<FinishedPlay> = {}): ReturnType<typeof resultView> =>
-    resultView(play(r, over), true)
+    resultView(play(r, over))
   const finRow = (r: ResultRecord): string | undefined => new Map(v(r).rows).get('完走')
 
   it('曲の行の末: A「自前音源」、V「YouTube」、W と W2「YouTube（途中で動画なしへ切替）」、ENDED が先の回は V と同じ', () => {
@@ -209,9 +209,6 @@ describe('S3 の曲の行・完走の行・切替の注記（期待値 (7)）', 
     expect(v(W()).song).toMatch(/ ・ YouTube（途中で動画なしへ切替）$/)
     expect(v(W({ skipped: 2 })).song).toMatch(/ ・ YouTube（途中で動画なしへ切替）$/)
     expect(v(V({ aborted: true }), { videoEnded: true }).song).toMatch(/ ・ YouTube$/)
-    // 門が偽（build）なら YouTube の句と注記は出さない
-    expect(resultView(play(W()), false).song).toMatch(/ ・ 自前音源$/)
-    expect(resultView(play(W()), false).notes).toEqual([])
   }) // prettier-ignore
 
   it('完走の行: W・W2「いいえ（途中で動画なしへ切替。…）」（枝は 途中終了 → 切替 → 中断あり）、V は完走印の注、ENDED が先の回は途中終了', () => {

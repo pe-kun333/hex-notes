@@ -5,7 +5,7 @@
 // 段 4（同期）は M2 では無いので 3 の次は 5、5 の前は 3。途中でやめた段の状態は捨てる（殻に持たない）。
 // M3 の手順 4（M3-03 後半、m3-kickoff 手順 4・§7-23・§7-25）: 段 4 は段 5 の「動画を付ける」から入る（動画なしが主経路。段 3 の
 // 次は video が真のときだけ 4）。state に video・videoId・sync（保存する同期。段 4 の結果か、持ち込み直しで前の譜面から写した
-// 物）。保存する sync の形は syncSourceOf、保存の下限と注意は headRoom。門（VIDEO_FEATURE）は画面が見る。
+// 物）。保存する sync の形は syncSourceOf、保存の下限と注意は headRoom。門（VIDEO_FEATURE）は門を外す PR（decisions #114）で外した。
 
 import {
   cautions,

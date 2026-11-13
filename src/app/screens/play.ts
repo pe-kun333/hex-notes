@@ -10,7 +10,7 @@
 // m2-kickoff §7-9）。練習の設定は殻の practice()（S4 に入るたびに既定、§7-7）。S0d の段階は音待ちで流す（decisions #61・#82）。
 // M2 の手順 9（M2-05）: 音ゲー向けの HUD（ランク・コンボ・ゲージ・ハイスピード・FAST／SLOW を 3 行に。m6 renderS2
 // L823–826）、流れる時間にハイスピード（settings.hispeed。両プロファイル）、ゲージ 0 の途中終了は play-runner が終了にする。
-// M3 の手順 2（M3-03 前半）: 動画の回（video-run.ts の videoRunOf。門 VIDEO_FEATURE は開発時だけ真）はプレイヤー矩形に
+// M3 の手順 2（M3-03 前半）: 動画の回（video-run.ts の videoRunOf。門 VIDEO_FEATURE は手順 12 まで開発時だけ真で、門を外す PR〔decisions #114〕で外した）はプレイヤー矩形に
 // ctx.videoPort の口（前に何も置かない。同意の門は mountPlayer）、毎フレームの標本を runFrame へ、要求の効果を口の apply へ。
 // 開始は利用者の ▶ だけ（decisions #95）。音を出す準備は S2 を作る時（S1 の釦の click の中）にも呼ぶ（m3-kickoff §7-14）。
 // M3 の手順 3（M3-01 後半＋M3-02）: 左列を 480×270 のまま詰めた（HUD 13 px・「ホームへ」を案内の行へ・曲名 1 行。動画なしの
