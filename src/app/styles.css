@@ -372,6 +372,45 @@ a {
   justify-content: center;
 }
 
+/* 共有 URL を開く確認の覆い（S1 の上。M4 の手順 5） */
+.shareconfirm {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgba(11, 12, 16, 0.82);
+}
+
+.shareconfirm .card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 20px;
+  max-width: 32em;
+}
+
+.shareconfirm h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.shareconfirm .sharerows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 0 0 8px;
+}
+
+.shareconfirm .sharerows dt {
+  color: var(--muted);
+}
+
+.shareconfirm .sharerows dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 /* hidden 属性は display を指定したクラスより強くする */
 [hidden] {
   display: none !important;

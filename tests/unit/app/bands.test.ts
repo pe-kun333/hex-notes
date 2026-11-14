@@ -201,8 +201,9 @@ describe('予約の遅れ（#47 (c)）と自動再生ブロック', () => {
     })
   })
 
-  it('IME と S7c 以外の 5 種は「閉じる」を出し、閉じると消える（M3 の手順 6 で sync）', () => {
+  it('IME と S7c 以外の 6 種は「閉じる」を出し、閉じると消える（M3 の手順 6 で sync、M4 の手順 5 で share）', () => {
     const shown: Record<Exclude<BandKind, 'ime' | 'videoFallback'>, BandEvent> = {
+      share: { kind: 'share', on: true, title: '題', detail: '本文' },
       sync: { kind: 'sync', on: true },
       autoplayBlocked: { kind: 'autoplayBlocked', on: true },
       audioLate: { kind: 'audioLate', on: true },
@@ -216,8 +217,9 @@ describe('予約の遅れ（#47 (c)）と自動再生ブロック', () => {
     }
   })
 
-  it('全部出ていれば BAND_ORDER の順（ime → 同期中 → S7c → 自動再生 → 予約の遅れ → 低負荷 → 保存できません。7 種）', () => {
+  it('全部出ていれば BAND_ORDER の順（ime → 共有 → 同期中 → S7c → 自動再生 → 予約の遅れ → 低負荷 → 保存できません。8 種）', () => {
     const s = run([
+      { kind: 'share', on: true, title: '題', detail: '本文' },
       { kind: 'videoFallback', on: true, enabled: true },
       { kind: 'sync', on: true },
       { kind: 'storageFail', area: 'idb' },
@@ -230,6 +232,7 @@ describe('予約の遅れ（#47 (c)）と自動再生ブロック', () => {
     // （M3 の手順 6、期待値 (9)）。BAND_ORDER 自身と比べない
     expect(kinds(s)).toEqual([
       'ime',
+      'share',
       'sync',
       'videoFallback',
       'autoplayBlocked',
@@ -318,8 +321,8 @@ describe('同期中の帯 sync と自動再生ブロックの文（M3 の手順 
     expect(bandStep(off, { kind: 'autoplayBlocked', on: false })).toBe(off)
   }) // prettier-ignore
 
-  it('定数の順は 7 種 ＝ ime → sync → videoFallback → autoplayBlocked → audioLate → lowLoad → storageFail。bands.ts は排他を持たない', () => {
-    expect(BAND_ORDER).toEqual(['ime', 'sync', 'videoFallback', 'autoplayBlocked', 'audioLate', 'lowLoad', 'storageFail'])
+  it('定数の順は 8 種 ＝ ime → share → sync → videoFallback → autoplayBlocked → audioLate → lowLoad → storageFail。bands.ts は排他を持たない', () => {
+    expect(BAND_ORDER).toEqual(['ime', 'share', 'sync', 'videoFallback', 'autoplayBlocked', 'audioLate', 'lowLoad', 'storageFail'])
     // sync と videoFallback を同時に点けても両方出る（同時に出さないのは同期中の訳。期待値 (9) は sync-video.test.ts）
     expect(kinds(run([{ kind: 'videoFallback', on: true, enabled: false }, { kind: 'sync', on: true }]))).toEqual(['sync', 'videoFallback'])
   }) // prettier-ignore
