@@ -27,6 +27,7 @@ import {
   type SyncKind,
 } from '../shared/types.ts'
 import type { KvStore } from './fallback.ts'
+import { dailyJson, parseDaily, type DailyLog } from '../results/daily.ts'
 
 export const LOCAL_KEYS = {
   settings: 'hexnote.settings',
@@ -35,6 +36,8 @@ export const LOCAL_KEYS = {
   fade: 'hexnote.fade',
   /** 埋め込み不可の動画 ID（M3 の手順 5、m3-kickoff §7-27。控え〔Backup〕には入れない、#53 (a)） */
   noembed: 'hexnote.noembed',
+  /** デイリーを達成した日と曲（{v:1, days: {日: 曲の id}}。控えに入れる。M4 の手順 6、decisions #116 (c)・#125） */
+  daily: 'hexnote.daily',
 } as const
 
 // ---------- 共通 ----------
@@ -365,6 +368,16 @@ export function parseFade(raw: unknown): FadeState {
       typeof manual === 'number' && Number.isFinite(manual) ? round3(clamp01(manual)) : d.manual,
     alpha,
   }
+}
+
+// ---------- hexnote.daily（v:1。M4 の手順 6） ----------
+
+export function loadDaily(kv: KvStore): DailyLog {
+  return parseDaily(readJson(kv, LOCAL_KEYS.daily))
+}
+
+export function saveDaily(kv: KvStore, log: DailyLog): boolean {
+  return writeJson(kv, LOCAL_KEYS.daily, dailyJson(log))
 }
 
 export function loadFade(kv: KvStore): FadeState {

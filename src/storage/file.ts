@@ -23,6 +23,7 @@ import {
   type Variant,
 } from '../shared/types.ts'
 import { parseFade, parseSettings, PROFILES, type Settings } from './local.ts'
+import { parseDaily, type DailyLog } from '../results/daily.ts'
 
 export const BACKUP_FORMAT = 'hexnote-backup/1' as const
 export const FILE_SUFFIX = '.hexnote.json'
@@ -36,6 +37,8 @@ export interface Backup {
   readonly fade: FadeState
   readonly charts: readonly Chart[]
   readonly results: readonly ResultRecord[]
+  /** デイリーを達成した日（M4 の手順 6、decisions #116 (c)。無い控え〔M4 の前〕は欄を持たない） */
+  readonly daily?: DailyLog
 }
 
 // ---------- 書き出し ----------
@@ -194,6 +197,7 @@ async function importBackup(raw: Rec): Promise<ImportResult> {
       fade: parseFade(raw['fade']),
       charts,
       results,
+      ...(raw['daily'] === undefined ? {} : { daily: parseDaily(raw['daily']) }),
     },
     dropped: { charts: droppedCharts, results: droppedResults },
     idChanged: renamed.size,

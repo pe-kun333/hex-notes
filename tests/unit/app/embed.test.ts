@@ -167,8 +167,9 @@ describe('embedError 行と手（期待値 (7)〜(10)）', () => {
 
 describe('控えと初期化（期待値 (11)）', () => {
   it('Backup の欄に noembed が無い。鍵を remove した後は get が null・readJson が undefined・一覧は空', () => {
-    const keys: (keyof Backup)[] = ['format', 'exportedAt', 'settings', 'fade', 'charts', 'results']
-    const b: Record<keyof Backup, unknown> = { format: 0, exportedAt: 0, settings: 0, fade: 0, charts: 0, results: 0 }
+    const keys: (keyof Backup)[] = ['format', 'exportedAt', 'settings', 'fade', 'charts', 'results', 'daily']
+    // M4 の手順 6 でデイリーの達成 daily を足した（noembed は今も無い）
+    const b: Record<keyof Backup, unknown> = { format: 0, exportedAt: 0, settings: 0, fade: 0, charts: 0, results: 0, daily: 0 }
     expect(Object.keys(b)).toEqual(keys)
     const s = kv()
     const now = Date.parse(AT)
