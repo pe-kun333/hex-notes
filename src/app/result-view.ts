@@ -55,14 +55,14 @@ export function switchedNote(fallbackAtMs: number): string {
 }
 
 /**
- * 対象外の回の称号の節（m6 renderS3 L866 の手直し。デイリーは M4-01 なので抜く）。主語は切替の回だけ「途中で動画なしに切り替わった
+ * 対象外の回の称号の節（m6 renderS3 L866 の手直し。M3 で抜いたデイリーを M4 の手順 7 で戻した）。主語は切替の回だけ「途中で動画なしに切り替わった
  * 回」、括弧は完走（isFinished）の回だけ「スコアと自己ベストは残ります」、他は「スコアは残ります」（M3 の手順 8）
  */
 export function offTargetLines(why: OffTargetWhy, finished: boolean): readonly string[] {
   const who = why === 'switched' ? '途中で動画なしに切り替わった回' : 'YouTube 再生の曲'
   const kept = finished ? 'スコアと自己ベストは残ります' : 'スコアは残ります'
   return [
-    `この回は対象外です。${who}は端末内だけに記録します。称号・ストリークは自前音源のプレイだけが対象です（${kept}）。`,
+    `この回は対象外です。${who}は端末内だけに記録します。称号・ストリーク・デイリーは自前音源のプレイだけが対象です（${kept}）。`,
   ]
 }
 export const HIST_BARS = 11

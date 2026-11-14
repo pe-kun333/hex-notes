@@ -135,11 +135,11 @@ describe('S3 の門 rewardFor（期待値 (2)、design §5.4 L273）', () => {
 })
 
 describe('対象外の文と、直す前の誤り（期待値 (3)）', () => {
-  it('「この回は対象外です。…」: デイリーなし、主語は切替の回だけ別、括弧は完走の回だけ「スコアと自己ベスト」', () => {
-    expect(offTargetLines('video', isFinished(V()))).toEqual(['この回は対象外です。YouTube 再生の曲は端末内だけに記録します。称号・ストリークは自前音源のプレイだけが対象です（スコアと自己ベストは残ります）。'])
-    expect(offTargetLines('switched', isFinished(W()))).toEqual(['この回は対象外です。途中で動画なしに切り替わった回は端末内だけに記録します。称号・ストリークは自前音源のプレイだけが対象です（スコアは残ります）。'])
+  it('「この回は対象外です。…」: デイリーを含む（M4 の手順 7 で戻した）、主語は切替の回だけ別、括弧は完走の回だけ「スコアと自己ベスト」', () => {
+    expect(offTargetLines('video', isFinished(V()))).toEqual(['この回は対象外です。YouTube 再生の曲は端末内だけに記録します。称号・ストリーク・デイリーは自前音源のプレイだけが対象です（スコアと自己ベストは残ります）。'])
+    expect(offTargetLines('switched', isFinished(W()))).toEqual(['この回は対象外です。途中で動画なしに切り替わった回は端末内だけに記録します。称号・ストリーク・デイリーは自前音源のプレイだけが対象です（スコアは残ります）。'])
     for (const r of [W({ skipped: 2 }), V({ rate: 0.75 }), V({ aborted: true })]) expect(offTargetLines(offTargetWhy(r) ?? 'video', isFinished(r))[0]).toMatch(/（スコアは残ります）。$/)
-    expect(offTargetLines('video', true).join('')).not.toContain('デイリー')
+    expect(offTargetLines('video', true).join('')).toContain('称号・ストリーク・デイリー')
     // 直す前: 動画の回でも集計して counted 偽 →「練習記録は…」と出ていた
     const before = awardsFor([A()], V(), { today: TODAY, bundledIds: ['c1'], dayOf: DAY })
     expect(before).toEqual({ titles: [], streak: 1, done: 1, total: 1, counted: false })

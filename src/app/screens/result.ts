@@ -15,6 +15,17 @@ import { HIST_BAR_MS, HIST_BARS, offTargetLines, resultView, rewardView } from '
 import { localDay } from '../../results/awards.ts'
 import { isFinished } from '../../results/record.ts'
 import { offTargetWhy, rewardFor, type RewardLoad } from '../../results/reward.ts'
+import { dailyAfterPlay, dailyDone, dailyOf } from '../../results/daily.ts'
+import { loadDaily, saveDaily } from '../../storage/local.ts'
+import { DAILY_DONE_LINE } from '../daily-view.ts'
+import type { ResultRecord } from '../../shared/types.ts'
+
+/** この回が、その日（記録の日）の 1 曲の対象プレイの完走か（M4 の手順 7） */
+function dailyDoneNow(rec: ResultRecord, pool: readonly string[]): boolean {
+  const day = localDay(rec.at)
+  const id = dailyOf(day, pool)
+  return id !== null && dailyDone(rec, day, id)
+}
 import type { ScreenContext, ScreenView } from '../shell.ts'
 import { calibRow } from '../../telemetry/rows.ts'
 import { updatePanel } from '../update-panel.ts'
@@ -154,10 +165,16 @@ export function resultScreen(ctx: ScreenContext): ScreenView {
     const why = offTargetWhy(rec)
     if (why !== null) put([], offTargetLines(why, isFinished(rec)))
     else
-      void rewardFor(rec, load, { today: localDay(new Date().toISOString()) }).then((g) => {
-        if (!alive || !g.target) return
+      void rewardFor(rec, load, { today: localDay(new Date().toISOString()) }).then(async (g) => {
+        if (!g.target) return
+        // デイリー（M4 の手順 7）: 門の後ろで、この回がその日の 1 曲の対象プレイの完走なら鍵に書き、行を 1 つ足す（書いた日は
+        // 変えないので、S3 を出入りしても 1 度だけ）。対象外の回は記録もデイリーも読まない
+        const pool = await ctx.dailyPool()
+        const done = dailyDoneNow(rec, pool)
+        if (done) saveDaily(booted.local, dailyAfterPlay(loadDaily(booted.local), rec, pool))
+        if (!alive) return
         const rv = rewardView(g.awards, rec.aborted === true)
-        put(rv.pills, rv.lines)
+        put(rv.pills, done ? [...rv.lines, DAILY_DONE_LINE] : rv.lines)
       })
   }
   // 新しい版が待っていれば「更新する」（プレイの合間。手順 13、ADR 0004）

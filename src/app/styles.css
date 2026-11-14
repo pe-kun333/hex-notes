@@ -1128,3 +1128,80 @@ table.tracks th {
 .terms a {
   color: var(--fg);
 }
+
+/* S1 の今日の 1 曲と六角カレンダー（M4 の手順 7、decisions #126。色だけにせず日付の数字と「✓」を出す） */
+.card.daily {
+  margin: 0 0 8px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 0 16px;
+}
+
+/* カレンダーは右に並べる（縦を詰め、狭い窓でも曲の一覧が下へ押し出されないように） */
+.card.daily > .calwrap {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.card.daily .t {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.card.daily h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.card.daily .t .name {
+  font-weight: 600;
+}
+
+.card.daily .calwrap .note {
+  margin: 2px 0;
+}
+
+.hexcal {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.hexcal .day polygon {
+  fill: var(--panel);
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.hexcal .day.future polygon {
+  opacity: 0.45;
+}
+
+.hexcal .day.done polygon {
+  fill: #62d4a0;
+  stroke: #62d4a0;
+}
+
+.hexcal .day.today polygon {
+  stroke: var(--fg, currentColor);
+  stroke-width: 2.5;
+}
+
+.hexcal text {
+  fill: currentColor;
+  font-size: 11px;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.hexcal .day.done text {
+  fill: #0b0d12;
+  font-weight: 700;
+}
+
+.hexcal text.mark {
+  font-size: 9px;
+}
