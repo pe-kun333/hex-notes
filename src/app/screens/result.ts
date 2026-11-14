@@ -171,10 +171,16 @@ export function resultScreen(ctx: ScreenContext): ScreenView {
       'div',
       { className: 'btnrow' },
       // もう一度 ＝ 同じ曲・同じ設定（同じ譜面版）で S2。練習室の回なら S4 へ（同じ練習の設定、M2 の手順 6）
-      button(doc, 'もう一度', () => ctx.go(ctx.practice() !== null ? 'S4' : 'S2'), 'primary'),
+      button(doc, 'もう一度', () => {
+        // 練習室の「もう一度」もその回のヒートマップを持ち越す（M4 の手順 2、decisions #121 (b)）
+        if (ctx.practice() !== null) ctx.setHeatCarry(last?.heat ?? null)
+        ctx.go(ctx.practice() !== null ? 'S4' : 'S2')
+      }, 'primary'),
       // 練習室で弾く（初回導線の S3 では出さない。苦手 2 小節があればループ区間に、m6 L387・L858・L987）
       ...(last === null || last.onboardEnd === true ? [] : [button(doc, practiceEntryText(weakRange(last.weak)), () => {
         ctx.setPractice({ ...DEFAULT_PRACTICE, loop: weakRange(last.weak) })
+        // その回のヒートマップを持ち越し、S4 で表示を ON にする（decisions #118。M4 の手順 2）
+        ctx.setHeatCarry(last.heat ?? null)
         ctx.go('S4')
       })]),
       button(doc, 'ホームへ', () => {

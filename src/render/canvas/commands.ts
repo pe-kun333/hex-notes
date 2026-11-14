@@ -27,7 +27,9 @@ import {
 import { chordShapes } from './chords.ts'
 import type { FxIntent } from './feedback.ts'
 import { feedbackCommands } from './feedback.ts'
+import { heatCommands } from './heat.ts'
 import { hintCommands, hintPairs, hintTargets } from './hints.ts'
+import type { HeatStat } from '../../results/heat.ts'
 import type { LowLoadLevel } from './lowload.ts'
 import { lowLoadEffects } from './lowload.ts'
 import type { DrawCommand, LineCmd, Rect, Regions } from './primitives.ts'
@@ -85,6 +87,11 @@ export type FrameInput = {
   /** 辺ヒント（入門者だけ） */
   readonly hints: boolean
   readonly level: LowLoadLevel
+  /**
+   * 鍵盤図に重ねるヒートマップ（鍵ごとのまとめ。無ければ描かない ＝ M3 までと同じコマンド）。鍵盤図のセルの後・キー文字の
+   * 前に挟む（M4 の手順 2、decisions #120 (c)）
+   */
+  readonly heat?: ReadonlyMap<KeyCode, HeatStat>
 }
 
 /** 背景の縦線（音のある鍵の上。同じ x は 1 本。落下域の中だけ。m1' L446） */
@@ -212,9 +219,13 @@ export function buildFrame(input: FrameInput): DrawCommand[] {
     realMs: t.real,
   })
 
+  const heat =
+    input.heat === undefined ? [] : heatCommands(grid, input.heat, { mode, depth: fx.depth })
+
   return [
     ...bg,
     ...kb.polys,
+    ...heat,
     ...kb.texts,
     ...hint.lines,
     ...hint.digits,

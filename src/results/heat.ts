@@ -107,6 +107,30 @@ export function heatAdd(heat: Heat, ev: HeatInput): Heat {
   }
 }
 
+/**
+ * 2 つを合わせる（鍵ごとに向き・other を足し、ずれを a の後に b の順で並べる）。S4 で「最初から」の前の回の分を残す
+ * （M4 の手順 2）。片方が空なら他方をそのまま返す
+ */
+export function heatMerge(a: Heat, b: Heat): Heat {
+  if (b.size === 0) return a
+  if (a.size === 0) return b
+  const m = new Map(a)
+  for (const [code, k] of b) {
+    const x = m.get(code)
+    m.set(
+      code,
+      x === undefined
+        ? k
+        : {
+            dirs: x.dirs.map((c, i) => c + (k.dirs[i] ?? 0)),
+            other: x.other + k.other,
+            offs: [...x.offs, ...k.offs],
+          },
+    )
+  }
+  return m
+}
+
 /** 事象の列をまとめて足す */
 export function heatAddAll(heat: Heat, evs: readonly HeatInput[]): Heat {
   return evs.reduce(heatAdd, heat)

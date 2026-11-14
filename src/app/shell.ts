@@ -57,6 +57,7 @@ import { navigate, type Route, type ScreenId } from './router.ts'
 import { songList, type SongEntry } from './songs.ts'
 import { INITIAL_UPDATE, type UpdateState } from './sw-update.ts'
 import { createYoutubePlayer, type MountOptions } from './youtube-player.ts'
+import type { Heat } from '../results/heat.ts'
 
 /** 開発ページへの導線（dev のときだけ S1 に出す。build では空） */
 export interface DevPage {
@@ -158,6 +159,12 @@ export interface ScreenContext {
    */
   practice(): PracticeOptions | null
   setPractice(p: PracticeOptions | null): void
+  /**
+   * S3 から S4 へ持ち越すヒートマップ（S3 の釦が S4 へ移る直前に書き、S4 が開くときに読んで消す。保存しない、decisions #118。
+   * M4 の手順 2）
+   */
+  heatCarry(): Heat | null
+  setHeatCarry(h: Heat | null): void
   /** 終わった回（S2 が書き S3 が読む。中身の画面は手順 5） */
   lastPlay(): FinishedPlay | null
   setLastPlay(r: FinishedPlay): void
@@ -311,6 +318,7 @@ export function startShell(opts: ShellOptions): Shell {
   let keyset: KeysetId = 'all'
   let spec: VariantSpec | null = null
   let practice: PracticeOptions | null = null
+  let heatCarry: Heat | null = null
   let lastPlay: FinishedPlay | null = null
   let proposalOpen = false
   let audio: AudioOut | null = null
@@ -432,6 +440,10 @@ export function startShell(opts: ShellOptions): Shell {
     practice: () => practice,
     setPractice: (p) => {
       practice = p
+    },
+    heatCarry: () => heatCarry,
+    setHeatCarry: (h) => {
+      heatCarry = h
     },
     lastPlay: () => lastPlay,
     setLastPlay: (r) => {

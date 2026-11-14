@@ -77,6 +77,7 @@ import {
   runNotes,
   finishedPlay,
   runPhase,
+  runClearHeat,
   runPress,
   runPump,
   runRelease,
@@ -91,7 +92,7 @@ import {
   type RunStep,
 } from '../play-runner.ts'
 import { practicePanel, type PracticePanel } from '../practice-panel.ts'
-import { keysetShown, loopBandText, practiceNote } from '../practice-view.ts'
+import { heatSummaryText, keysetShown, loopBandText, practiceNote } from '../practice-view.ts'
 import type { KeysetId } from '../../chart/keyset.ts'
 import { profileOf, travelOf } from '../profile.ts'
 import type { ScreenContext, ScreenView } from '../shell.ts'
@@ -102,6 +103,14 @@ import { KEYSET_NAMES, TUTORIAL_KEYSETS } from '../../chart/keyset.ts'
 import { markBooted } from '../../storage/session.ts'
 import { onboardRow } from '../../telemetry/rows.ts'
 import { newRecordId } from '../../results/record.ts'
+import {
+  EMPTY_HEAT,
+  heatMerge,
+  heatStats,
+  heatSummary,
+  type Heat,
+  type HeatStat,
+} from '../../results/heat.ts'
 import type { PortEvent } from '../../youtube/port.ts'
 import { videoRunOf } from '../video-run.ts'
 import { embedFailPlan, isEmbedFail, type EmbedFailEvent, type EmbedView } from '../embed-view.ts'
@@ -255,6 +264,18 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   const loopNote = h(doc, 'div', { className: 'loopnote' })
   const practiceLine = h(doc, 'p', { className: 'note' })
   let panel: PracticePanel | null = null
+  // S4 のヒートマップ（M4 の手順 2）: 前の回から持ち越した分と、この部屋で「最初から」の前の回の分（heatBase）に、今の回の
+  // 分（run.heat）を合わせて出す。S3 から持ち越したら ON で始める。消すまで残し、保存しない（decisions #118・#121）
+  const carried = room ? ctx.heatCarry() : null
+  if (room) ctx.setHeatCarry(null)
+  let heatBase: Heat = carried ?? EMPTY_HEAT
+  let heatOn = carried !== null && carried.size > 0
+  let heatMemo: { base: Heat; cur: Heat; stats: Map<KeyCode, HeatStat> } | null = null
+  const heatShown = (r: Run): Map<KeyCode, HeatStat> => {
+    if (heatMemo === null || heatMemo.base !== heatBase || heatMemo.cur !== r.heat)
+      heatMemo = { base: heatBase, cur: r.heat, stats: heatStats(heatMerge(heatBase, r.heat)) }
+    return heatMemo.stats
+  }
   if (room) {
     panel = practicePanel(doc, {
       change: (patch) => changePractice(patch),
@@ -271,6 +292,15 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       home: () => {
         ctx.setPractice(null)
         goHome()
+      },
+      heatShow: (v) => {
+        heatOn = v
+        showPractice()
+      },
+      heatClear: () => {
+        heatBase = EMPTY_HEAT
+        if (run !== null) run = runClearHeat(run)
+        showPractice()
       },
     })
     player.className = 'player room'
@@ -450,8 +480,14 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
       loopNote.replaceChildren(...(b === null ? [] : [h(doc, 'b', { text: b.title }), h(doc, 'span', { text: b.detail })]))
       loopNote.hidden = b === null
     }
-    panel.update({ opts: { ...p.opts, mode: p.mode }, rate: p.pendingRate ?? p.rate, range, laps: p.loop.laps, bars: runBars(r), nowBar: runBar(r), self: r.judge.selfRate, keyset: r.opts.keyset ?? 'all', keysetShown: keysetShown(settings.profile), layout: r.song.variant.layout, idle: runPhase(r) === 'idle', labels: ctx.settings().labels, fade: r.judge.fade, pitches: r.notes.map((n) => n.midi), fadeFrozen })
+    panel.update({ opts: { ...p.opts, mode: p.mode }, rate: p.pendingRate ?? p.rate, range, laps: p.loop.laps, bars: runBars(r), nowBar: runBar(r), self: r.judge.selfRate, keyset: r.opts.keyset ?? 'all', keysetShown: keysetShown(settings.profile), layout: r.song.variant.layout, idle: runPhase(r) === 'idle', labels: ctx.settings().labels, fade: r.judge.fade, pitches: r.notes.map((n) => n.midi), fadeFrozen, ...heatPanel(r) })
   } // prettier-ignore
+
+  /** パネルのヒートマップの行（要約は今の回までの合わせた分） */
+  function heatPanel(r: Run): { heatOn: boolean; heatText: string; heatEmpty: boolean } {
+    const s = heatSummary(heatShown(r))
+    return { heatOn, heatText: heatSummaryText(s), heatEmpty: s.keys === 0 }
+  }
 
   /**
    * 鍵数制限を替えた（S4。判定する音の集合が変わるので、替えられるのは待機中だけ ＝ 回を作り直す。殻に覚えて S3 の
@@ -741,6 +777,8 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
     }
     if (r.step === null) return
     if (runPhase(r.step.run) === 'syncing') wake()
+    // S4 の「最初から」: 前の回のヒートマップを残す（消すまで。M4 の手順 2）
+    if (r.fresh && room) heatBase = heatMerge(heatBase, run.heat)
     if (r.fresh) {
       // 新しい回の始め: 予約の遅れの帯を下ろす（#65 (c)）、演出を捨てる。S7c の帯の形も初めに戻す（帯は次のフレームで下りる）
       fbGuide = false
@@ -830,11 +868,14 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
   const draw = (now: number): void => {
     if (g2d === null || sizing === null || grid === null || run === null) return
     effects = pruneEffects(effects, now)
+    // ヒートマップは S4 で ON の間、待機と一時停止の間だけ重ねる（演奏中は落ちる音と重なる。§7-8）。重ねている間は落ちるセルを
+    // 描かない（区間の前の音は待機中に着地のセルに留まり、そのセルの重ね描きを隠すため。decisions #121 (c)）
+    const heatNow = room && heatOn && (runPhase(run) === 'idle' || runPhase(run) === 'paused')
     const cmds = buildFrame({
       sizing,
       grid,
       mode: settings.landing,
-      notes: runNotes(run),
+      notes: heatNow ? [] : runNotes(run),
       t: { song: run.t, real: now },
       pressed,
       effects,
@@ -844,6 +885,7 @@ export function playScreen(ctx: ScreenContext, room = false): ScreenView {
         : { fade: (midi: number) => fadeOf(run?.judge.fade ?? ctx.fade(), midi) }),
       hints: settings.hints,
       level: low.level,
+      ...(heatNow ? { heat: heatShown(run) } : {}),
     })
     flush(g2d, cmds, {
       regions: regionsOf(sizing),
