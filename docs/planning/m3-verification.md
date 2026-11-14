@@ -64,7 +64,7 @@ pane が表に出ている時に、開発ページ `/src/app/dev/youtube.html` �
 | 153（Referer を送らない設定）・拡張機能のブロック・オフラインで S2 の S7a の見出しと本文 | 5 | 手順 5 の PR の後（まとめて 30 日目でも可） | 未 |
 | Firefox で一時停止 → Space の再開が止められたときの自動再生ブロックの帯（1 秒後、▶ で下りる）。Space の後の状態の列（BUFFERING・CUED が先に来るか）と、onAutoplayBlocked が来るか・いつかも記録する（§8 の開いた点） | 6 | 手順 6 の PR の後（まとめて 30 日目でも可） | 未 |
 | 再生中にプレイヤーのシークバーを触る（iframe への blur で一時停止、再開は resync(resume)。コードの読みだけ） | 6 | 同上 | 未 |
-| 実 IFrame の S7c: 見本の動画で `__hexnoteDev.freeze(10000)` → 2.0〜2.5 秒で帯、iframe の ▶ で戻る。▶ の後の状態の列（BUFFERING を挟むか）とピアノが鳴り直すか、pauseVideo → PAUSED の遅れを記録する | 7 | pane を表に出せる時（主担当）か手順 7 の PR の後 | 一部（2026-11-14、§16: 凍結から 2,042 ms で帯と切替、iframe の ▶ で戻った。▶ の後の状態の列と pauseVideo → PAUSED の遅れの値は、製品の読み口が実物の口の要求・事象を残さないので未） |
+| 実 IFrame の S7c: 見本の動画で `__hexnoteDev.freeze(10000)` → 2.0〜2.5 秒で帯、iframe の ▶ で戻る。▶ の後の状態の列（BUFFERING を挟むか）とピアノが鳴り直すか、pauseVideo → PAUSED の遅れを記録する | 7 | pane を表に出せる時（主担当）か手順 7 の PR の後 | 一部（2026-11-14、§16: 凍結から 2,042 ms で帯と切替、iframe の ▶ で戻った。▶ の後の状態の列と pauseVideo → PAUSED の遅れの値は、製品の読み口が実物の口の要求・事象を残さないので未。2026-11-15 に読み口が実物の口の要求と状態の変わり目も残すようにした〔decisions #128〕ので、次に pane を表に出せる時に `__hexnoteDev.state` の requests・events から取る） |
 | 切替からピアノ音までの遅れ・▶ の後に鳴り始めるピアノが 1 音まで（耳で）・切替の後の押下が親に届く・Firefox | 7 | 手順 7 の PR の後（まとめて 30 日目でも可） | 未 |
 | 実動画の回の S3 が対象外の文・S1 に完走印なし（耳の 8 拍から S3 までの通しの中で） | 8 → 12 | 手順 12 の通しの時 | 未 |
 | 実 IFrame の動画の回（見本の動画の行。式の sync）で S3 の帯の内訳が「YouTube の…」、「適用」で `hexnote.calibration` の youtube だけ変わる | 9 | pane を表に出せる時（主担当）か手順 11 の U-02 の式の sync の回 | 済（2026-11-14、主担当。§16） |
@@ -519,4 +519,4 @@ Claude の窓を前に出してもらい、pane（Chromium、視口 682×731・�
 | 式の sync の動画の回の提案帯（同じ行を「もう一度」。合成の押下を着地の時刻に 64 打） | S3 の帯「平均 ＋90 ms（少し遅め）→ オフセットを −90 ms にしますか」「ばらつき 1 ms、ヒット 64。YouTube のオフセットとして保存します。」→「適用」→「YouTube のオフセットを −90 ms にしました。」、`hexnote.calibration` は youtube だけ（−90、propose）。平均の ＋90 は合成の押下の置き方（再生の始まりを rAF で見てから置いた）の分で、端末の値ではない。確かめの後に校正を元（空）へ戻した |
 | コンソール | 受け口で console.error 0 |
 
-言えない事: 音（切替からピアノ音までの遅れ、▶ の後に鳴るピアノが 1 音まで）、物理のキーボード、▶ の後の状態の列（BUFFERING を挟むか）と pauseVideo → PAUSED の遅れの値。製品の DEV の読み口（`__hexnoteDev` の requests・events）はダミーの口だけが書き、実物の口では空のままだった（提案: 実物の口の要求と事象も読み口に残す。直すかは次の手順書で決める）。
+言えない事: 音（切替からピアノ音までの遅れ、▶ の後に鳴るピアノが 1 音まで）、物理のキーボード、▶ の後の状態の列（BUFFERING を挟むか）と pauseVideo → PAUSED の遅れの値。製品の DEV の読み口（`__hexnoteDev` の requests・events）はダミーの口だけが書き、実物の口では空のままだった（提案: 実物の口の要求と事象も読み口に残す。直すかは次の手順書で決める）。→ 2026-11-15 に直した（M4 の手順書 §7-13 (i)、decisions #128）。実物の口は `wrapRealPort` が記録の包み `recordingPort` を掛け、`__hexnoteDev.state` の requests・events に残る。at の原点は buffering か playing を最初に読んだ時で、それより前の unstarted・cued は 0。pane（隠れたまま）では、製品の S2 の見本の動画の行で videoId と cued が入るところまで見た。

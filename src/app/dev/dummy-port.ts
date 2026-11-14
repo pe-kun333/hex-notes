@@ -12,6 +12,8 @@
 // 自動再生ブロックの帯。利用者の ▶（ダミー）は口を通らないので効く）を足した。
 // 手順 3 で band（帯を点ける。殻の band へ）と actions（帯の釦の押下の記録）を足した。performance.now の直呼びは src/app/ だけ
 // （src/README.md）。
+// M4 の手順書 §7-13 (i)（decisions #128）: 実物の口も recordingPort で包み、要求と状態の変わり目を同じ列に残す（m3-verification
+// §16 の「▶ の後の状態の列」と「pauseVideo → PAUSED の遅れ」を DEV で読めるように）。
 
 import {
   createDummyVideo,
@@ -212,6 +214,7 @@ interface DevState {
   /** 最初の ▶ の performance.now（無ければ null。列の at はここからの ms） */
   startAt: number | null
   videoId: string | null
+  /** 口への要求と状態の変わり目（ダミーの口と、wrapRealPort で包んだ実物の口。実物の at は再生へ向かった最初の状態から） */
   requests: Array<{ at: number; kind: VideoRequest['kind']; why?: string }>
   events: Array<{ at: number; state: VideoState }>
   play: DevPlayState | null
@@ -275,9 +278,73 @@ export function freezeReads(base: VideoPort): FrozenPort {
 /** 今の実物の口（freeze の的） */
 let realFreeze: FrozenPort | null = null
 
-/** 殻の wrapVideoPort（実物の口を作るたびに包む。DEV だけ） */
-export function wrapRealPort(p: VideoPort): VideoPort {
-  realFreeze = freezeReads(p)
+/** 記録の受け口（ダミーの口の ScenarioHooks と同じ形に、口の dispose を足した） */
+export interface RecordHooks extends ScenarioHooks {
+  onDispose?(): void
+}
+
+/**
+ * 口を包み、apply に渡した要求と、標本の状態の変わり目を受け口へ流す（中身は変えない）。実物の口の要求・事象を DEV の
+ * 読み口に残すため（m3-verification §16 の宿題、M4 の手順書 §7-13 (i)、decisions #128）。状態は読んだ tick の now で、
+ * 同じ状態が続く間は流さない
+ */
+export function recordingPort(base: VideoPort, hooks: RecordHooks): VideoPort {
+  let last: VideoState | null = null
+  return {
+    sample(now) {
+      const s = base.sample(now)
+      if (s !== null && s.state !== last) {
+        last = s.state
+        hooks.onState?.(now, s.state)
+      }
+      return s
+    },
+    apply(now, reqs) {
+      for (const q of reqs) hooks.onRequest?.(now, q)
+      return base.apply(now, reqs)
+    },
+    dispose() {
+      hooks.onDispose?.()
+      base.dispose()
+    },
+  }
+}
+
+/** 実物の口の最初の ▶ と見なす状態（iframe の ▶ は DEV から見えないので、再生へ向かった最初の状態で原点を置く） */
+const REAL_START: readonly VideoState[] = ['buffering', 'playing']
+
+/**
+ * 殻の wrapVideoPort（実物の口を作るたびに包む。DEV だけ）。読み口の列を空にし、要求と状態の変わり目を記録してから
+ * 凍結の包みを掛ける（凍結は timeMs だけを固め、状態は実物のまま記録される）。startAt は buffering か playing を
+ * 最初に読んだ時（それより前の unstarted・cued は at 0）
+ */
+export function wrapRealPort(p: VideoPort, o?: Pick<MountOptions, 'videoId'>): VideoPort {
+  Object.assign(state, {
+    startAt: null,
+    videoId: o?.videoId ?? null,
+    requests: [],
+    events: [],
+    disposes: 0,
+    fails: [],
+  })
+  let disposed = false
+  const rec = recordingPort(p, {
+    onRequest: (now, q) =>
+      state.requests.push({
+        at: since(now),
+        kind: q.kind,
+        ...(q.kind === 'pauseVideo' ? { why: q.why } : {}),
+      }),
+    onState: (now, s) => {
+      if (state.startAt === null && REAL_START.includes(s)) state.startAt = now
+      state.events.push({ at: since(now), state: s })
+    },
+    onDispose: () => {
+      if (!disposed) state.disposes++
+      disposed = true
+    },
+  })
+  realFreeze = freezeReads(rec)
   return realFreeze.port
 }
 
