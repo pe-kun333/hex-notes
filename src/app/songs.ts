@@ -8,6 +8,7 @@
 import { validateChart } from '../chart/validate.ts'
 import { buildVariant, type VariantSpec } from '../chart/variants.ts'
 import type { Chart, Variant } from '../shared/types.ts'
+import { BUNDLED_LIST } from './bundled-list.ts'
 import type { RunSong } from './play-runner.ts'
 
 /** 一覧の 1 曲。load は譜面の JSON（検査の前）を返す。読めなければ投げる */
@@ -58,13 +59,12 @@ export function songList(bundled: readonly SongEntry[], local: readonly Chart[])
 
 /**
  * 同梱曲（content/charts/。dev は vite が、build は copyContent が dist/content/ に写して配る。ADR 0003）。今は U-03 の
- * 代替の 3 曲（m1-kickoff §5。チュートリアル曲と PD の 2 曲）。名前は譜面の name。並びと譜面版の自動選択は手順 8
+ * 代替の 3 曲（m1-kickoff §5。チュートリアル曲と PD の 2 曲）。名前は譜面の name。並びと譜面版の自動選択は手順 8。一覧は
+ * charts:bundle が書く bundled-list.ts（元は tools/charts/bundle-songs.ts の BUNDLE_SONGS。M4 の手順 3、decisions #122）
  */
-export const BUNDLED_SONGS: readonly UrlSong[] = [
-  ['tutorial/hajime', 'はじめの六角'],
-  ['pd/twinkle', 'きらきら星'],
-  ['pd/ode', '歓喜の歌'],
-].map(([file, name]) => urlSong(`bundled:${file}`, name ?? '', `/content/charts/${file}.json`))
+export const BUNDLED_SONGS: readonly UrlSong[] = BUNDLED_LIST.map(([file, name]) =>
+  urlSong(`bundled:${file}`, name, `/content/charts/${file}.json`),
+)
 
 /** チュートリアル曲（S0d。手順 7 の鍵数制限の 3 段階、手順 9 の導線） */
 export const TUTORIAL_SONG_ID = 'bundled:tutorial/hajime'

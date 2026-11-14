@@ -41,7 +41,13 @@ const dev = import.meta.env.DEV
   : null
 
 // 同梱曲（M1 の手順 6）。dev ではフィクスチャ 6 曲とクリック譜面の 6 行（vite dev が tests/ を配る）を「試験:」付きで後ろに足す
-const SONGS: readonly SongEntry[] = [...BUNDLED_SONGS, ...(dev?.[0].DEV_SONGS ?? [])]
+// ?bulk=30 で同梱曲を 30 曲に見せる（複製。S1 の並び・絞り込み・縦の長さと S6 のクレジットを見る、M4 の手順 3）
+const bulk = dev === null ? 0 : Number(new URLSearchParams(location.search).get('bulk') ?? 0)
+const SONGS: readonly SongEntry[] = [
+  ...BUNDLED_SONGS,
+  ...(dev?.[0].bulkSongs(BUNDLED_SONGS, bulk) ?? []),
+  ...(dev?.[0].DEV_SONGS ?? []),
+]
 
 const SCREENS: Readonly<Record<ScreenId, ScreenFactory>> = {
   S0: onboardScreen,

@@ -74,11 +74,71 @@ export async function bundledChart(song: BundleSong): Promise<Chart> {
   })
 }
 
-/** content/charts/ に書くファイル（path は content/charts/ からの相対） */
+/** content/charts/ に書くファイル（path は content/charts/ からの相対、name は譜面の name ＝ 製品の一覧に書く名前） */
 export async function buildBundle(
   songs: readonly BundleSong[],
-): Promise<{ path: string; text: string }[]> {
-  const out: { path: string; text: string }[] = []
-  for (const s of songs) out.push({ path: s.file, text: formatJson(await bundledChart(s)) + '\n' })
+): Promise<{ path: string; text: string; name: string }[]> {
+  const out: { path: string; text: string; name: string }[] = []
+  for (const s of songs) {
+    const c = await bundledChart(s)
+    out.push({ path: s.file, text: formatJson(c) + '\n', name: c.name })
+  }
+  return out
+}
+
+/** 製品の同梱曲の一覧（charts:bundle が書く。M4 の手順 3、decisions #122） */
+export const BUNDLE_LIST_PATH = 'src/app/bundled-list.ts'
+
+/**
+ * TS の文字列（Prettier と同じ選び方: 単引用符を好み、' の方が " より多い時だけ二重引用符。\ と使った引用符を逃がす）
+ */
+function tsString(s: string): string {
+  const q = (s.split("'").length > s.split('"').length ? '"' : "'") as '"' | "'"
+  const body = s.replace(/\\/g, '\\\\').split(q).join(`\\${q}`)
+  return `${q}${body}${q}`
+}
+
+/**
+ * 製品の一覧のファイルの中身（src/app/songs.ts の BUNDLED_SONGS が読む）。並びは BUNDLE_SONGS の順、file は .json を外した
+ * content/charts/ からの相対、name は譜面の name。Prettier の形のまま書く（試験で整形し直して同じ事を見る）
+ */
+export function bundleListText(
+  files: readonly { readonly path: string; readonly name: string }[],
+): string {
+  const rows = files.map(
+    (f) => `  [${tsString(f.path.replace(/\.json$/, ''))}, ${tsString(f.name)}],`,
+  )
+  return [
+    '// 同梱曲の一覧（生成物。手で書かない: npm run charts:bundle が tools/charts/bundle-songs.ts の BUNDLE_SONGS から書き、',
+    '// charts:bundle:check が照合する。M4 の手順 3、decisions #122）。file は content/charts/ からの相対（.json なし）、',
+    '// name は譜面の name。src/app/songs.ts の BUNDLED_SONGS が読む。',
+    '',
+    'export const BUNDLED_LIST: readonly (readonly [string, string])[] = [',
+    ...rows,
+    ']',
+    '',
+  ].join('\n')
+}
+
+/**
+ * 一覧・譜面ファイル・権利表が同じ曲を指すか（M4 の手順 3、decisions #122）。list は一覧の file、charts は content/charts/ の
+ * 譜面（listCharts）、rights は権利表の行の file。どれも content/charts/ からの相対。食い違いを 1 件ずつ返す（空なら揃っている）
+ */
+export function bundleIssues(
+  list: readonly string[],
+  charts: readonly string[],
+  rights: readonly string[],
+): string[] {
+  const out: string[] = []
+  for (const f of list) {
+    if (!charts.includes(f))
+      out.push(`${f}: 一覧に在って譜面が無い（npm run charts:bundle で書く）`)
+    if (!rights.includes(f))
+      out.push(`${f}: 一覧に在って権利表に行が無い（content/charts/rights.json に足す）`)
+  }
+  for (const f of charts)
+    if (!list.includes(f))
+      out.push(`${f}: 譜面が在って一覧に無い（bundle-songs.ts に足すか、譜面を消す）`)
+  for (const f of rights) if (!list.includes(f)) out.push(`${f}: 権利表の行が一覧に無い`)
   return out
 }
