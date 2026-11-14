@@ -167,7 +167,10 @@ export interface JudgeState {
 
 /** 判定の事象（演出・音・計測は呼ぶ側がこれから作る） */
 export type JudgeOutcome =
-  /** 当てた（grade は perfect／great／good／near）。code は押した鍵、noteCode はノートの鍵 */
+  /**
+   * 当てた（grade は perfect／great／good／near）。code は押した鍵、noteCode はノートの鍵。untimed は待ちで当てた音
+   * （judgeWaitHit。dtMs は 0 で埋めた値で、ずれの標本ではない。ヒートマップの早遅に入れない、M4 の手順 1）
+   */
   | {
       readonly kind: 'hit'
       readonly index: number
@@ -176,15 +179,21 @@ export type JudgeOutcome =
       readonly code: KeyCode
       readonly noteCode: KeyCode
       readonly self: SelfCategory
+      readonly untimed?: true
     }
   | { readonly kind: 'miss'; readonly index: number; readonly noteCode: KeyCode }
   | { readonly kind: 'skipped'; readonly index: number }
-  /** 窓の外・鍵違いの押下（空打ち。§2.3「押下は無視」）。stopped は時計が止まっている間の押下 */
+  /**
+   * 窓の外・鍵違いの押下（空打ち。§2.3「押下は無視」）。stopped は時計が止まっている間の押下。target は window のときの
+   * 相手の音: 押した時刻に GOOD の窓の中にある未判定の音のうち一番近い音（鍵を問わない。同じ近さなら先の音）。無ければ
+   * 付けない。判定には使わない（ヒートマップの誤打の向き、m4 L448、M4 の手順 1）
+   */
   | {
       readonly kind: 'stray'
       readonly code: KeyCode
       readonly tsPerf: number
       readonly reason: 'window' | 'stopped'
+      readonly target?: { readonly index: number; readonly code: KeyCode }
     }
   /** 猶予中の押下を溜めた（猶予の終わりに判定する） */
   | { readonly kind: 'deferred'; readonly code: KeyCode; readonly tsPerf: number }
@@ -330,6 +339,7 @@ function settle(
       code: code ?? n.code,
       noteCode: n.code,
       self: cat,
+      ...(dt === null ? { untimed: true as const } : {}),
     })
   if (!failedBefore && score.failed) w.out.push({ kind: 'failed' })
 }
@@ -360,6 +370,8 @@ function pressNow(w: Work, code: KeyCode, tsPerf: number, map: ClockMap): void {
   let sameD = Infinity
   let near = -1
   let nearD = Infinity
+  let any = -1
+  let anyD = Infinity
   for (let i = s.from; i < s.notes.length; i++) {
     const n = s.notes[i]
     if (n === undefined) break
@@ -368,6 +380,10 @@ function pressNow(w: Work, code: KeyCode, tsPerf: number, map: ClockMap): void {
     if (dt < -r.windows.good) break
     if (curResult(w, i).state !== 'pending' || !inGoodWindow(r.windows, dt)) continue
     const d = Math.abs(dt)
+    if (d < anyD) {
+      any = i
+      anyD = d
+    }
     if (n.code === code) {
       if (d < sameD) {
         same = i
@@ -381,7 +397,18 @@ function pressNow(w: Work, code: KeyCode, tsPerf: number, map: ClockMap): void {
   const pick = same >= 0 ? same : near
   const n = s.notes[pick]
   if (pick < 0 || n === undefined) {
-    w.out.push({ kind: 'stray', code, tsPerf, reason: 'window' })
+    const t = s.notes[any]
+    w.out.push(
+      t === undefined
+        ? { kind: 'stray', code, tsPerf, reason: 'window' }
+        : {
+            kind: 'stray',
+            code,
+            tsPerf,
+            reason: 'window',
+            target: { index: t.index, code: t.code },
+          },
+    )
     return
   }
   const dt = tj - perfAt(map, n.tLandMs)

@@ -31,6 +31,7 @@ const DEV_PAGES: readonly DevPage[] = import.meta.env.DEV
       { href: '/src/app/dev/telemetry.html', label: '計測層（手順 12）' },
       { href: '/src/app/dev/sync.html', label: '同期タップ（M2 手順 3）' },
       { href: '/src/app/dev/youtube.html', label: 'YouTube の実プレイヤー（M3 手順 1）' },
+      { href: '/src/app/dev/heat.html', label: 'ヒートマップ（M4 手順 1、U-05 の見本）' },
     ]
   : []
 

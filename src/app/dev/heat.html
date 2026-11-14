@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>ヒートマップ（開発）</title>
+    <style>
+      :root {
+        --bg: #111318;
+        --fg: #e8e9ec;
+        --dim: #8a8f99;
+        --line: #2a2e37;
+        --heat-early: #62a6f2;
+        --heat-late: #f2a452;
+        --heat-miss: #f06a6a;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          15px/1.5 system-ui,
+          sans-serif;
+      }
+      main {
+        padding: 16px;
+        max-width: 1100px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 15px;
+        margin: 16px 0 4px;
+      }
+      p.note {
+        color: var(--dim);
+        margin: 0 0 12px;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 20px;
+        align-items: center;
+        margin: 0 0 8px;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 16px;
+        color: var(--dim);
+        margin: 0 0 8px;
+      }
+      .legend i {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 4px;
+        vertical-align: -1px;
+      }
+      canvas {
+        display: block;
+        border: 1px solid var(--line);
+      }
+      #check.bad {
+        color: var(--heat-miss);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>ヒートマップ（開発、M4 の手順 1）</h1>
+      <p class="note">
+        決まった見本の事象を heatAdd で貯め、heatCommands
+        と同じ図形をセルごとに作って鍵盤図に重ねる（セルの外へ出た図形を数える）。R 24・26・28 と 3
+        視口（1366×668・1280×620・1093×514）の R
+        で描く。読めるかどうかの判定は利用者の手元（U-05、125%
+        の端末を含む）。製品画面への組み込みは手順 2。
+      </p>
+      <div class="controls">
+        <label
+          >配列
+          <select id="layout"></select
+        ></label>
+        <label>
+          キー文字
+          <select id="labels">
+            <option value="key">キー</option>
+            <option value="both">キー＋音名</option>
+          </select>
+        </label>
+        <label><input type="checkbox" id="depth" checked /> 奥行き</label>
+        <label><input type="checkbox" id="show" checked /> 重ねる</label>
+      </div>
+      <div class="legend">
+        <span
+          ><i style="background: var(--heat-miss)"></i>扇: 狙いの鍵から見た誤打の向き（隣の 6
+          つ、長さ ＝ 回数）</span
+        >
+        <span><i style="background: var(--heat-early)"></i>早い</span>
+        <span
+          ><i style="background: var(--heat-late)"></i>遅い（中央の丸 ＝ 平均、濃さは ±60 ms
+          で飽和）</span
+        >
+        <span><i style="border: 1.5px solid #fff"></i>輪の半径 ＝ SD（0〜100 ms）</span>
+      </div>
+      <p id="summary"></p>
+      <p id="check"></p>
+      <div id="stages"></div>
+    </main>
+    <script type="module" src="./heat-dev.ts"></script>
+  </body>
+</html>

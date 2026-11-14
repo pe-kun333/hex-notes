@@ -56,6 +56,11 @@ export const DARK_PALETTE: Readonly<Record<Paint, string>> = {
   hint: '#ffffff',
   hull: '#ffffff',
   flash: '#ffffff',
+  // ヒートマップ（m6 の --heat-miss・--heat-early・--heat-late。m4 の扇の橙は m6 で遅いの色なので、扇は誤打の色。M4 の手順 1）
+  heatMiss: '#f06a6a',
+  heatEarly: '#62a6f2',
+  heatLate: '#f2a452',
+  heatRing: 'rgba(255,255,255,0.95)',
   'judge:perfect': '#ffd766',
   'judge:great': '#62d4a0',
   'judge:good': '#62a6f2',
