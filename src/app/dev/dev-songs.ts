@@ -50,3 +50,17 @@ export const DEV_SONGS: readonly SongEntry[] = [...FIXTURE_SONGS, ...VIDEO_SONGS
   ...s,
   name: `試験: ${s.name}`,
 }))
+
+/**
+ * 同梱曲を n 曲に見せる複製（dev だけ。URL の ?bulk=30。M4 の手順 3「DEV で曲を 30 枚に増やした S1 と S6 のクレジット」）。
+ * チュートリアル曲を除く同梱曲を巡回して、id bundled:dev-bulk/<番号>・名前「複製 番号: 曲名」で足す（中身は元の曲の URL）
+ */
+export function bulkSongs(bundled: readonly UrlSong[], n: number): UrlSong[] {
+  const pool = bundled.filter((s) => s.id !== 'bundled:tutorial/hajime')
+  const out: UrlSong[] = []
+  for (let i = bundled.length; i < n && pool.length > 0; i++) {
+    const s = pool[(i - bundled.length) % pool.length] as UrlSong
+    out.push(urlSong(`bundled:dev-bulk/${i + 1}`, `複製 ${i + 1}: ${s.name}`, s.url))
+  }
+  return out
+}
