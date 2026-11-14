@@ -4,6 +4,7 @@
 // 手直し: m6 の「持ち込み曲を削除」1 釦 → 曲ごと（記録は残す）。「動画あり」のフィルタは M3。
 // 純関数（DOM は screens/settings.ts・screens/home.ts）。
 
+import { canShare } from '../chart/share.ts'
 import { importSpecs } from '../chart/import.ts'
 import { variantMetrics } from '../chart/metrics.ts'
 import { validateChart } from '../chart/validate.ts'
@@ -140,6 +141,8 @@ export interface LibraryRow {
   /** 曲名・作者・持ち込み日・版の 1 行 */
   readonly line: string
   readonly fileName: string
+  /** 共有 URL にできるか（権利印が private でない。M4 の手順 5、design L286） */
+  readonly shareable: boolean
 }
 
 /** 持ち込み曲の一覧（殻の songs() と同じ曲名の順。持ち込み日は端末のローカル日付、無ければ —） */
@@ -150,7 +153,7 @@ export function libraryRows(charts: readonly Chart[]): LibraryRow[] {
       const by = c.source.composer === undefined ? '' : ` — ${c.source.composer}`
       const at = c.created === undefined || !Number.isFinite(Date.parse(c.created)) ? '—' : localDay(c.created)
       const vs = (c.variants ?? []).map((v) => v.id).join('・') || 'なし'
-      return { id: c.id, name: c.name, line: `${c.name}${by} ・ 持ち込み ${at} ・ 版 ${vs}`, fileName: chartFileName(c) }
+      return { id: c.id, name: c.name, line: `${c.name}${by} ・ 持ち込み ${at} ・ 版 ${vs}`, fileName: chartFileName(c), shareable: canShare(c) }
     })
 } // prettier-ignore
 

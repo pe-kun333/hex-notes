@@ -272,8 +272,8 @@ describe('S6 の持ち込み曲の一覧と文言', () => {
     const b = { ...(await imported({ play: 1, name: 'あめ' })), created: undefined }
     delete b.created
     expect(libraryRows([a, b])).toEqual([
-      { id: b.id, name: 'あめ', line: 'あめ — 作者 ・ 持ち込み — ・ 版 ableton/2/cut・ableton/3/cut・vmpk/2/cut・vmpk/3/cut', fileName: 'あめ.hexnote.json' },
-      { id: a.id, name: 'ゆき', line: 'ゆき — 作者 ・ 持ち込み 2026-11-01 ・ 版 ableton/2/cut・ableton/3/cut・vmpk/2/cut・vmpk/3/cut', fileName: 'ゆき.hexnote.json' },
+      { id: b.id, name: 'あめ', line: 'あめ — 作者 ・ 持ち込み — ・ 版 ableton/2/cut・ableton/3/cut・vmpk/2/cut・vmpk/3/cut', fileName: 'あめ.hexnote.json', shareable: false },
+      { id: a.id, name: 'ゆき', line: 'ゆき — 作者 ・ 持ち込み 2026-11-01 ・ 版 ableton/2/cut・ableton/3/cut・vmpk/2/cut・vmpk/3/cut', fileName: 'ゆき.hexnote.json', shareable: false },
     ])
     expect(libraryRows([])).toEqual([])
     expect(LIBRARY_EMPTY).toBe('持ち込み曲はありません（ホームの「＋ 曲を持ち込む」から）。')

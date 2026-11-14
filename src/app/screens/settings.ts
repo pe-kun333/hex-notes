@@ -42,6 +42,8 @@ import { updatePanel } from '../update-panel.ts'
 import { button, frame, h } from './frame.ts'
 import { calibText, limitText } from './home.ts'
 import { termsLine } from '../terms.ts'
+import { SHARE_REFUSAL_TEXT, encodeShare } from '../../chart/share.ts'
+import { SHARE_COPY_LABEL, SHARE_PRIVATE_NOTE, shareCopiedText, shareUrlOf } from '../share-view.ts'
 
 /** S6 の YouTube の校正の注記（仮、M3 の手順 9） */
 export const YOUTUBE_CALIB_NOTE =
@@ -227,6 +229,8 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
     library.replaceChildren(...(rows.length === 0 ? [h(doc, 'li', { className: 'note', text: LIBRARY_EMPTY })] : rows.map((row) =>
       h(doc, 'li', {}, h(doc, 'span', { text: row.line }), ' ',
         button(doc, '書き出す', () => void exportChart(row.id, row.fileName), 'small'),
+        // 共有 URL を写す（private の行は釦の代わりに訳。M4 の手順 5、design L286）
+        row.shareable ? button(doc, SHARE_COPY_LABEL, () => void copyShare(row.id), 'small') : h(doc, 'span', { className: 'note', text: SHARE_PRIVATE_NOTE }),
         confirmButton(doc, '削除', deleteSure(row.name), async () => {
           // 記録は残す（控えか曲のファイルで戻せる、§7-18）
           await booted.db.deleteChart(row.id).catch(() => {})
@@ -241,6 +245,36 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
     if (c === undefined) return say('書き出せませんでした（曲が見つかりません）。')
     say(downloadText(doc, fileName, chartFileText(c)) ? `「${c.name}」を書き出しました。` : '書き出せませんでした。')
   } // prettier-ignore
+  /** 共有 URL を作って写す（写せなければ下の欄に出して手で写してもらう。M4 の手順 5、decisions #124） */
+  const shareOut = h(doc, 'p', { className: 'shareout' })
+  shareOut.hidden = true
+  const copyShare = async (id: string): Promise<void> => {
+    const c = await booted.db.getChart(id).catch(() => undefined)
+    if (c === undefined) return say('共有 URL を作れませんでした（曲が見つかりません）。')
+    const e = await encodeShare(c)
+    if (!e.ok) return say(SHARE_REFUSAL_TEXT[e.reason])
+    const loc = doc.defaultView?.location
+    const url = shareUrlOf(loc?.origin ?? '', loc?.pathname ?? '/', e.fragment)
+    const copied = await (
+      doc.defaultView?.navigator.clipboard?.writeText(url) ?? Promise.reject(new Error('clipboard'))
+    ).then(
+      () => true,
+      () => false,
+    )
+    if (!alive) return
+    say(shareCopiedText(c.name, e.chars, copied))
+    if (copied) {
+      shareOut.hidden = true
+      return
+    }
+    const box = h(doc, 'input')
+    box.readOnly = true
+    box.value = url
+    box.setAttribute('aria-label', '共有 URL')
+    shareOut.replaceChildren(box)
+    shareOut.hidden = false
+    box.select()
+  }
   /** 全持ち込み曲の版を作り直す（保存時の fold のまま、§7-18） */
   const rebuildAll = async (): Promise<void> => {
     let done = 0
@@ -321,6 +355,7 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
     pending,
     h(doc, 'h3', { text: '持ち込み曲' }),
     library,
+    shareOut,
     h(doc, 'div', { className: 'btnrow' },
       button(doc, '全持ち込み曲の版を作り直す', () => void rebuildAll(), 'small'),
       h(doc, 'span', { className: 'note', text: '折り畳みは持ち込んだときのまま。記録は残ります。Safari は 7 日で消えることがあるので、曲ごとか控えで書き出してください。' }),

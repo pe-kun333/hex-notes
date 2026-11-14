@@ -54,10 +54,20 @@ import { attachKeyboard } from './dom-input.ts'
 import { STAMP_RING } from '../input/resolution.ts'
 import type { FinishedPlay, PracticeOptions } from './play-runner.ts'
 import { navigate, type Route, type ScreenId } from './router.ts'
-import { songList, type SongEntry } from './songs.ts'
+import { localSong, songList, type SongEntry } from './songs.ts'
 import { INITIAL_UPDATE, type UpdateState } from './sw-update.ts'
 import { createYoutubePlayer, type MountOptions } from './youtube-player.ts'
 import type { Heat } from '../results/heat.ts'
+import { decodeShare, isShareFragment } from '../chart/share.ts'
+import { rebuildChart } from './library-view.ts'
+import { shareConfirm, type ShareConfirm } from './share-confirm.ts'
+import {
+  SHARE_SAVE_FAILED,
+  shareOpenKind,
+  shareOpenedBand,
+  shareRefusedBand,
+} from './share-view.ts'
+import type { Chart } from '../shared/types.ts'
 
 /** 開発ページへの導線（dev のときだけ S1 に出す。build では空） */
 export interface DevPage {
@@ -313,6 +323,21 @@ export function startShell(opts: ShellOptions): Shell {
   let tutorial: TutorialRun | null = null
   let onboard: OnboardState | null = null
   let bundled: Promise<readonly string[]> | null = null
+  // 同梱曲と読んだ譜面の id の対（読めない曲は null。bundledIds と共有 URL の「同梱曲を開く」が使う）
+  let bundledPairs: Promise<readonly (readonly [SongEntry, string | null])[]> | null = null
+  const loadBundled = (): Promise<readonly (readonly [SongEntry, string | null])[]> =>
+    (bundledPairs ??= Promise.all(
+      (opts.songs ?? [])
+        .filter((s) => s.id.startsWith('bundled:'))
+        .map(async (s) => {
+          try {
+            const v = validateChart(await s.load())
+            return [s, v.ok ? v.chart.id : null] as const
+          } catch {
+            return [s, null] as const
+          }
+        }),
+    ))
   let view: ScreenView | null = null
   let song: SongEntry | null = null
   let keyset: KeysetId = 'all'
@@ -408,18 +433,7 @@ export function startShell(opts: ShellOptions): Shell {
       onboard = s
     },
     bundledIds: () =>
-      (bundled ??= Promise.all(
-        (opts.songs ?? [])
-          .filter((s) => s.id.startsWith('bundled:'))
-          .map(async (s) => {
-            try {
-              const v = validateChart(await s.load())
-              return v.ok ? v.chart.id : null
-            } catch {
-              return null
-            }
-          }),
-      ).then((ids) => ids.filter((x): x is string => x !== null))),
+      (bundled ??= loadBundled().then((ps) => ps.flatMap(([, id]) => (id === null ? [] : [id])))),
     calibration: () => calibration,
     saveCalibration: (kind, entry) => {
       saveCalibration(booted.local, kind, entry)
@@ -500,6 +514,82 @@ export function startShell(opts: ShellOptions): Shell {
     host.replaceChildren(view.root)
     host.focus({ preventScroll: true })
     renderBands()
+    // 共有 URL は S1 の上で開く（初回の端末は S0 の導線の後、プレイ中に来たら S1 に戻った時。M4 の手順 5）
+    if (route.screen === 'S1') void openShare()
+  }
+
+  // ---------- 共有 URL（M4 の手順 5、decisions #124） ----------
+  // 起動の時と hashchange で #c1= を読み、読んだらフラグメントを消す（履歴は増やさない）。S1 の上に確認の覆いを出し、
+  // 「保存して開く」で持ち込み曲と同じ道（版を作って charts に保存）。同じ id の持ち込み曲は上書きせず、同梱曲と同じ id は
+  // 保存せず、その曲を選んで S1 を描き直す。フラグメントはサーバーへ送られないので SW と precache は変えない
+  let shareFragment: string | null = null
+  let shareOpen: ShareConfirm | null = null
+  function takeShareHash(): void {
+    const loc = doc.defaultView?.location
+    if (loc === undefined || !isShareFragment(loc.hash)) return
+    shareFragment = loc.hash
+    doc.defaultView?.history.replaceState(null, '', loc.pathname + loc.search)
+  }
+  function closeShare(): void {
+    shareOpen?.el.remove()
+    shareOpen = null
+    host.focus({ preventScroll: true })
+  }
+  async function openShare(): Promise<void> {
+    if (shareFragment === null || shareOpen !== null || route.screen !== 'S1') return
+    const frag = shareFragment
+    shareFragment = null
+    const d = await decodeShare(frag)
+    if (!d.ok) {
+      band({ kind: 'share', on: true, ...shareRefusedBand(d.reason) })
+      return
+    }
+    const c = shareConfirm(doc, d.chart, {
+      open: () => void saveShared(d.chart),
+      cancel: closeShare,
+    })
+    shareOpen = c
+    doc.body.append(c.el)
+    c.primary.focus()
+  }
+  async function saveShared(chart: Chart): Promise<void> {
+    shareOpen?.busy(true)
+    const pairs = await loadBundled()
+    const ids = pairs.flatMap(([, id]) => (id === null ? [] : [id]))
+    const existing = await booted.db.getChart(chart.id).catch(() => undefined)
+    const kind = shareOpenKind(chart.id, ids, existing !== undefined)
+    let entry: SongEntry | null = null
+    if (kind === 'bundled') entry = pairs.find(([, id]) => id === chart.id)?.[0] ?? null
+    else if (kind === 'exists' && existing !== undefined) entry = localSong(existing)
+    else {
+      // 持ち込み曲と同じ道: 版を作って保存（作れなければそのまま。S1 の版はその場で作る）
+      let saved: Chart = { ...chart, created: new Date().toISOString() }
+      try {
+        saved = rebuildChart(saved)
+      } catch {
+        // 版を作れない譜面でも保存はする
+      }
+      const ok = await booted.db.putChart(saved).then(
+        () => true,
+        () => false,
+      )
+      if (!ok) {
+        closeShare()
+        band({ kind: 'share', on: true, ...SHARE_SAVE_FAILED })
+        return
+      }
+      entry = localSong(saved)
+    }
+    closeShare()
+    if (entry !== null) {
+      song = entry
+      keyset = 'all'
+      spec = null
+    }
+    // 既にある曲は手元の名前で知らせる（URL の曲名は申告で、違う事がある）
+    band({ kind: 'share', on: true, ...shareOpenedBand(kind, existing?.name ?? chart.name) })
+    // S1 を描き直して選んだ曲を出す（S1 → S1 は go では行けないので、その場で組み直す）
+    if (route.screen === 'S1') mount()
   }
 
   function go(to: ScreenId | 'back'): void {
@@ -533,7 +623,12 @@ export function startShell(opts: ShellOptions): Shell {
     view?.onResize?.()
     checkLayout()
   })
+  window.addEventListener('hashchange', () => {
+    takeShareHash()
+    void openShare()
+  })
 
+  takeShareHash()
   mount()
   return { band, route: () => route, updated: () => view?.onUpdate?.() }
 }

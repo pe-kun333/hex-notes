@@ -24,7 +24,14 @@ import {
  * 低負荷の段が自動で上がったとき、audioLate は発音の予約の遅れ（#47 (c)）
  */
 export type BandKind =
-  'ime' | 'sync' | 'videoFallback' | 'autoplayBlocked' | 'audioLate' | 'lowLoad' | 'storageFail'
+  | 'ime'
+  | 'share'
+  | 'sync'
+  | 'videoFallback'
+  | 'autoplayBlocked'
+  | 'audioLate'
+  | 'lowLoad'
+  | 'storageFail'
 
 /**
  * 並べる順（m6 L790–803 の ime → 自動再生 → 保存できません の間に、低負荷と予約の遅れを入れた。M3 の手順 3 で videoFallback を
@@ -32,6 +39,7 @@ export type BandKind =
  */
 export const BAND_ORDER: readonly BandKind[] = [
   'ime',
+  'share',
   'sync',
   'videoFallback',
   'autoplayBlocked',
@@ -81,6 +89,11 @@ export interface BandsState {
   readonly autoplayBlocked: { readonly title?: string; readonly detail?: string } | null
   /** S7c の帯（題は無ければ既定、釦「戻す」の活性。null は出さない。M3 の手順 3、仮） */
   readonly videoFallback: { readonly title?: string; readonly enabled: boolean } | null
+  /**
+   * 共有 URL を開いた・開けなかった知らせ（題と本文は殻が share-view.ts から渡す。閉じるあり。null は出さない。M4 の手順 5、
+   * decisions #124）
+   */
+  readonly share: { readonly title: string; readonly detail: string } | null
   /** 「閉じる」で閉じた帯（同じ種類の新しい知らせで開き直す） */
   readonly closed: readonly BandKind[]
 }
@@ -100,6 +113,9 @@ export type BandEvent =
   /** S7c の帯（題と釦の活性は画面が渡す。M3 の手順 3、仮） */
   | { kind: 'videoFallback'; on: true; title?: string; enabled: boolean }
   | { kind: 'videoFallback'; on: false }
+  /** 共有 URL の知らせ（M4 の手順 5） */
+  | { kind: 'share'; on: true; title: string; detail: string }
+  | { kind: 'share'; on: false }
   | { kind: 'dismiss'; band: BandKind }
 
 export function initialBands(): BandsState {
@@ -111,6 +127,7 @@ export function initialBands(): BandsState {
     sync: false,
     autoplayBlocked: null,
     videoFallback: null,
+    share: null,
     closed: [],
   }
 }
@@ -167,6 +184,23 @@ export function bandStep(s: BandsState, ev: BandEvent): BandsState {
           ...(ev.title === undefined ? {} : { title: ev.title }),
           enabled: ev.enabled,
         },
+      }
+    }
+    case 'share': {
+      if (!ev.on) return s.share === null ? s : { ...s, share: null }
+      const cur = s.share
+      if (
+        cur !== null &&
+        cur.title === ev.title &&
+        cur.detail === ev.detail &&
+        !s.closed.includes('share')
+      )
+        return s
+      // 新しい知らせは閉じていても開き直す
+      return {
+        ...s,
+        share: { title: ev.title, detail: ev.detail },
+        closed: reopen(s.closed, 'share'),
       }
     }
     case 'dismiss':
@@ -245,6 +279,10 @@ function bandOf(s: BandsState, kind: BandKind, opts: BandsOptions): Band | null 
             detail: LOWLOAD_DETAIL[s.lowLoad as Exclude<LowLoadLevel, 0>],
             dismissible: true,
           }
+        : null
+    case 'share':
+      return s.share !== null && open
+        ? { kind, title: s.share.title, detail: s.share.detail, dismissible: true }
         : null
     case 'storageFail':
       return s.storageFail.length > 0 && open
