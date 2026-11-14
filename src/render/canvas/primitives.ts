@@ -35,6 +35,9 @@ export type Tag =
   | 'edgeReturn'
   | 'flash'
   | 'judgeText'
+  | 'heatFan'
+  | 'heatDot'
+  | 'heatRing'
 
 /**
  * 色の名前。shade0〜3 は白鍵のセル（KEY_ROWS の段ごとの明度。数字段が暗く Z 段が明るい）、black は黒鍵のセル。
@@ -60,6 +63,10 @@ export type Paint =
   | 'hint'
   | 'hull'
   | 'flash'
+  | 'heatMiss'
+  | 'heatEarly'
+  | 'heatLate'
+  | 'heatRing'
   | `judge:${Judgment}`
 
 type Meta = {

@@ -139,7 +139,7 @@ describe('flush', () => {
     expect(calls).toContainEqual(['fillText', 'よい', 50, 20])
   })
 
-  it('パレットは全部の色の名前を持つ', () => {
-    expect(Object.keys(DARK_PALETTE)).toHaveLength(24)
+  it('パレットは全部の色の名前を持つ（M4 の手順 1 でヒートマップの 4 色を足して 28）', () => {
+    expect(Object.keys(DARK_PALETTE)).toHaveLength(28)
   })
 })
