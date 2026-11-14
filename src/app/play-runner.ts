@@ -115,6 +115,7 @@ import {
   type WeakBars,
 } from '../results/analysis.ts'
 import { resultRecord } from '../results/record.ts'
+import { EMPTY_HEAT, heatAdd, heatAddAll, type Heat } from '../results/heat.ts'
 import type { Chart, Profile, ResultRecord, Variant } from '../shared/types.ts'
 import {
   collectClock,
@@ -255,6 +256,11 @@ export interface Run {
   readonly returnLandMs: number | null
   /** 練習（RunOptions.practice。通常プレイは null） */
   readonly practice: PracticeRun | null
+  /**
+   * その回のヒートマップ（判定の事象と待ちの間の鍵違いから貯める。ループの巻き戻しで消えない。保存しない、decisions #118・
+   * #120。M4 の手順 2）
+   */
+  readonly heat: Heat
 }
 
 /** 画面がする事（出た順に効かせる） */
@@ -339,6 +345,7 @@ export function newRun(song: RunSong, opts: RunOptions): Run {
     pumpGated: false,
     returnLandMs: null,
     practice,
+    heat: EMPTY_HEAT,
   }
 } // prettier-ignore
 
@@ -428,6 +435,7 @@ function applyStep(r: Run, step: SessionStep, realNow: number, effects: RunEffec
     }),
     collect: collectClock(r.collect, step.out),
     judge: j.state,
+    heat: heatAddAll(r.heat, j.out),
     items,
     sched,
     returnLandMs: returned ? nextLandOf(r.notes, j.state) : returnLandMs,
@@ -512,7 +520,12 @@ export function runPress(
     return { run: waitPressRun(r1, r1.practice, press, now, effects), effects }
   if (phase !== 'playing' && phase !== 'syncing') return { run: r1, effects }
   const j = judgePress(r1.judge, press, { map: r1.map, now })
-  const r2: Run = { ...r1, judge: j.state, collect: collectPress(r1.collect, press.lag) }
+  const r2: Run = {
+    ...r1,
+    judge: j.state,
+    heat: heatAddAll(r1.heat, j.out),
+    collect: collectPress(r1.collect, press.lag),
+  }
   effects.push(...judgeEffects(r2, j.out, now))
   return { run: r2, effects }
 }
@@ -547,6 +560,14 @@ function waitPressRun(
   const w = waitPress(p.wait, press.code)
   const r1: Run = { ...r, practice: { ...p, wait: w.state } }
   if (w.press.kind === 'wrong') {
+    // ヒートマップ: 待っている組のまだ当てていない音を相手にする（decisions #120 (a)）
+    const waiting = (p.wait.group?.notes ?? [])
+      .filter((x) => !p.wait.hit.includes(x.index))
+      .map((x) => x.code)
+    const r1h: Run = {
+      ...r1,
+      heat: heatAdd(r1.heat, { kind: 'waitWrong', code: press.code, waiting }),
+    }
     if (r.opts.keyclick) {
       const layout = r.song.variant.layout
       const stray = {
@@ -558,11 +579,11 @@ function waitPressRun(
       const plan = keyclickFor(stray, (c: KeyCode) => midiOf(layout, c))
       if (plan !== null) effects.push({ kind: 'keyclick', plan })
     }
-    return r1
+    return r1h
   }
   if (w.press.kind !== 'hit') return r1
   const j = judgeWaitHit(r1.judge, w.press.index, { tainted: w.press.tainted })
-  const r2: Run = { ...r1, judge: j.state }
+  const r2: Run = { ...r1, judge: j.state, heat: heatAddAll(r1.heat, j.out) }
   effects.push(...judgeEffects(r2, j.out, now))
   return w.press.done ? releaseWait(r2, now, effects) : r2
 }
@@ -744,7 +765,7 @@ export function runRelease(
   const effects: RunEffect[] = []
   const r1 = applyStep(r, sessionIdle(r.session, now), now, effects)
   const j = judgeRelease(r1.judge, rel, { map: r1.map, now })
-  const r2: Run = { ...r1, judge: j.state }
+  const r2: Run = { ...r1, judge: j.state, heat: heatAddAll(r1.heat, j.out) }
   effects.push(...judgeEffects(r2, j.out, now))
   return { run: r2, effects }
 }
@@ -767,7 +788,7 @@ export function runFrame(
   // 待ちは掃き出しより先（途切れたフレームの後でも、待つ音を MISS にせず止める）
   if (next.practice !== null) next = waitStopFirst(next, now, effects)
   const j = judgeSweep(next.judge, { map: next.map, now })
-  next = { ...next, judge: j.state }
+  next = { ...next, judge: j.state, heat: heatAddAll(next.heat, j.out) }
   effects.push(...judgeEffects(next, j.out, now))
   if (next.practice !== null) {
     const misses = j.out.flatMap((o) => (o.kind === 'miss' ? [o.index] : []))
@@ -869,6 +890,8 @@ export interface PlayResult {
   readonly syncUsed: SyncUsed
   /** 曲末より前に動画が終わった（S3 の注記「動画が先に終わりました」、m3-kickoff §7-16） */
   readonly videoEnded: boolean
+  /** その回のヒートマップ（保存しない。S3 から S4 へ持ち越す。動画の回も、decisions #118。M4 の手順 2） */
+  readonly heat?: Heat
 }
 
 /** 練習の要約（m6 L451「測ること」: ループの回数・テンポ段の始めと終わり・待った回数、§7-20） */
@@ -963,7 +986,13 @@ export function runOutcome(r: Run): PlayResult {
     clock: r.video === null ? 'novideo' : 'video',
     syncUsed: syncUsedOf(r),
     videoEnded: r.videoEnded,
+    heat: r.heat,
   }
+}
+
+/** ヒートマップを消す（S4 の「消す」。判定は変えない） */
+export function runClearHeat(r: Run): Run {
+  return r.heat.size === 0 ? r : { ...r, heat: EMPTY_HEAT }
 }
 
 /** 保存した記録を持つ終わった回（S3 へ） */

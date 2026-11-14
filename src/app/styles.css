@@ -924,6 +924,54 @@ table.tracks th {
   font-size: 14px;
 }
 
+/* S4 のヒートマップのカード（M4 の手順 2。色は描画のパレットと同じ値: m6 の --heat-early・--heat-late・--heat-miss） */
+.practice-panel .self {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.practice-panel .heattoggle {
+  margin-left: auto;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.practice-panel .heat .btnrow > .note {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.practice-panel .heatlegend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+}
+
+.practice-panel .heatlegend .sw {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.practice-panel .heatlegend .sw.miss {
+  background: #f06a6a;
+}
+
+.practice-panel .heatlegend .sw.early {
+  background: #62a6f2;
+}
+
+.practice-panel .heatlegend .sw.late {
+  background: #f2a452;
+}
+
+.practice-panel .heatlegend .sw.ring {
+  border: 1.5px solid currentColor;
+}
+
 /* S4 の足場外し（M2-04。折り畳みの中: 9 マス・手動／成績連動・音高ごとの棒） */
 .practice-panel .fadebox summary {
   cursor: pointer;

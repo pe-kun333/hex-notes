@@ -14,6 +14,26 @@ import { TEMPO_NOVIDEO } from '../practice/tempo.ts'
 import type { WaitMode } from '../practice/wait.ts'
 import type { LayoutId, Profile, SelfRate } from '../shared/types.ts'
 import type { PracticeOptions } from './play-runner.ts'
+import type { HeatSummary } from '../results/heat.ts'
+
+/** ヒートマップの要約（m4 updateHeatInfo L495–496 を手直し: 隣でない誤打を分けて出す。色だけで伝えない、H-5。M4 の手順 2） */
+export function heatSummaryText(s: HeatSummary): string {
+  if (s.keys === 0) return 'まだデータがありません。'
+  const other = s.other > 0 ? `（うち隣でない物 ${s.other} 回）` : ''
+  return `${s.keys} キーに記録。誤打 ${s.wrong} 回${other}、タイミング ${s.timing} 回。`
+}
+
+/** ヒートマップの凡例（m4 L188、m6 の色の名前。扇は誤打の色、遅いは橙、decisions #120 (b)） */
+export const HEAT_LEGEND: readonly { readonly cls: string; readonly text: string }[] = [
+  { cls: 'miss', text: '扇 ＝ 誤打の向き（長さ ＝ 回数）' },
+  { cls: 'early', text: '早い' },
+  { cls: 'late', text: '遅い（丸 ＝ 平均）' },
+  { cls: 'ring', text: '輪 ＝ ばらつき' },
+]
+
+/** 鍵盤図に描くのは待機と一時停止の間だけ（演奏中は落ちる音と重なる。m4-kickoff §7-8、decisions #121 (c)） */
+export const HEAT_NOTE =
+  '待機中と一時停止中だけ鍵盤図に重ねます（演奏中は消えます）。重ねている間は落ちるセルを隠します。保存しません。'
 
 export interface WaitChoice {
   readonly value: WaitMode

@@ -12,6 +12,8 @@ import type { LayoutId, SelfRate } from '../shared/types.ts'
 import type { PracticeOptions } from './play-runner.ts'
 import {
   FADE_NOTE,
+  HEAT_LEGEND,
+  HEAT_NOTE,
   LABEL_SIDE_CHOICES,
   fadeBars,
   manualValue,
@@ -51,6 +53,10 @@ export interface PanelState {
   readonly fade: FadeState
   readonly pitches: readonly number[]
   readonly fadeFrozen: boolean
+  /** ヒートマップ（M4 の手順 2）: 表示の切替と要約の文（heatSummaryText） */
+  readonly heatOn: boolean
+  readonly heatText: string
+  readonly heatEmpty: boolean
 }
 
 export interface PracticePanel {
@@ -69,6 +75,9 @@ export function practicePanel(
     readonly fade: (patch: Partial<FadeState>) => void
     readonly fullPlay: () => void
     readonly home: () => void
+    /** ヒートマップの表示の切替と「消す」（M4 の手順 2） */
+    readonly heatShow: (on: boolean) => void
+    readonly heatClear: () => void
   },
 ): PracticePanel {
   let last = ''
@@ -89,6 +98,29 @@ export function practicePanel(
   autoLoop.type = 'checkbox'
   autoLoop.addEventListener('change', () => on.change({ autoLoop: autoLoop.checked }))
   const selfText = h(doc, 'b')
+  // ヒートマップのカード（m4 L186–190・m6 L433–447。M4 の手順 2）。左列は 1093×514 でちょうど入る高さなので行を足さない:
+  // 表示の切替は自力率の行の右端、要約・凡例・「消す」は足場外しの折り畳みの中（decisions #121 (d)）
+  const heatBox = h(doc, 'input')
+  heatBox.type = 'checkbox'
+  heatBox.addEventListener('change', () => on.heatShow(heatBox.checked))
+  const heatText = h(doc, 'span', { className: 'note' })
+  const heatClear = button(doc, '消す', () => on.heatClear(), 'small')
+  const heatLegend = h(
+    doc,
+    'p',
+    { className: 'note heatlegend' },
+    ...HEAT_LEGEND.flatMap((x) => [
+      h(doc, 'i', { className: `sw ${x.cls}` }),
+      h(doc, 'span', { text: x.text }),
+    ]),
+  )
+  const heatToggle = h(doc, 'label', { className: 'heattoggle' }, heatBox, ' ヒートマップ')
+  heatToggle.title = HEAT_NOTE
+  const heatSection = h(doc, 'section', { className: 'heat' },
+    h(doc, 'h3', { text: 'ヒートマップ' }),
+    h(doc, 'div', { className: 'btnrow' }, heatText, heatClear),
+    heatLegend,
+    h(doc, 'p', { className: 'note', text: HEAT_NOTE })) // prettier-ignore
   // 鍵数制限（入門者だけ。1 行に収め、説明は title）
   const keysetSeg = seg('keyset')
   const keysetHead = h(doc, 'span', { className: 'label', text: '鍵数制限' })
@@ -113,7 +145,8 @@ export function practicePanel(
     text: '退避（幾何）の間はキー文字を常に出し、透明度は動きません。',
   })
   const fadeBox = h(doc, 'details', { className: 'fadebox' },
-    h(doc, 'summary', { text: '足場外し（ラベルの透明度）・自力率の内訳' }),
+    h(doc, 'summary', { text: '足場外し・自力率の内訳・ヒートマップの要約' }),
+    heatSection,
     h(doc, 'p', { className: 'note', text: FADE_NOTE }),
     nine,
     h(doc, 'div', { className: 'btnrow' }, fadeSeg, manual, manualText,
@@ -179,6 +212,9 @@ export function practicePanel(
     }))
     frozenNote.hidden = !s.fadeFrozen
     parts.textContent = selfPartsText(s.self)
+    heatBox.checked = s.heatOn
+    heatText.textContent = s.heatText
+    heatClear.disabled = s.heatEmpty
     const ln = keysetLayoutNote(s.layout)
     keysetRow.title = ln === null ? KEYSET_NOTE : `${KEYSET_NOTE} ${ln}`
   } // prettier-ignore
@@ -201,7 +237,7 @@ export function practicePanel(
         }, 'small'),
         h(doc, 'label', { className: 'note' }, autoLoop, ' 自動ループ'))),
     keysetRow,
-    h(doc, 'p', { className: 'self' }, '自力率 ', selfText),
+    h(doc, 'p', { className: 'self' }, h(doc, 'span', {}, '自力率 ', selfText), heatToggle),
     fadeBox,
     h(doc, 'div', { className: 'btnrow' },
       button(doc, '通しで弾く → プレイ', () => on.fullPlay(), 'primary'),
@@ -229,6 +265,9 @@ export function practicePanel(
         s.fade,
         s.pitches,
         s.fadeFrozen,
+        s.heatOn,
+        s.heatText,
+        s.heatEmpty,
         pending,
       ])
       if (key === last) return
