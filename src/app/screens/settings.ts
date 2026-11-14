@@ -19,7 +19,8 @@ import {
   makeBackup,
   type Backup,
 } from '../../storage/file.ts'
-import { defaultSettings, offsetFor } from '../../storage/local.ts'
+import { defaultSettings, loadDaily, offsetFor, saveDaily } from '../../storage/local.ts'
+import { dailyMerge } from '../../results/daily.ts'
 import { PROFILE_NAMES, applyProfileDefaults } from '../profile.ts'
 import { calibrationPanel } from '../calibration-panel.ts'
 import { chordTestPanel, saveDeviceLimit, type ChordTestPanel } from '../chord-test-panel.ts'
@@ -212,7 +213,7 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
   const exportBackup = async (): Promise<void> => {
     const at = new Date().toISOString()
     const [charts, results] = await Promise.all([booted.db.listCharts(), booted.db.listResults()])
-    const b = makeBackup({ settings: ctx.settings(), fade: ctx.fade(), charts, results }, at)
+    const b = makeBackup({ settings: ctx.settings(), fade: ctx.fade(), charts, results, daily: loadDaily(booted.local) }, at)
     say(downloadText(doc, backupFileName(at), backupFileText(b)) ? `控えを書き出しました（記録 ${results.length} 件）。` : '書き出せませんでした。')
   } // prettier-ignore
   // ---------- 持ち込み曲（M2-06） ----------
@@ -299,6 +300,8 @@ export function settingsScreen(ctx: ScreenContext): ScreenView {
     const { keep, bundled } = backupCharts(b.charts, await ctx.bundledIds())
     for (const c of keep) await booted.db.putChart(c).catch(() => {})
     for (const r of b.results) await booted.db.putResult(r).catch(() => {})
+    // デイリーの達成は手元に書いた日を優先して足す（M4 の手順 6、decisions #125）
+    if (b.daily !== undefined) saveDaily(booted.local, dailyMerge(loadDaily(booted.local), b.daily))
     if (withSettings) {
       ctx.saveSettings(b.settings)
       ctx.saveFade(b.fade)
