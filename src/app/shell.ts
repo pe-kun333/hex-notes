@@ -54,7 +54,7 @@ import { attachKeyboard } from './dom-input.ts'
 import { STAMP_RING } from '../input/resolution.ts'
 import type { FinishedPlay, PracticeOptions } from './play-runner.ts'
 import { navigate, type Route, type ScreenId } from './router.ts'
-import { localSong, songList, type SongEntry } from './songs.ts'
+import { TUTORIAL_SONG_ID, localSong, songList, type SongEntry } from './songs.ts'
 import { INITIAL_UPDATE, type UpdateState } from './sw-update.ts'
 import { createYoutubePlayer, type MountOptions } from './youtube-player.ts'
 import type { Heat } from '../results/heat.ts'
@@ -138,6 +138,11 @@ export interface ScreenContext {
   setOnboard(s: OnboardState | null): void
   /** 同梱曲の chartId（「同梱 10 曲完走」を数える。初めて呼んだときに譜面を読んで覚える、手順 11） */
   bundledIds(): Promise<readonly string[]>
+  /**
+   * デイリーの曲の候補（チュートリアル曲を除く同梱曲の chartId、一覧の順。読めない曲は入れない。M4 の手順 7、decisions #125 (b)・
+   * #126）
+   */
+  dailyPool(): Promise<readonly string[]>
   /** 校正（起動で読んだ値に、この後の保存を重ねた物。S1 の上帯・S2 の判定が読む） */
   calibration(): Calibration
   /** 1 つの音源種別の校正を保存する（hexnote.calibration。置き場が壊れていてもメモリ内で続く、decisions #50） */
@@ -432,6 +437,10 @@ export function startShell(opts: ShellOptions): Shell {
     setOnboard: (s) => {
       onboard = s
     },
+    dailyPool: () =>
+      loadBundled().then((ps) =>
+        ps.flatMap(([s, id]) => (id === null || s.id === TUTORIAL_SONG_ID ? [] : [id])),
+      ),
     bundledIds: () =>
       (bundled ??= loadBundled().then((ps) => ps.flatMap(([, id]) => (id === null ? [] : [id])))),
     calibration: () => calibration,

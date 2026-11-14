@@ -20,7 +20,16 @@ import {
   type ResultRecord,
 } from '../../shared/types.ts'
 import { localDay, streakDays } from '../../results/awards.ts'
-import { offsetFor } from '../../storage/local.ts'
+import { loadDaily, offsetFor } from '../../storage/local.ts'
+import { calendarOf, dailyOf } from '../../results/daily.ts'
+import {
+  DAILY_TITLE,
+  calendarLayout,
+  calendarTitle,
+  CAL_R,
+  dailyCardOf,
+  dayLabel,
+} from '../daily-view.ts'
 import { signedMs } from '../calibration.ts'
 import {
   LIMIT_NOTE,
@@ -133,7 +142,10 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
   }
   // 曲を持ち込む（S5）は初回でないときだけ（m6 L312）
   if (!first) sortRow.append(button(doc, '＋ 曲を持ち込む', () => ctx.go('S5'), 'import-entry'))
-  f.body.append(sortRow, list, panel)
+  // 今日の 1 曲と六角カレンダー（M4 の手順 7、decisions #126。曲を読んでから描く。デイリーが無ければ隠す）
+  const dailyBox = h(doc, 'section', { className: 'card daily' })
+  dailyBox.hidden = true
+  f.body.append(dailyBox, sortRow, list, panel)
 
   let loaded: Loaded[] = []
   let failed: Failed[] = []
@@ -193,6 +205,86 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
     )
     return b
   }
+
+  /** 今日の 1 曲のカードと今月の六角カレンダー（同梱曲が読めた後） */
+  async function showDaily(): Promise<void> {
+    const pool = await ctx.dailyPool()
+    if (!alive) return
+    const today = localDay(new Date().toISOString())
+    const id = dailyOf(today, pool)
+    if (id === null) {
+      dailyBox.hidden = true
+      return
+    }
+    const log = loadDaily(booted.local)
+    const bundledOf = (cid: string): Loaded | undefined => loaded.find((x) => x.chart.id === cid && x.entry.id.startsWith('bundled:'))
+    const l = bundledOf(id)
+    const card = dailyCardOf(l?.entry.name ?? '（読めません）', log.days[today] !== undefined, pool.length)
+    const play = button(doc, '弾く', () => {
+      if (l === undefined) return
+      // その曲の譜面版の選択へ（絞り込みは「すべて」に戻す）
+      filter = 'all'
+      if (filters !== null) showFilter()
+      selected = l.entry.id
+      layoutPick = null
+      limitPick = null
+      videoPick = null
+      makeError = ''
+      showList()
+      panel.scrollIntoView?.({ block: 'nearest' })
+    }, 'primary small')
+    play.disabled = l === undefined
+    const head = h(doc, 'div', { className: 't' }, h(doc, 'h3', { text: DAILY_TITLE }), h(doc, 'span', { className: 'name', text: card.name }))
+    if (card.done) head.append(h(doc, 'span', { className: 'pill good', text: '達成 ✓' }))
+    head.append(play)
+    const [y, m] = today.split('-').map(Number)
+    const cells = calendarOf(log, pool, y ?? 1970, m ?? 1, today)
+    dailyBox.replaceChildren(head, h(doc, 'p', { className: 'note', text: card.note }), calendarSvg(cells, y ?? 1970, m ?? 1, (cid) => bundledOf(cid)?.entry.name))
+    dailyBox.hidden = false
+  } // prettier-ignore
+
+  /** 六角カレンダー（SVG。達成した日を塗り「✓」、今日を輪。日付の数字は全部の日に出す） */
+  function calendarSvg(cells: ReturnType<typeof calendarOf>, year: number, month: number, nameOf: (id: string) => string | undefined): Element {
+    const NS = 'http://www.w3.org/2000/svg'
+    const lay = calendarLayout(cells)
+    const svg = doc.createElementNS(NS, 'svg')
+    svg.setAttribute('class', 'hexcal')
+    svg.setAttribute('viewBox', `0 0 ${lay.width.toFixed(1)} ${lay.height.toFixed(1)}`)
+    svg.setAttribute('width', lay.width.toFixed(1))
+    svg.setAttribute('height', lay.height.toFixed(1))
+    svg.setAttribute('role', 'img')
+    svg.setAttribute('aria-label', `${calendarTitle(year, month)}のデイリー（達成 ${cells.filter((c) => c.done).length} 日）`)
+    const r = CAL_R * 0.94
+    for (const d of lay.days) {
+      const g = doc.createElementNS(NS, 'g')
+      const cls = ['day', d.cell.done ? 'done' : '', d.cell.today ? 'today' : '', d.cell.chartId === null && !d.cell.done ? 'future' : ''].filter((x) => x !== '').join(' ')
+      g.setAttribute('class', cls)
+      const t = doc.createElementNS(NS, 'title')
+      t.textContent = dayLabel(d.cell, nameOf)
+      const poly = doc.createElementNS(NS, 'polygon')
+      const pts: string[] = []
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI / 180) * (60 * i - 30)
+        pts.push(`${(d.x + r * Math.cos(a)).toFixed(1)},${(d.y + r * Math.sin(a)).toFixed(1)}`)
+      }
+      poly.setAttribute('points', pts.join(' '))
+      const num = doc.createElementNS(NS, 'text')
+      num.setAttribute('x', d.x.toFixed(1))
+      num.setAttribute('y', (d.y + (d.cell.done ? -2 : 0)).toFixed(1))
+      num.textContent = String(d.cell.date)
+      g.append(t, poly, num)
+      if (d.cell.done) {
+        const mark = doc.createElementNS(NS, 'text')
+        mark.setAttribute('class', 'mark')
+        mark.setAttribute('x', d.x.toFixed(1))
+        mark.setAttribute('y', (d.y + 8).toFixed(1))
+        mark.textContent = '✓'
+        g.append(mark)
+      }
+      svg.append(g)
+    }
+    return h(doc, 'div', { className: 'calwrap' }, h(doc, 'p', { className: 'note', text: calendarTitle(year, month) }), svg as unknown as HTMLElement)
+  } // prettier-ignore
 
   function showPanel(): void {
     const l = loaded.find((x) => x.entry.id === selected && shown(x.entry))
@@ -336,6 +428,7 @@ export function homeScreen(ctx: ScreenContext): ScreenView {
     loaded = results.filter((x): x is Loaded => 'card' in x)
     failed = results.filter((x): x is Failed => !('card' in x))
     showList()
+    await showDaily()
   })()
 
   // 開発ページへの導線（dev のときだけ）

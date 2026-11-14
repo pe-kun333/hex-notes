@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { awardsFor, countsForAwards, isTargetPlay } from '../../../src/results/awards.ts'
+import { EMPTY_DAILY, dailyAfterPlay } from '../../../src/results/daily.ts'
 import type { ResultRecord } from '../../../src/shared/types.ts'
 import { EMBED_ATTRS, embedSrc } from '../../../src/youtube/embed.ts'
 import { ERROR_GROUPS_CHECKED, errorGroupOf } from '../../../src/youtube/errors.ts'
@@ -56,6 +57,15 @@ describe('動画の回は称号の集計に入らない（期待値 (5)、III.F.
     const a = rec({ kind: 'audio' })
     expect([isTargetPlay(a), countsForAwards(a)]).toEqual([true, true])
     expect(awardsFor([], a, opts).titles).toEqual(['初クリア', '同梱 1 曲完走'])
+  }) // prettier-ignore
+
+  it('デイリーも同じ（M4 の手順 7、照合表の III.F.3.c の行・decisions #116 (e)）: その日の曲を動画の回で完走しても達成にならず鍵は変わらない、自前音源なら達成', () => {
+    const dayOf = (at: string) => at.slice(0, 10)
+    // 2026-11-12 の通し番号 20,769 は奇数なので、2 曲の pool では 2 曲目（c1）がその日の曲
+    const pool = ['c0', 'c1']
+    for (const r of [rec({ kind: 'youtube', videoId: 'M7lc1UVf-VE' }), rec({ kind: 'youtube', videoId: 'M7lc1UVf-VE', fallbackAt: 0 }), rec({ kind: 'audio', fallbackAt: 0 })])
+      expect(dailyAfterPlay(EMPTY_DAILY, r, pool, dayOf)).toBe(EMPTY_DAILY)
+    expect(dailyAfterPlay(EMPTY_DAILY, rec({ kind: 'audio' }), pool, dayOf).days).toEqual({ '2026-11-12': 'c1' })
   }) // prettier-ignore
 })
 
