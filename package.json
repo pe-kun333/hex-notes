@@ -36,7 +36,7 @@
   "devDependencies": {
     "@types/node": "24.19.2",
     "license-checker-rseidelsohn": "5.0.1",
-    "prettier": "3.9.10",
+    "prettier": "3.10.1",
     "typescript": "7.0.2",
     "vite": "8.3.5",
     "vite-plugin-pwa": "2.0.0",
